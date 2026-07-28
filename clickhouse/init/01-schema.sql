@@ -1,0 +1,13 @@
+-- OPA smoke-test ClickHouse init.
+--
+-- Schema ownership: the AGENT now owns the full schema via schema.go's
+-- BootstrapSchema (CREATE TABLE IF NOT EXISTS for every table it reads/writes,
+-- run at startup). Previously this file ALSO created a subset of tables — but
+-- because ClickHouse init runs first, those stale definitions won the race
+-- and the agent's correct CREATE ... IF NOT EXISTS became a no-op, so newer
+-- columns (logs.id/fields, error_instances.error_type, rum_events.navigation_timing,
+-- http_requests_count, …) were missing and many /api/* endpoints returned 500.
+--
+-- To keep a single source of truth we now only ensure the database here and let
+-- the agent create every table + seed the demo tenant (see BootstrapSchema).
+CREATE DATABASE IF NOT EXISTS opa;

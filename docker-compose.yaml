@@ -1,0 +1,178 @@
+# Top-level OPA smoke-test stack: ClickHouse + agent + MySQL + PHP(+extension) + Node + dashboard.
+# There is no such compose in any of the three repos today (Phase 1 deliverable).
+# Usage:
+#   docker compose build            # (images are prebuilt as *:smoke; build re-creates them)
+#   docker compose up -d clickhouse mysql agent dashboard node-app
+#   docker compose run --rm php-cli # one-shot: runs the PHP smoke harness
+#   docker compose --profile smoke run --rm node-smoke   # one-shot: curls the node demo app
+#   harness/node-smoke.sh           # same curls, from the host (node-app publishes :3000)
+#   harness/rum-smoke.sh            # POST a canned RUM beacon to the agent
+name: opa-stack
+
+services:
+  clickhouse:
+    image: clickhouse/clickhouse-server:24.3
+    container_name: opa_clickhouse
+    environment:
+      # Keep the passwordless `default` user usable over the network and stop the
+      # entrypoint from writing default-user.xml into the read-only users.d mount.
+      CLICKHOUSE_SKIP_USER_SETUP: "1"
+    ulimits:
+      nofile: { soft: 262144, hard: 262144 }
+    volumes:
+      - ./clickhouse/init:/docker-entrypoint-initdb.d:ro
+      - ./clickhouse/users.d:/etc/clickhouse-server/users.d:ro
+    ports:
+      - "8123:8123"
+    healthcheck:
+      test: ["CMD", "clickhouse-client", "--query", "SELECT 1"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  mysql:
+    image: mysql:8.0
+    container_name: opa_mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: app
+      MYSQL_USER: app
+      MYSQL_PASSWORD: app
+    command: --default-authentication-plugin=mysql_native_password
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-proot"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  agent:
+    image: opa-agent:smoke
+    container_name: opa_agent
+    depends_on:
+      clickhouse:
+        condition: service_healthy
+    environment:
+      TRANSPORT_TCP: ":9090"           # extension connects here (host:port)
+      CLICKHOUSE_URL: "http://clickhouse:8123"
+      WS_PORT: "8082"
+      # auth.go now fails closed if JWT_SECRET is unset/placeholder/<32 bytes.
+      JWT_SECRET: "smoke-test-jwt-secret-please-change-in-prod-0123456789"
+      OPA_WS_ALLOWED_ORIGINS: "http://localhost:8088"
+      OPA_REDACT: "1"
+    ports:
+      - "8080:8080"   # admin/query API
+      - "2112:2112"   # prometheus metrics
+      - "8082:8082"   # websocket
+      - "9090:9090"   # ND-JSON ingest
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "-", "http://localhost:8080/api/health"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  dashboard:
+    image: opa-dashboard:smoke
+    container_name: opa_dashboard
+    depends_on:
+      - agent
+    ports:
+      - "8088:80"     # http://localhost:8088
+
+  # One-shot harness. `docker compose run --rm php-cli`
+  redis:
+    image: redis:7-alpine
+    container_name: opa_redis
+    # No host port mapping: only php-cli (inside the compose network) talks to
+    # redis, and host 6379 may already be taken by another project's Redis.
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  php-cli:
+    image: opa-php:smoke
+    container_name: opa_php_cli
+    depends_on:
+      mysql:
+        condition: service_healthy
+      agent:
+        condition: service_started
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./harness:/harness:ro
+    environment:
+      OPA_ENABLED: "1"
+      OPA_SOCKET_PATH: "agent:9090"    # TCP transport to the agent
+      OPA_SAMPLING_RATE: "1.0"
+      OPA_FULL_CAPTURE_THRESHOLD_MS: "0"
+      OPA_EXPAND_SPANS: "1"
+      OPA_REDACT_SQL: "1"
+      # Observe internal functions/methods too, so Redis (and other internal I/O)
+      # is captured, not just userland calls.
+      OPA_COLLECT_INTERNAL_FUNCTIONS: "1"
+      OPA_DEBUG_LOG: "1"
+      OPA_SERVICE: "php-smoke"
+      OPA_ORGANIZATION_ID: "test-org"
+      OPA_PROJECT_ID: "default-project"
+      OPA_LANGUAGE: "php"
+      OPA_LANGUAGE_VERSION: "8.4"
+      MYSQL_HOST: "mysql"
+      MYSQL_DATABASE: "app"
+      MYSQL_USER: "app"
+      MYSQL_PASSWORD: "app"
+      REDIS_HOST: "redis"
+      REDIS_PORT: "6379"
+    entrypoint: ["/usr/local/bin/docker-entrypoint-custom.sh"]
+    command: ["php", "-d", "apc.enable_cli=1", "/harness/smoke.php"]
+
+  # Always-on Node demo app instrumented with opa-node (zero-dependency, so the
+  # sibling repo can be bind-mounted read-only and run straight off the stock
+  # node image — no npm install, no build step).
+  node-app:
+    image: node:20-alpine
+    container_name: opa_node_app
+    restart: unless-stopped
+    depends_on:
+      agent:
+        condition: service_started
+    volumes:
+      # ../opa-node == /Users/nicolasmeloni/Documents/repos/opa-node (sibling checkout)
+      - ../opa-node:/opa-node:ro
+    working_dir: /opa-node
+    environment:
+      OPA_SOCKET_PATH: "agent:9090"    # TCP transport to the agent
+      OPA_SERVICE: "node-smoke"
+      OPA_ORGANIZATION_ID: "test-org"
+      OPA_PROJECT_ID: "default-project"
+      PORT: "3000"                     # example/app.js reads process.env.PORT
+    command: ["node", "example/app.js"]
+    ports:
+      - "3000:3000"   # so harness/node-smoke.sh works from the host
+    healthcheck:
+      # busybox wget; /hello exercises the outbound-http instrumentation too.
+      test: ["CMD", "wget", "-q", "-O", "-", "http://localhost:3000/hello"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  # One-shot node smoke: `docker compose --profile smoke run --rm node-smoke`
+  node-smoke:
+    image: curlimages/curl:8.10.1
+    container_name: opa_node_smoke
+    profiles: ["smoke"]
+    depends_on:
+      node-app:
+        condition: service_healthy
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        set -e
+        for i in 1 2 3 4 5; do
+          echo "--- pass $$i /hello"
+          curl -fsS http://node-app:3000/hello; echo
+          echo "--- pass $$i /db"
+          curl -fsS http://node-app:3000/db; echo
+        done
+        echo "node-smoke: OK"
