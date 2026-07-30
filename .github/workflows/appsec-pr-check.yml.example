@@ -1,0 +1,16 @@
+# Example — AppSec PR check against a running OPA Agent.
+name: opa-appsec-pr-check
+on:
+  workflow_dispatch:
+  pull_request:
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: OPA security PR check
+        env:
+          AGENT_URL: ${{ secrets.OPA_AGENT_URL }}
+        run: |
+          resp=$(curl -fsS "$AGENT_URL/api/security/pr-check")
+          echo "$resp"
+          echo "$resp" | grep -q '"status":"fail"' && exit 1 || true
