@@ -1,0 +1,146 @@
+# shellcheck shell=bash
+# Shared helpers for OPA-stack wave smoke scripts.
+
+AGENT_HTTP="${AGENT_HTTP:-http://127.0.0.1:8080}"
+ORG_ID="${ORG_ID:-test-org}"
+PROJECT_ID="${PROJECT_ID:-default-project}"
+SMOKE_TIMEOUT_S="${SMOKE_TIMEOUT_S:-5}"
+SMOKE_STRICT="${SMOKE_STRICT:-0}" # 1 = treat soft failures as hard
+
+PASS=0
+FAIL=0
+SOFT=0
+
+smoke_reset_counters() { PASS=0; FAIL=0; SOFT=0; }
+
+section() {
+  printf '\n======== %s ========\n' "$1"
+}
+
+ok() {
+  PASS=$((PASS + 1))
+  printf '  OK  %s\n' "$1"
+}
+
+fail() {
+  FAIL=$((FAIL + 1))
+  printf '  FAIL %s\n' "$1" >&2
+  if [[ "${SMOKE_STRICT}" == "1" ]]; then
+    return 1
+  fi
+  return 0
+}
+
+soft() {
+  SOFT=$((SOFT + 1))
+  printf '  SOFT %s\n' "$1"
+}
+
+# http_code METHOD PATH [curl args...]
+# prints body to stdout; sets global LAST_HTTP
+LAST_HTTP=0
+http_req() {
+  local method="$1" path="$2"
+  shift 2
+  local url="${AGENT_HTTP}${path}"
+  local tmp
+  tmp="$(mktemp)"
+  set +e
+  LAST_HTTP=$(curl -sS -o "$tmp" -w '%{http_code}' \
+    --connect-timeout "$SMOKE_TIMEOUT_S" --max-time "$SMOKE_TIMEOUT_S" \
+    -X "$method" "$@" "$url")
+  local rc=$?
+  set -e
+  if [[ $rc -ne 0 ]]; then
+    LAST_HTTP=0
+    echo ""
+    rm -f "$tmp"
+    return 0
+  fi
+  cat "$tmp"
+  rm -f "$tmp"
+}
+
+expect_http() {
+  local want="$1" label="$2"
+  if [[ "$LAST_HTTP" == "$want" ]]; then
+    ok "$label (HTTP $want)"
+  else
+    fail "$label (HTTP $LAST_HTTP, want $want)"
+  fi
+}
+
+expect_http_any() {
+  local label="$1"
+  shift
+  local code
+  for code in "$@"; do
+    if [[ "$LAST_HTTP" == "$code" ]]; then
+      ok "$label (HTTP $LAST_HTTP)"
+      return 0
+    fi
+  done
+  fail "$label (HTTP $LAST_HTTP, want one of: $*)"
+}
+
+# expect_json_key BODY KEY LABEL — BODY must contain "KEY"
+expect_json_key() {
+  local body="$1" key="$2" label="$3"
+  if printf '%s' "$body" | grep -q "\"$key\""; then
+    ok "$label (has .$key)"
+  else
+    fail "$label (missing .$key)"
+  fi
+}
+
+json_get() {
+  # Best-effort extract with python3 when available.
+  local body="$1" expr="$2"
+  if command -v python3 >/dev/null 2>&1; then
+    BODY="$body" EXPR="$expr" python3 - <<'PY' 2>/dev/null || true
+import json, os
+raw = os.environ.get("BODY") or ""
+expr = os.environ.get("EXPR") or ""
+try:
+    data = json.loads(raw)
+except Exception:
+    print("")
+    raise SystemExit(0)
+cur = data
+for part in expr.split("."):
+    if part == "":
+        continue
+    if isinstance(cur, dict) and part in cur:
+        cur = cur[part]
+    else:
+        print("")
+        raise SystemExit(0)
+if isinstance(cur, (dict, list)):
+    print(json.dumps(cur))
+else:
+    print(cur)
+PY
+  fi
+}
+
+wait_agent() {
+  local i
+  for i in $(seq 1 60); do
+    if curl -fsS --connect-timeout 2 --max-time 2 "${AGENT_HTTP}/api/health" >/dev/null 2>&1; then
+      ok "agent healthy at ${AGENT_HTTP}"
+      return 0
+    fi
+    sleep 1
+  done
+  fail "agent not healthy at ${AGENT_HTTP}"
+  return 1
+}
+
+smoke_summary() {
+  printf '\n======== SUMMARY ========\n'
+  printf 'pass=%s soft=%s fail=%s\n' "$PASS" "$SOFT" "$FAIL"
+  if [[ "$FAIL" -gt 0 ]]; then
+    return 1
+  fi
+  return 0
+}

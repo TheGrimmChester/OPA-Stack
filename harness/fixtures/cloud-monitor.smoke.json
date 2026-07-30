@@ -1,0 +1,26 @@
+{
+  "interval": "60s",
+  "api_budget_per_minute": 30,
+  "providers": [
+    {
+      "id": "smoke-mock",
+      "provider": "mock",
+      "region": "eu-west-1",
+      "organization_id": "test-org",
+      "project_id": "default-project",
+      "cost_enabled": true,
+      "inventory": ["rds", "lambda", "s3"],
+      "metrics": [
+        {
+          "namespace": "AWS/RDS",
+          "name": "CPUUtilization",
+          "stat": "Average",
+          "period_seconds": 300,
+          "opa_metric": "cloud.rds.cpu",
+          "dimensions": { "DBInstanceIdentifier": "smoke-db" }
+        }
+      ],
+      "labels": { "env": "smoke", "service": "opa-stack" }
+    }
+  ]
+}
