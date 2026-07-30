@@ -1,0 +1,22 @@
+site_name: Open Profiling Agent
+site_description: Self-hosted open-source observability
+docs_dir: docs
+site_dir: site
+theme:
+  name: material
+  palette:
+    - scheme: slate
+      primary: blue grey
+      accent: light blue
+markdown_extensions:
+  - tables
+  - toc:
+      permalink: true
+nav:
+  - Home: index.md
+  - Architecture: architecture.md
+  - Data model: data-model.md
+  - Config reference: config-reference.md
+  - Distribution: distribution.md
+  - OTLP compatibility: otlp-compatibility.md
+  - Licensing: LICENSING.md

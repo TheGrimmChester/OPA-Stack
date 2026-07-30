@@ -138,7 +138,7 @@ services:
       agent:
         condition: service_started
     volumes:
-      # ../opa-node == /Users/nicolasmeloni/Documents/repos/opa-node (sibling checkout)
+      # Sibling checkout: ../opa-node (optional app harness)
       - ../opa-node:/opa-node:ro
     working_dir: /opa-node
     environment:
