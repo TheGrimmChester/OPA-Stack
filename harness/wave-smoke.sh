@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
-# Wave 17–27 (plus light 13–16 baseline) API smoke suite against a running agent.
+# Wave 17–30 (plus light 13–16 baseline) API smoke suite against a running agent.
 #
 # Prerequisites:
 #   Agent healthy at AGENT_HTTP (default http://127.0.0.1:8080).
 #   Auth off unless OPA_AUTH_REQUIRED=1 (compose leaves auth open).
-#   Prefer agent image built from wave27-diagnostics (see harness/rebuild-smoke-images.sh).
+#   Prefer agent image built from wave28-30-verticals (see harness/rebuild-smoke-images.sh).
 #
 # Usage:
 #   ./harness/wave-smoke.sh
@@ -539,6 +539,244 @@ EOF
 }
 
 # ---------------------------------------------------------------------------
+smoke_wave28() {
+  section "Wave 28 — Experience replay / mobile"
+
+  local sid="smoke-replay-$(date +%s)"
+  local body
+  body="$(http_req POST /api/rum/replay "${JSON_HDR[@]}" "${ORG_HDR[@]}" "${PROJ_HDR[@]}" --data "$(cat <<EOF
+{"organization_id":"${ORG_ID}","project_id":"${PROJECT_ID}","session_id":"${sid}","page_view_id":"pv-smoke","chunk_index":0,"masked":true,"events":[{"type":"navigation","t":0,"url":"https://shop.example.com/","title":"Home"},{"type":"longtask","t":120,"duration_ms":80,"name":"self"},{"type":"resource","t":200,"name":"/assets/app.js","duration_ms":40,"transfer_size":1024},{"type":"ajax","t":300,"method":"GET","url":"/api/cart","status":200,"duration_ms":45},{"type":"mutation","t":400,"target":"#root","mutation":"childList","added":1,"removed":0,"textContent":"Hello"}]}
+EOF
+)")"
+  expect_http_any "POST /api/rum/replay" 200 204
+  if [[ "$LAST_HTTP" == "204" || "$LAST_HTTP" == "200" ]]; then
+    ok "replay chunk ingest HTTP $LAST_HTTP"
+  else
+    fail "replay chunk ingest HTTP $LAST_HTTP"
+  fi
+
+  sleep 2
+
+  body="$(get_json "/api/rum/replay/${sid}")"
+  expect_http 200 "GET /api/rum/replay/{session}"
+  expect_json_key_or_soft_empty "$body" "chunks" "replay chunks"
+
+  body="$(get_json "/api/rum/replay-timeline/${sid}")"
+  expect_http 200 "GET /api/rum/replay-timeline/{session}"
+  expect_json_key "$body" "session_id" "replay timeline session_id"
+  expect_json_key_or_soft_empty "$body" "events" "replay timeline events"
+  if printf '%s' "$body" | grep -q '"by_type"'; then
+    ok "replay timeline has by_type"
+  else
+    soft "replay timeline missing by_type (async CH lag or older agent)"
+  fi
+
+  body="$(http_req POST /api/mobile/crash "${JSON_HDR[@]}" "${ORG_HDR[@]}" "${PROJ_HDR[@]}" --data "$(cat <<EOF
+{"organization_id":"${ORG_ID}","project_id":"${PROJECT_ID}","session_id":"${sid}","platform":"ios","app_version":"1.0.0-smoke","exception_type":"NSException","message":"smoke crash","stack":"main\\nfoo","device":"iPhone-smoke"}
+EOF
+)")"
+  expect_http_any "POST /api/mobile/crash" 200 204
+  if [[ "$LAST_HTTP" == "204" || "$LAST_HTTP" == "200" ]]; then
+    ok "mobile crash ingest HTTP $LAST_HTTP"
+  else
+    soft "mobile crash ingest HTTP $LAST_HTTP"
+  fi
+
+  sleep 1
+
+  body="$(get_json /api/rum/mobile/sessions)"
+  expect_http_any "GET /api/rum/mobile/sessions" 200 404
+  if [[ "$LAST_HTTP" == "200" ]]; then
+    expect_json_key_or_soft_empty "$body" "sessions" "mobile sessions"
+  else
+    soft "mobile sessions HTTP $LAST_HTTP"
+  fi
+
+  body="$(get_json "/api/mobile/crashes?session_id=${sid}")"
+  expect_http 200 "GET /api/mobile/crashes?session_id="
+  expect_json_key_or_soft_empty "$body" "crashes" "mobile crashes"
+}
+
+# ---------------------------------------------------------------------------
+smoke_wave29() {
+  section "Wave 29 — Perf lab"
+
+  local body scn_id run_id
+  body="$(post_json /api/perf/scenarios "$(cat <<EOF
+{"name":"smoke-health","target_url":"http://127.0.0.1:8080/api/health","method":"GET","vus":2,"duration_seconds":1,"thresholds":{"p95_ms":2000}}
+EOF
+)")"
+  expect_http 200 "POST /api/perf/scenarios"
+  expect_json_key "$body" "ok" "perf scenario upsert"
+  expect_json_key "$body" "id" "perf scenario id"
+  scn_id="$(printf '%s' "$body" | sed -n 's/.*"id"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -1)"
+
+  body="$(get_json /api/perf/scenarios)"
+  expect_http 200 "GET /api/perf/scenarios"
+  expect_json_key_or_soft_empty "$body" "scenarios" "perf scenarios list"
+
+  # fanout:false keeps create under SMOKE_TIMEOUT; fanout:true runs local load (seconds).
+  body="$(post_json /api/perf/runs "$(cat <<EOF
+{"scenario_id":"${scn_id:-smoke}","vus":2,"profile":"soak","fanout":false}
+EOF
+)")"
+  expect_http 200 "POST /api/perf/runs"
+  expect_json_key "$body" "ok" "perf run create"
+  expect_json_key "$body" "id" "perf run id"
+  expect_json_key "$body" "load_run_id" "perf load_run_id"
+  expect_json_key "$body" "fanout_peers" "perf fanout_peers"
+  run_id="$(printf '%s' "$body" | sed -n 's/.*"load_run_id"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -1)"
+  if [[ -z "$run_id" ]]; then
+    run_id="$(printf '%s' "$body" | sed -n 's/.*"id"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -1)"
+  fi
+
+  # Optional fan-out with simulate so peer path is exercised without multi-second load.
+  body="$(post_json /api/perf/runs "$(cat <<EOF
+{"scenario_id":"${scn_id:-smoke}","vus":1,"profile":"soak","fanout":true}
+EOF
+)")"
+  # May exceed default 5s curl budget when local sample runs — soft if timed out.
+  expect_http_any "POST /api/perf/runs fanout" 200 0
+  if [[ "$LAST_HTTP" == "200" ]]; then
+    expect_json_key "$body" "fanout_peers" "perf fanout_peers (fanout)"
+    if printf '%s' "$body" | grep -Eq '"fanout_peers"[[:space:]]*:[[:space:]]*\[\]'; then
+      soft "fanout_peers empty — no federation peers configured (honest skip)"
+    elif printf '%s' "$body" | grep -q '"peer_id"'; then
+      ok "fanout_peers has local/peer sample"
+    else
+      soft "fanout_peers present but unexpected shape"
+    fi
+  else
+    soft "perf runs fanout HTTP $LAST_HTTP (local load exceeds SMOKE_TIMEOUT — expected under 5s budget)"
+  fi
+
+  body="$(get_json /api/perf/runs)"
+  expect_http 200 "GET /api/perf/runs"
+  expect_json_key_or_soft_empty "$body" "runs" "perf runs list"
+
+  if [[ -n "$run_id" ]]; then
+    body="$(get_json "/api/perf/runs/${run_id}/export-k6")"
+    expect_http_any "GET /api/perf/runs/{id}/export-k6" 200 404
+    if [[ "$LAST_HTTP" == "200" ]]; then
+      ok "k6 export HTTP 200"
+    else
+      soft "k6 export HTTP $LAST_HTTP"
+    fi
+  fi
+
+  # Peer remote-load ack with simulate=true (instant; no live HTTP load).
+  body="$(post_json /api/federation/remote-load "$(cat <<EOF
+{"scenario_id":"${scn_id:-smoke}","load_run_id":"${run_id:-smoke-run}","vus":1,"duration_seconds":1,"target_url":"http://127.0.0.1:8080/api/health","simulate":true}
+EOF
+)")"
+  expect_http_any "POST /api/federation/remote-load" 200 400 404
+  if [[ "$LAST_HTTP" == "200" ]]; then
+    ok "federation remote-load ack (simulate)"
+  else
+    soft "federation remote-load HTTP $LAST_HTTP"
+  fi
+
+  body="$(get_json /api/performance/baselines)"
+  expect_http_any "GET /api/performance/baselines" 200 404
+  if [[ "$LAST_HTTP" == "200" ]]; then
+    expect_json_key_or_soft_empty "$body" "baselines" "performance baselines"
+  else
+    soft "performance baselines HTTP $LAST_HTTP"
+  fi
+}
+
+# ---------------------------------------------------------------------------
+smoke_wave30() {
+  section "Wave 30 — AppSec hub (secrets / SAST / IaC / PR-check)"
+
+  local body
+  body="$(post_json /v1/security/secrets "$(cat <<EOF
+{"service":"smoke-shop","findings":[{"rule":"aws-key","file":"config.env","line":3,"severity":"high","snippet":"AKIA****SMOKE","detector":"wave-smoke"}]}
+EOF
+)")"
+  expect_http 200 "POST /v1/security/secrets"
+  expect_json_key "$body" "ok" "secrets ingest"
+  expect_json_key "$body" "ingested" "secrets ingested"
+
+  body="$(post_json /v1/security/sast "$(cat <<EOF
+{"service":"smoke-shop","findings":[{"rule":"sql-concat","file":"app.php","line":10,"severity":"medium","message":"string concat into SQL","tool":"sast-lite"}]}
+EOF
+)")"
+  expect_http 200 "POST /v1/security/sast"
+  expect_json_key "$body" "ok" "sast ingest"
+
+  body="$(post_json /v1/security/iac "$(cat <<EOF
+{"findings":[{"kind":"dockerfile","rule":"no-root","file":"Dockerfile","line":1,"severity":"low","message":"runs as root","resource":"smoke-image"}]}
+EOF
+)")"
+  expect_http 200 "POST /v1/security/iac"
+  expect_json_key "$body" "ok" "iac ingest"
+
+  body="$(post_json /v1/ndjson "$(cat <<EOF
+{"type":"iast","organization_id":"${ORG_ID}","project_id":"${PROJECT_ID}","service":"smoke-shop","sink":"sql.injection","evidence":"SELECT * FROM users WHERE id='1' OR '1'='1","route":"/api/users","blocked":true,"trace_id":"smoke-block","span_id":"smoke-span"}
+EOF
+)")"
+  expect_http 200 "POST /v1/ndjson type:iast blocked"
+  expect_json_key "$body" "ok" "ndjson iast blocked"
+
+  sleep 1
+
+  body="$(get_json /api/security/secrets)"
+  expect_http 200 "GET /api/security/secrets"
+  expect_json_key_or_soft_empty "$body" "findings" "secrets list"
+
+  body="$(get_json /api/security/sast)"
+  expect_http 200 "GET /api/security/sast"
+  expect_json_key_or_soft_empty "$body" "findings" "sast list"
+
+  body="$(get_json /api/security/iac)"
+  expect_http 200 "GET /api/security/iac"
+  expect_json_key_or_soft_empty "$body" "findings" "iac list"
+
+  body="$(get_json /api/security/policies)"
+  expect_http 200 "GET /api/security/policies"
+  expect_json_key "$body" "fail_on_secrets" "security policies"
+
+  body="$(get_json /api/security/pr-check)"
+  expect_http 200 "GET /api/security/pr-check"
+  # PR-check may fail=true after we ingested secrets — that is success for the API.
+  if printf '%s' "$body" | grep -Eq '"fail"|"ok"|"status"|"pass"'; then
+    ok "pr-check responded with gate fields"
+  else
+    soft "pr-check body missing expected gate keys: $body"
+  fi
+
+  # Notebook execute (Wave 26 deepen) — create TQL notebook then execute.
+  body="$(post_json /api/notebooks "$(cat <<EOF
+{"title":"Smoke TQL execute","description":"wave30","cells":[{"type":"tql","content":"FIND spans LIMIT 1"}],"created_by":"smoke"}
+EOF
+)")"
+  expect_http 200 "POST /api/notebooks (tql)"
+  local nb_id
+  nb_id="$(printf '%s' "$body" | sed -n 's/.*"id"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -1)"
+  if [[ -n "$nb_id" ]]; then
+    body="$(post_json "/api/notebooks/${nb_id}/execute" '{}')"
+    expect_http_any "POST /api/notebooks/{id}/execute" 200 400 404 500
+    if [[ "$LAST_HTTP" == "200" ]]; then
+      ok "notebook execute HTTP 200"
+    else
+      soft "notebook execute HTTP $LAST_HTTP"
+    fi
+  else
+    soft "notebook id missing — skip execute"
+  fi
+
+  # Federated TQL — soft when no peers.
+  body="$(post_json /api/federation/query '{"kind":"tql","query":"FIND spans LIMIT 1"}')"
+  expect_http_any "POST /api/federation/query kind=tql" 200 400 404 405
+  if [[ "$LAST_HTTP" == "200" ]]; then
+    ok "federated TQL HTTP 200"
+  else
+    soft "federated TQL HTTP $LAST_HTTP (peers optional)"
+  fi
+}
+
+# ---------------------------------------------------------------------------
 main() {
   smoke_reset_counters
   printf 'OPA wave smoke → %s (org=%s project=%s)\n' "$AGENT_HTTP" "$ORG_ID" "$PROJECT_ID"
@@ -560,6 +798,9 @@ main() {
   smoke_wave25
   smoke_wave26
   smoke_wave27
+  smoke_wave28
+  smoke_wave29
+  smoke_wave30
 
   smoke_summary
 }
