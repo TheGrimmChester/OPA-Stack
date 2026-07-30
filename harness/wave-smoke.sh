@@ -280,10 +280,26 @@ smoke_wave23() {
   expect_http 200 "GET /api/cloud/resources"
   expect_json_key_or_soft_empty "$body" "resources" "cloud resources"
 
+  # Cost ingest round-trip, then assert cost keys are populated / accepted.
+  body="$(post_json /api/cloud/cost/ingest "$(cat <<EOF
+{"organization_id":"${ORG_ID}","project_id":"${PROJECT_ID}","rows":[{"day":"$(date -u +%Y-%m-%d)","provider":"mock","service":"smoke-rds","resource":"smoke-db","tag_key":"env","tag_value":"smoke","amount":12.5,"currency":"USD","util_pct":40}]}
+EOF
+)")"
+  expect_http 200 "POST /api/cloud/cost/ingest"
+  expect_json_key "$body" "ok" "cloud cost ingest"
+  expect_json_key "$body" "ingested" "cloud cost ingested"
+
+  sleep 1
+
   body="$(get_json /api/cloud/cost)"
   expect_http 200 "GET /api/cloud/cost"
   expect_json_key "$body" "by_service" "cloud cost"
   expect_json_key "$body" "days" "cloud cost days"
+  if printf '%s' "$body" | grep -Eq '"by_service"[[:space:]]*:[[:space:]]*\[\]'; then
+    soft "cloud cost by_service empty after ingest (async CH write lag)"
+  else
+    ok "cloud cost by_service non-empty after ingest"
+  fi
 
   body="$(get_json /api/cloud/tags)"
   expect_http 200 "GET /api/cloud/tags"
@@ -311,8 +327,13 @@ EOF
   expect_http 200 "POST /v1/network/flows"
   expect_json_key "$body" "ok" "network flows ingest"
   expect_json_key "$body" "accepted" "network flows accepted"
+  if printf '%s' "$body" | grep -Eq '"accepted"[[:space:]]*:[[:space:]]*0'; then
+    fail "network flows accepted should be >0"
+  else
+    ok "network flows accepted >0"
+  fi
 
-  sleep 1
+  sleep 2
 
   body="$(get_json /api/network/summary)"
   expect_http 200 "GET /api/network/summary"
@@ -321,7 +342,12 @@ EOF
 
   body="$(get_json /api/network/flows)"
   expect_http 200 "GET /api/network/flows"
-  expect_json_key_or_soft_empty "$body" "flows" "network flows query"
+  expect_json_key "$body" "flows" "network flows query"
+  if printf '%s' "$body" | grep -Eq '"flows"[[:space:]]*:[[:space:]]*\[\]'; then
+    soft "network flows query empty after ingest (async CH write lag)"
+  else
+    ok "network flows query has data after ingest"
+  fi
 
   body="$(get_json /api/network/dns)"
   expect_http 200 "GET /api/network/dns"
@@ -351,14 +377,54 @@ smoke_wave25() {
   expect_http 200 "GET /api/residency/policy"
   expect_json_key "$body" "region" "residency policy region"
   expect_json_key "$body" "write_allowed" "residency write_allowed"
+
+  # Pin org to a foreign region, expect 451 on ND-JSON write; federation reads still 200.
+  local foreign="smoke-foreign-region-zz"
+  body="$(post_json /api/residency/policy/upsert "$(cat <<EOF
+{"organization_id":"${ORG_ID}","project_id":"${PROJECT_ID}","home_region":"${foreign}","allowed_regions":["${foreign}"],"transfer_policy":"deny","notes":"wave-smoke locality"}
+EOF
+)")"
+  expect_http 200 "POST /api/residency/policy/upsert"
+  expect_json_key "$body" "ok" "residency policy upsert"
+
+  sleep 1
+
+  body="$(http_req POST /v1/ndjson "${JSON_HDR[@]}" "${ORG_HDR[@]}" "${PROJ_HDR[@]}" \
+    --data '{"type":"faas","organization_id":"'"${ORG_ID}"'","project_id":"'"${PROJECT_ID}"'","function_name":"denied","service":"smoke","cold_start":false,"duration_ms":1}')"
+  expect_http 451 "POST /v1/ndjson under foreign residency (expect 451)"
+
+  body="$(get_json /api/federation/summary)"
+  expect_http 200 "GET /api/federation/summary after residency pin"
+
+  body="$(post_json /api/federation/query '{"kind":"summary"}')"
+  expect_http_any "POST /api/federation/query" 200 405
+  if [[ "$LAST_HTTP" == "200" ]]; then
+    ok "federation query still 200 under pin"
+  else
+    body="$(http_req GET '/api/federation/query?kind=summary' "${ORG_HDR[@]}" "${PROJ_HDR[@]}")"
+    expect_http 200 "GET /api/federation/query under pin"
+  fi
+
+  # Restore: allow local agent region (or clear via home=local).
+  local local_region
+  local_region="$(get_json /api/federation/summary | sed -n 's/.*"region"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -1)"
+  if [[ -z "$local_region" ]]; then
+    local_region="default"
+  fi
+  body="$(post_json /api/residency/policy/upsert "$(cat <<EOF
+{"organization_id":"${ORG_ID}","project_id":"${PROJECT_ID}","home_region":"${local_region}","allowed_regions":["${local_region}"],"transfer_policy":"deny","notes":"wave-smoke restore"}
+EOF
+)")"
+  expect_http 200 "POST /api/residency/policy/upsert restore"
 }
 
 # ---------------------------------------------------------------------------
 smoke_wave26() {
   section "Wave 26 — Collaboration"
 
-  local body ts
+  local body ts slug
   ts="$(date +%s)"
+  slug="smoke-${ts}"
 
   body="$(post_json /api/notebooks "$(cat <<EOF
 {"title":"Smoke notebook ${ts}","description":"wave-smoke","cells":[{"type":"markdown","content":"hello smoke"}],"created_by":"smoke"}
@@ -373,12 +439,20 @@ EOF
   expect_json_key_or_soft_empty "$body" "notebooks" "notebooks list"
 
   body="$(post_json /api/status/pages "$(cat <<EOF
-{"slug":"smoke-${ts}","title":"Smoke Status","public":true,"components":[{"name":"API","status":"operational"}]}
+{"slug":"${slug}","title":"Smoke Status","public":true,"components":[{"name":"API","status":"operational"}]}
 EOF
 )")"
   expect_http 200 "POST /api/status/pages"
   expect_json_key "$body" "ok" "status page create"
   expect_json_key "$body" "slug" "status page slug"
+
+  sleep 1
+
+  body="$(http_req GET "/status/${slug}")"
+  expect_http 200 "GET /status/${slug} public page"
+  body="$(http_req GET "/api/public/status/${slug}")"
+  expect_http 200 "GET /api/public/status/${slug}"
+  expect_json_key "$body" "slug" "public status slug"
 
   body="$(get_json /api/status/pages)"
   expect_http 200 "GET /api/status/pages"
@@ -406,6 +480,7 @@ EOF
   expect_http 200 "GET /api/reports"
   expect_json_key_or_soft_empty "$body" "reports" "reports list"
 }
+
 
 # ---------------------------------------------------------------------------
 smoke_wave27() {

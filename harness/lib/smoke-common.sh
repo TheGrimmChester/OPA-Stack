@@ -11,6 +11,9 @@ PASS=0
 FAIL=0
 SOFT=0
 
+# Persist last HTTP status across command-substitution subshells (body="$(http_req …)").
+SMOKE_LAST_HTTP_FILE="${SMOKE_LAST_HTTP_FILE:-${TMPDIR:-/tmp}/opa-smoke-last-http-$$}"
+
 smoke_reset_counters() { PASS=0; FAIL=0; SOFT=0; }
 
 section() {
@@ -37,7 +40,7 @@ soft() {
 }
 
 # http_code METHOD PATH [curl args...]
-# prints body to stdout; sets global LAST_HTTP
+# prints body to stdout; sets global LAST_HTTP (and SMOKE_LAST_HTTP_FILE for subshells)
 LAST_HTTP=0
 http_req() {
   local method="$1" path="$2"
@@ -53,34 +56,49 @@ http_req() {
   set -e
   if [[ $rc -ne 0 ]]; then
     LAST_HTTP=0
+    printf '%s' "0" >"$SMOKE_LAST_HTTP_FILE"
     echo ""
     rm -f "$tmp"
     return 0
   fi
+  printf '%s' "$LAST_HTTP" >"$SMOKE_LAST_HTTP_FILE"
   cat "$tmp"
   rm -f "$tmp"
 }
 
+smoke_last_http() {
+  if [[ -f "$SMOKE_LAST_HTTP_FILE" ]]; then
+    cat "$SMOKE_LAST_HTTP_FILE"
+  else
+    printf '%s' "${LAST_HTTP:-0}"
+  fi
+}
+
 expect_http() {
   local want="$1" label="$2"
-  if [[ "$LAST_HTTP" == "$want" ]]; then
+  local got
+  got="$(smoke_last_http)"
+  LAST_HTTP="$got"
+  if [[ "$got" == "$want" ]]; then
     ok "$label (HTTP $want)"
   else
-    fail "$label (HTTP $LAST_HTTP, want $want)"
+    fail "$label (HTTP $got, want $want)"
   fi
 }
 
 expect_http_any() {
   local label="$1"
   shift
-  local code
+  local got code
+  got="$(smoke_last_http)"
+  LAST_HTTP="$got"
   for code in "$@"; do
-    if [[ "$LAST_HTTP" == "$code" ]]; then
-      ok "$label (HTTP $LAST_HTTP)"
+    if [[ "$got" == "$code" ]]; then
+      ok "$label (HTTP $got)"
       return 0
     fi
   done
-  fail "$label (HTTP $LAST_HTTP, want one of: $*)"
+  fail "$label (HTTP $got, want one of: $*)"
 }
 
 # expect_json_key BODY KEY LABEL — BODY must contain "KEY"
