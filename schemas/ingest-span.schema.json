@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://openprofiling.dev/schemas/ingest-span.schema.json",
+  "title": "OPA ND-JSON span",
+  "type": "object",
+  "required": ["trace_id", "span_id", "service", "name"],
+  "properties": {
+    "type": { "type": "string", "description": "Omit or set to span; use error/log/metric/profile for other messages" },
+    "trace_id": { "type": "string", "minLength": 8 },
+    "span_id": { "type": "string", "minLength": 4 },
+    "parent_id": { "type": ["string", "null"] },
+    "service": { "type": "string" },
+    "name": { "type": "string" },
+    "status": { "type": "string", "enum": ["ok", "error", "unset", ""] },
+    "duration_ms": { "type": "number", "minimum": 0 },
+    "timestamp": { "type": "string" },
+    "tags": { "type": "object", "additionalProperties": true },
+    "sample_weight": { "type": "number", "exclusiveMinimum": 0 },
+    "w3c_traceparent": { "type": "string" }
+  },
+  "additionalProperties": true
+}

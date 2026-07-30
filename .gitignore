@@ -1,1 +1,5 @@
 .DS_Store
+
+# Local planning docs (never commit)
+docs/ROADMAP.local.md
+docs/*.local.md
