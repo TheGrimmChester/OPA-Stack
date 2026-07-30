@@ -40,10 +40,17 @@ done
 echo "==> Generating demo traffic"
 bash harness/demo-traffic.sh
 
+if [[ "${WAVE_SMOKE:-0}" == "1" ]]; then
+  echo "==> Running Waves 17–27 API smoke (WAVE_SMOKE=1)"
+  bash harness/wave-smoke.sh
+fi
+
 echo
 echo "Dashboard:  http://127.0.0.1:8088"
 echo "Agent API:  http://127.0.0.1:8080/api/health"
 echo "Version:    $(curl -fsS http://127.0.0.1:8080/api/version 2>/dev/null || echo '{}')"
 echo
 echo "Done. Open the dashboard — Overview should already show spans."
+echo "Wave smoke: WAVE_SMOKE=1 ./harness/quickstart.sh   or   ./harness/wave-smoke.sh"
+echo "Rebuild:    ./harness/rebuild-smoke-images.sh"
 echo "Tear down: docker compose -p $COMPOSE_PROJECT_NAME down"
