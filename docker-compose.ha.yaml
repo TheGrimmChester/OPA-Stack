@@ -1,0 +1,45 @@
+# Optional multi-replica agent overlay (Wave 15-0).
+# Usage: docker compose -f docker-compose.yaml -f docker-compose.ha.yaml up -d
+# Still one ClickHouse; three agent processes with leader election.
+# For TailBuffer sharding use OPA_INGEST_SHARDS=3 and distinct SHARD_INDEX per agent
+# plus a sticky LB — this overlay alone is for query/API HA + job election.
+
+services:
+  agent:
+    environment:
+      OPA_REPLICAS: "3"
+      OPA_LEADER_ELECTION: "1"
+
+  agent-2:
+    image: opa-agent:smoke
+    depends_on:
+      clickhouse:
+        condition: service_healthy
+    environment:
+      TRANSPORT_TCP: ":9090"
+      CLICKHOUSE_URL: "http://clickhouse:8123"
+      WS_PORT: "8082"
+      JWT_SECRET: "smoke-test-jwt-secret-please-change-in-prod-0123456789"
+      OPA_REPLICAS: "3"
+      OPA_LEADER_ELECTION: "1"
+      OPA_INGEST_SHARDS: "1"
+    ports:
+      - "8081:8080"
+      - "2113:2112"
+
+  agent-3:
+    image: opa-agent:smoke
+    depends_on:
+      clickhouse:
+        condition: service_healthy
+    environment:
+      TRANSPORT_TCP: ":9090"
+      CLICKHOUSE_URL: "http://clickhouse:8123"
+      WS_PORT: "8082"
+      JWT_SECRET: "smoke-test-jwt-secret-please-change-in-prod-0123456789"
+      OPA_REPLICAS: "3"
+      OPA_LEADER_ELECTION: "1"
+      OPA_INGEST_SHARDS: "1"
+    ports:
+      - "8083:8080"
+      - "2114:2112"
