@@ -1,0 +1,9 @@
+# Optional local JMeter helper for OPA Perf Lab (not required for Agent if OPA_JMETER_BIN is set).
+# Usage: docker compose -f docker-compose.jmeter.yml run --rm jmeter -n -t /jmeter/plan.jmx -l /jmeter/out.jtl
+services:
+  jmeter:
+    image: ${OPA_JMETER_IMAGE:-justb4/jmeter:5.5}
+    volumes:
+      - ${OPA_JMETER_WORK:-./jmeter-work}:/jmeter
+    working_dir: /jmeter
+    entrypoint: ["jmeter"]
