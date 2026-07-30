@@ -1,0 +1,6 @@
+apiVersion: v2
+name: opa
+description: Open Profiling Agent — optional Kubernetes packaging (Wave 15-1). Single-node docker compose remains the default path.
+type: application
+version: 0.15.0
+appVersion: "15"

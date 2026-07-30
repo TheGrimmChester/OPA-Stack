@@ -1,0 +1,32 @@
+replicaCount: 1
+image:
+  repository: opa-agent
+  tag: latest
+  pullPolicy: IfNotPresent
+service:
+  type: ClusterIP
+  apiPort: 8080
+  ingestPort: 9090
+  metricsPort: 2112
+  wsPort: 8082
+ingress:
+  enabled: false
+  className: ""
+  hosts: []
+resources: {}
+autoscaling:
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 5
+  targetCPUUtilizationPercentage: 80
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1
+serviceMonitor:
+  enabled: false
+env:
+  OPA_REPLICAS: "1"
+  OPA_INGEST_SHARDS: "1"
+  OPA_INGEST_SHARD_INDEX: "0"
+  OPA_LEADER_ELECTION: "1"
+  CLICKHOUSE_URL: "http://clickhouse:8123"
