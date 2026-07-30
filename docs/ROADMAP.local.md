@@ -13,8 +13,8 @@ repos: [OPA-Agent, OPA-Dashboard, OPA-PHP-extension, opa-node, opa-rum-js, OPA-s
 ## Executive summary
 
 - **Vision:** Self-hosted APM for PHP and polyglot stacks — traces, errors, logs, RUM, reliability, and thin perf/AppSec verticals without vendor lock-in.
-- **Maturity:** Waves 1–27 scaffolded/shipped on tip branches; Waves 28–30 thin verticals (replay player, perf lab, AppSec hub) in progress on `wave28-30-verticals`.
-- **Honesty:** Late waves are contracts + demos until depth spikes land; do not claim eBPF/cloud inventory/commercial load-test/AppSec parity.
+- **Maturity:** Waves 1–27 scaffolded/shipped on tip branches; Waves 28–30 deepened verticals (replay fidelity, federation load fan-out, SAST/IaC hub) on `wave28-30-verticals`.
+- **Honesty:** Late waves are contracts + demos until depth spikes land; do not claim eBPF/cloud inventory/commercial load-test/AppSec parity. Explicitly still deferred: JVM/.NET agents, hundreds of cloud integrations, full ClickHouse Keeper HA as net-new, pixel-perfect commercial session replay.
 
 ---
 
@@ -259,11 +259,18 @@ Source: [`docs/AUDIT-2026-07-23.md`](AUDIT-2026-07-23.md) — header notes sever
 | 13–16 | Hard XL / OSS | Partial; JVM/.NET / full CH cluster still deferred |
 | 17–22 | Mid scaffold | Stronger contracts; TF provider = stub only |
 | 23–27 | Late scaffold | P0 honesty (residency, mock labels, bytes) + depth spikes on tip |
-| **28 Experience replay** | Thin vertical | Timeline API + Dashboard player + synthetics artefacts |
-| **29 Perf lab** | Thin vertical | Scenarios/runs + load-runner + CI gate examples (single-runner) |
-| **30 AppSec hub** | Thin vertical | OSV opt-in, secrets ingest, PR check, IAST examples — not full SAST/IaC |
+| **28 Experience replay** | Deepened vertical | Timeline + markers (nav/longtask/resource/ajax) + player reconstruction; still not rrweb |
+| **29 Perf lab** | Deepened vertical | Profiles + federation `remote-load` fan-out + baselines UI; ≠ multi-cloud load grid |
+| **30 AppSec hub** | Deepened vertical | SAST/IaC tables+ingest+scripts, IAST opt-in block, scanner token; not full commercial AppSec |
 
-Depth-review Phase 1 (honesty/smoke) completed on `wave27-diagnostics`. Phase 2–3 + Waves 28–30 land on `wave28-30-verticals`.
+### Explicitly still deferred (docs honesty)
+
+- JVM / .NET language agents
+- Hundreds of cloud integrations
+- Full ClickHouse Keeper HA cluster as a net-new program
+- Pixel-perfect commercial session replay (full rrweb)
+
+Depth-review Phase 1 (honesty/smoke) completed on `wave27-diagnostics`. Phase 2–3 + Waves 28–30 deepen on `wave28-30-verticals`.
 
 ---
 
