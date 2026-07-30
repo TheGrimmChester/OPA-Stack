@@ -683,6 +683,45 @@ EOF
   else
     soft "performance baselines HTTP $LAST_HTTP"
   fi
+
+  # Wave 31 — multi-step upsert + validate + import-jmx (JMeter engine optional)
+  body="$(post_json /api/perf/scenarios "$(cat <<EOF
+{"name":"smoke-steps","target_url":"http://127.0.0.1:8080/api/health","method":"GET","vus":1,"duration_seconds":5,"steps":[{"type":"http","name":"health","method":"GET","url":"http://127.0.0.1:8080/api/health","think_ms":10}],"sla":{"p95_ms":5000,"error_rate_max":1},"datasets":{}}
+EOF
+)")"
+  expect_http 200 "POST /api/perf/scenarios steps"
+  expect_json_key "$body" "id" "steps scenario id"
+  local steps_id
+  steps_id="$(printf '%s' "$body" | sed -n 's/.*"id"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -1)"
+
+  if [[ -n "$steps_id" ]]; then
+    body="$(post_json "/api/perf/scenarios/${steps_id}/validate" "{}")"
+    expect_http_any "POST /api/perf/scenarios/{id}/validate" 200 404 503
+    if [[ "$LAST_HTTP" == "200" ]]; then
+      ok "scenario validate"
+    else
+      soft "scenario validate HTTP $LAST_HTTP"
+    fi
+    body="$(get_json "/api/perf/scenarios/${steps_id}/export-jmx")"
+    expect_http_any "GET export-jmx" 200 404
+    if [[ "$LAST_HTTP" == "200" ]]; then
+      ok "export-jmx"
+    else
+      soft "export-jmx HTTP $LAST_HTTP"
+    fi
+  fi
+
+  body="$(post_json /api/perf/scenarios/import-jmx "$(cat <<'EOF'
+{"name":"smoke-jmx","jmx":"<?xml version=\"1.0\"?><jmeterTestPlan version=\"1.2\" properties=\"5.0\" jmeter=\"5.5\"><hashTree><TestPlan testname=\"t\"/><hashTree><ThreadGroup testname=\"tg\" enabled=\"true\"><stringProp name=\"ThreadGroup.num_threads\">1</stringProp><stringProp name=\"ThreadGroup.duration\">5</stringProp></ThreadGroup><hashTree><HTTPSamplerProxy testname=\"h\" enabled=\"true\"><stringProp name=\"HTTPSampler.domain\">127.0.0.1</stringProp><stringProp name=\"HTTPSampler.path\">/api/health</stringProp><stringProp name=\"HTTPSampler.method\">GET</stringProp></HTTPSamplerProxy><hashTree/></hashTree></hashTree></hashTree></jmeterTestPlan>"}
+EOF
+)")"
+  expect_http_any "POST /api/perf/scenarios/import-jmx" 200 400 404
+  if [[ "$LAST_HTTP" == "200" ]]; then
+    expect_json_key "$body" "ok" "import-jmx ok"
+    ok "import-jmx"
+  else
+    soft "import-jmx HTTP $LAST_HTTP (admin auth may be required)"
+  fi
 }
 
 # ---------------------------------------------------------------------------
