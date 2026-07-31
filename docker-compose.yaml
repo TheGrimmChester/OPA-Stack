@@ -1,8 +1,8 @@
-# Top-level OPA smoke-test stack: ClickHouse + agent + MySQL + PHP(+extension) + Node + dashboard.
+# Top-level OPA smoke-test stack: ClickHouse + agent + orchestrator + perf-lab + MySQL + PHP + Node + dashboard.
 # Usage:
 #   docker compose build            # (images are prebuilt as *:smoke; build re-creates them)
-#   ./harness/rebuild-smoke-images.sh   # build sibling Agent/Dashboard → *:smoke + recreate
-#   docker compose up -d clickhouse mysql agent dashboard node-app
+#   ./harness/rebuild-smoke-images.sh   # build sibling Agent/Orchestrator/Perf-Lab/Dashboard → *:smoke + recreate
+#   docker compose up -d clickhouse mysql agent orchestrator perf-lab dashboard node-app
 #   docker compose run --rm php-cli # one-shot: runs the PHP smoke harness
 #   docker compose --profile smoke run --rm node-smoke   # one-shot: curls the node demo app
 #   docker compose --profile wave-smoke run --rm wave-smoke  # Waves 17–31 API smoke (incl. live Docker JMeter)
@@ -10,6 +10,8 @@
 #   harness/jmeter-perf-gate.sh     # standalone Docker JMeter dispatch → gate → samples
 #   harness/node-smoke.sh           # same curls, from the host (node-app publishes :3000)
 #   harness/rum-smoke.sh            # POST a canned RUM beacon to the agent
+#
+# Ports: Agent :8080 | AI Orchestrator :8091 | Perf Lab :8092 | Dashboard :8088
 name: opa-stack
 
 services:
@@ -97,6 +99,7 @@ services:
       CLICKHOUSE_URL: "http://clickhouse:8123"
       JWT_SECRET: "smoke-test-jwt-secret-please-change-in-prod-0123456789"
       OPA_SECURITY_WORKSPACE: "/workspace"
+      OPA_SCM_STATE_DIR: "/workspace/scm-state"
       OPA_REVIEW_TMP: "${OPA_REVIEW_TMP:-/tmp/opa-review}"
       OPA_CURSOR_AGENT_BIN: "${OPA_CURSOR_AGENT_BIN:-/usr/local/bin/agent}"
       OPA_SCM_MOCK_GITHUB: "1"
@@ -267,12 +270,18 @@ services:
     depends_on:
       agent:
         condition: service_healthy
+      orchestrator:
+        condition: service_healthy
+      perf-lab:
+        condition: service_healthy
       dashboard:
         condition: service_started
     volumes:
       - ./harness:/harness:ro
     environment:
       AGENT_HTTP: "http://agent:8080"
+      ORCHESTRATOR_HTTP: "http://orchestrator:8091"
+      PERF_LAB_HTTP: "http://perf-lab:8092"
       DASH_HTTP: "http://dashboard"
       SKIP_BROWSER: "1"
       ORG_ID: "test-org"
