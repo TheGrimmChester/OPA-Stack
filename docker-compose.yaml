@@ -83,7 +83,8 @@ services:
       # Wave 34 — Repo Watch / AI (smoke: mock GitHub + skip Cursor CLI)
       OPA_SCM_MOCK_GITHUB: "1"
       SKIP_CURSOR_AI: "${SKIP_CURSOR_AI:-1}"
-      OPA_SCM_ALLOW_UNSIGNED: "1"
+      OPA_GITHUB_WEBHOOK_SECRET: "${OPA_GITHUB_WEBHOOK_SECRET:-smoke-webhook-secret}"
+      OPA_SCM_ALLOW_UNSIGNED: "${OPA_SCM_ALLOW_UNSIGNED:-0}"
       OPA_PUBLIC_URL: "http://127.0.0.1:8080"
       OPA_DASHBOARD_URL: "http://127.0.0.1:8088"
       OPA_SCM_CRON: "0"
@@ -231,11 +232,12 @@ services:
       ORG_ID: "test-org"
       PROJECT_ID: "default-project"
       SMOKE_TIMEOUT_S: "10"
+      OPA_GITHUB_WEBHOOK_SECRET: "${OPA_GITHUB_WEBHOOK_SECRET:-smoke-webhook-secret}"
     entrypoint: ["/bin/sh", "-c"]
     command:
       - |
         set -e
-        apk add --no-cache bash curl >/dev/null
+        apk add --no-cache bash curl openssl python3 >/dev/null
         exec bash /harness/wave-smoke.sh
 
 volumes:
