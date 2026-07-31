@@ -1055,7 +1055,7 @@ smoke_wave31_docker_jmeter() {
   local body scn_id run_id mode workers_n status="" i requests="" gate_ok=""
 
   body="$(post_json /api/perf/scenarios/upsert "$(cat <<EOF
-{"name":"smoke-docker-jmeter","target_url":"https://example.com/","method":"GET","vus":2,"duration_seconds":8,"steps":[{"type":"http","name":"ex","method":"GET","url":"https://example.com/","think_ms":10}],"sla":{"p95_ms":30000,"error_rate_max":1},"thresholds":{"p95_ms":30000,"error_rate_max":1}}
+{"name":"smoke-docker-jmeter","target_url":"http://node-app:3000/hello","method":"GET","vus":2,"duration_seconds":8,"steps":[{"type":"http","name":"hello","method":"GET","url":"http://node-app:3000/hello","think_ms":10}],"sla":{"p95_ms":30000,"error_rate_max":1},"thresholds":{"p95_ms":30000,"error_rate_max":1}}
 EOF
 )")"
   expect_http_any "POST upsert docker-jmeter scenario" 200 403 404
@@ -1173,6 +1173,25 @@ print(int(sj.get('requests') or 0))
     ok "Docker JMeter samples ingested"
   else
     fail "Docker JMeter samples empty/missing: $body"
+  fi
+
+  # Correlated APM traces: JMeter hits instrumented node-app with X-OPA-Load-Run-Id.
+  sleep 3
+  local filter_q trace_total
+  filter_q="tags.load_run_id:\"${run_id}\""
+  body="$(get_json "/api/traces?limit=5&filter=$(printf '%s' "$filter_q" | python3 -c 'import urllib.parse,sys; print(urllib.parse.quote(sys.stdin.read().strip()))')")"
+  expect_http 200 "GET /api/traces filter=load_run_id"
+  trace_total="$(printf '%s' "$body" | python3 -c "
+import json,sys
+raw=sys.stdin.buffer.read()
+clean=bytes(b if b in (9,10,13) or b>=32 else 32 for b in raw)
+d=json.loads(clean)
+print(int(d.get('total') or 0))
+" 2>/dev/null || echo 0)"
+  if [[ "${trace_total:-0}" -gt 0 ]]; then
+    ok "APM traces correlated for load_run_id (${trace_total} traces)"
+  else
+    fail "no APM traces for load_run_id=${run_id} (is node-app up and OPA_PERF_INTERNAL_HOSTS=node-app set?)"
   fi
 
   # Scale: workers=2 splits VUs across containers and must also finish
