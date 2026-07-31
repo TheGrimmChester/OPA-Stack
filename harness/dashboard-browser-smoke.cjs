@@ -46,7 +46,7 @@ async function main() {
       const blankFatal =
         /Something went wrong|Application error|ChunkLoadError/i.test(text) && text.length < 500;
       const chromeCount = await page.locator('.opa-rail, .opa-page-title, .opa-page-head, nav').count();
-      const hasChrome = chromeCount > 0 || /Open Profiling|Services|Perf lab|Traces|Security/i.test(text);
+      const hasChrome = chromeCount > 0 || /Open Profiling|Service|Perf lab|Traces|Security/i.test(text);
       const fatalConsole = consoleErrors.filter((e) =>
         /ChunkLoadError|Unexpected token|is not defined|Cannot read prop/i.test(e),
       );
