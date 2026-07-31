@@ -8,11 +8,11 @@ const { chromium } = require('playwright');
 
 const DASH = process.env.DASH_HTTP || 'http://127.0.0.1:8088';
 const ROUTES = [
-  // Service only — Overview is the same panel (do not visit `/` as Overview).
+  // Service only — Overview removed. Perf Lab browser UX owned by sibling — API smoke only here.
   '/services', '/catalog', '/key-transactions', '/commands', '/traces',
   '/profiling', '/errors', '/logs', '/alerts', '/slos', '/anomalies',
   '/synthetics', '/security', '/diagnostics', '/sql', '/http', '/service-map',
-  '/network', '/rum', '/performance', '/perf-lab', '/compare', '/infrastructure',
+  '/network', '/rum', '/performance', '/compare', '/infrastructure',
   '/cloud', '/metrics', '/query', '/dashboards', '/live', '/serverless',
   '/collaborate', '/system', '/users', '/api-keys', '/automation', '/federation',
 ];

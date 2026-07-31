@@ -113,7 +113,6 @@ smoke_dashboard_routes() {
     /network \
     /rum \
     /performance \
-    /perf-lab \
     /compare \
     /infrastructure \
     /cloud \
@@ -200,6 +199,7 @@ smoke_dashboard_apis() {
   panel_api "/api/rum/mobile/sessions" "rum mobile sessions"
   panel_api "/api/mobile/crashes" "mobile crashes"
   panel_api "/api/metrics/network" "performance network"
+  # Perf Lab — light API smoke only (UI/UX owned by sibling agent)
   panel_api "/api/perf/scenarios" "perf-lab scenarios"
   panel_api "/api/perf/runs" "perf-lab runs"
   panel_api "/api/performance/baselines" "perf baselines"
