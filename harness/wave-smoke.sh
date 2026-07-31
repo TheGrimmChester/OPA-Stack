@@ -54,6 +54,26 @@ post_json() {
     --data "$data" "$@"
 }
 
+put_json() {
+  local path="$1" data="$2"
+  shift 2
+  http_req PUT "$path" "${JSON_HDR[@]}" "${ORG_HDR[@]}" "${PROJ_HDR[@]}" \
+    --data "$data" "$@"
+}
+
+patch_json() {
+  local path="$1" data="$2"
+  shift 2
+  http_req PATCH "$path" "${JSON_HDR[@]}" "${ORG_HDR[@]}" "${PROJ_HDR[@]}" \
+    --data "$data" "$@"
+}
+
+delete_json() {
+  local path="$1"
+  shift
+  http_req DELETE "$path" "${ORG_HDR[@]}" "${PROJ_HDR[@]}" "$@"
+}
+
 # ---------------------------------------------------------------------------
 smoke_baseline() {
   section "Baseline (health / version / topology / TQL)"
@@ -1556,6 +1576,92 @@ EOF
       fi
       body="$(post_json "/api/scm/jobs/${job_id}/retry" '{}')"
       expect_http 200 "POST scm job retry"
+    fi
+
+    body="$(post_json /api/scm/contexts "$(cat <<EOF
+{"repo_full_name":"local/smoke-repo","title":"Smoke design enforcement","body_markdown":"## Design enforcement\nUse existing Panel/DataTable; CSS vars from theme.\n","connector_id":"${conn_id}","tags":["design","ui"]}
+EOF
+)")"
+    expect_http 200 "POST design-tagged context"
+    expect_json_key "$body" "context" "design context create"
+
+    body="$(post_json /api/scm/contexts "$(cat <<EOF
+{"repo_full_name":"local/smoke-repo","title":"Smoke reviewer context","body_markdown":"## Purpose\nSmoke service.\n","connector_id":"${conn_id}"}
+EOF
+)")"
+    expect_http 200 "POST /api/scm/contexts"
+    expect_json_key "$body" "context" "context create"
+    local ctx_id
+    ctx_id="$(printf '%s' "$body" | python3 -c 'import sys,json; print(json.load(sys.stdin).get("context",{}).get("id",""))' 2>/dev/null || true)"
+
+    body="$(get_json /api/scm/contexts)"
+    expect_http 200 "GET /api/scm/contexts"
+    expect_json_key "$body" "contexts" "contexts list"
+
+    body="$(post_json /api/scm/contexts/generate "$(cat <<EOF
+{"repo_full_name":"local/smoke-repo","connector_id":"${conn_id}"}
+EOF
+)")"
+    expect_http 200 "POST contexts/generate (skip path ok)"
+    if printf '%s' "$body" | grep -Eq '"status"[[:space:]]*:[[:space:]]*"(skipped|generated|heuristic)"'; then
+      ok "contexts/generate status present"
+    else
+      soft "contexts/generate unexpected: $body"
+    fi
+
+    body="$(put_json /api/scm/context-links "$(cat <<EOF
+{"repo_full_names":["local/smoke-repo","smoke/opa-workspace"]}
+EOF
+)")"
+    expect_http 200 "PUT /api/scm/context-links"
+
+    body="$(get_json "/api/connectors/${conn_id}/pulls?repo=local/smoke-repo")"
+    expect_http 200 "GET connector pulls"
+    expect_json_key "$body" "pulls" "open pulls"
+
+    body="$(post_json /api/scm/ai-review "$(cat <<EOF
+{"repo_full_name":"local/smoke-repo","pr_number":42,"connector_id":"${conn_id}","force":true,"ai_only":true,"allow_unwatched":true}
+EOF
+)")"
+    expect_http 200 "POST /api/scm/ai-review"
+    expect_json_key "$body" "job_id" "ai-review job_id"
+    local ai_job
+    ai_job="$(printf '%s' "$body" | sed -n 's/.*"job_id"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -1)"
+    if [[ -n "$ai_job" ]]; then
+      ok "ai-review job_id=${ai_job}"
+      local ai_status="" j
+      for j in $(seq 1 40); do
+        body="$(get_json "/api/scm/jobs/${ai_job}")"
+        ai_status="$(printf '%s' "$body" | python3 -c 'import sys,json; print(json.load(sys.stdin).get("status",""))' 2>/dev/null || true)"
+        if [[ "$ai_status" == "completed" || "$ai_status" == "failed" || "$ai_status" == "error" ]]; then
+          break
+        fi
+        sleep 1
+      done
+        if [[ "$ai_status" == "completed" || "$ai_status" == "failed" || "$ai_status" == "error" ]]; then
+          ok "ai-review job status=${ai_status}"
+        else
+          fail "ai-review job did not finish (status=${ai_status:-empty})"
+        fi
+        if printf '%s' "$body" | grep -Eq 'worktrees/|checkout_path|mock_worktree'; then
+          ok "ai-review job records worktree checkout"
+        else
+          soft "ai-review job missing worktree path in summary"
+        fi
+        if printf '%s' "$body" | grep -Eq '"status"[[:space:]]*:[[:space:]]*"skipped"|SKIP_CURSOR_AI|ai_only'; then
+          ok "ai-review skipped/ai_only honesty present"
+        else
+          soft "ai summary may omit skipped when Cursor ran: check summary.ai"
+        fi
+      body="$(post_json "/api/scm/jobs/${ai_job}/ai-review" '{"force":true,"ai_only":true}')"
+      expect_http 200 "POST scm job ai-review re-run"
+    fi
+
+    if [[ -n "$ctx_id" ]]; then
+      body="$(patch_json "/api/scm/contexts/${ctx_id}" '{"title":"Smoke reviewer context (edited)"}')"
+      expect_http 200 "PATCH context"
+      body="$(delete_json "/api/scm/contexts/${ctx_id}")"
+      expect_http 200 "DELETE context"
     fi
   else
     soft "connector id missing — skip watched/simulate"
