@@ -599,14 +599,34 @@ EOF
 
 # ---------------------------------------------------------------------------
 smoke_wave29() {
-  section "Wave 29 — Perf lab"
+  section "Wave 29/31 — Perf lab + harden"
 
   local body scn_id run_id
+
+  # View route must not accept upsert (admin path is /upsert).
   body="$(post_json /api/perf/scenarios "$(cat <<EOF
-{"name":"smoke-health","target_url":"http://127.0.0.1:8080/api/health","method":"GET","vus":2,"duration_seconds":1,"thresholds":{"p95_ms":2000}}
+{"name":"smoke-health-view","target_url":"http://example.com/","method":"GET","vus":1,"duration_seconds":1}
 EOF
 )")"
-  expect_http 200 "POST /api/perf/scenarios"
+  expect_http_any "POST /api/perf/scenarios (view)" 405 404
+  if [[ "$LAST_HTTP" == "405" ]]; then
+    ok "view POST /api/perf/scenarios rejected (405)"
+  elif [[ "$LAST_HTTP" == "404" ]]; then
+    soft "POST /api/perf/scenarios HTTP 404 (older agent)"
+  else
+    soft "POST /api/perf/scenarios HTTP $LAST_HTTP (expected 405)"
+  fi
+
+  # Upsert via admin path (open when auth off).
+  body="$(post_json /api/perf/scenarios/upsert "$(cat <<EOF
+{"name":"smoke-health","target_url":"https://example.com/","method":"GET","vus":2,"duration_seconds":1,"thresholds":{"p95_ms":2000},"sla":{"p95_ms":2000,"error_rate_max":1}}
+EOF
+)")"
+  expect_http_any "POST /api/perf/scenarios/upsert" 200 403 404
+  if [[ "$LAST_HTTP" != "200" ]]; then
+    soft "perf scenario upsert HTTP $LAST_HTTP — skip remaining perf harden checks"
+    return 0
+  fi
   expect_json_key "$body" "ok" "perf scenario upsert"
   expect_json_key "$body" "id" "perf scenario id"
   scn_id="$(printf '%s' "$body" | sed -n 's/.*"id"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -1)"
@@ -630,13 +650,64 @@ EOF
     run_id="$(printf '%s' "$body" | sed -n 's/.*"id"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -1)"
   fi
 
+  # Gate fail-closed on in-progress / empty summary.
+  if [[ -n "$run_id" ]]; then
+    body="$(get_json "/api/perf/runs/${run_id}/gate")"
+    expect_http_any "GET /api/perf/runs/{id}/gate (running)" 200 404
+    if [[ "$LAST_HTTP" == "200" ]]; then
+      if printf '%s' "$body" | grep -Eq '"ok"[[:space:]]*:[[:space:]]*false|"status"[[:space:]]*:[[:space:]]*"(failed|running)"'; then
+        ok "gate fail-closed on running/empty run"
+      else
+        soft "gate body did not fail-closed: $body"
+      fi
+    else
+      soft "run gate HTTP $LAST_HTTP"
+    fi
+  fi
+
+  # Scenario gate rejects mismatched run_id / scenario_id.
+  body="$(post_json /api/perf/scenarios/upsert "$(cat <<EOF
+{"name":"smoke-other","target_url":"https://example.com/other","method":"GET","vus":1,"duration_seconds":1,"sla":{"p95_ms":100}}
+EOF
+)")"
+  local other_id=""
+  if [[ "$LAST_HTTP" == "200" ]]; then
+    other_id="$(printf '%s' "$body" | sed -n 's/.*"id"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -1)"
+  fi
+  if [[ -n "$run_id" && -n "$other_id" && -n "$scn_id" && "$other_id" != "$scn_id" ]]; then
+    body="$(post_json "/api/perf/scenarios/${other_id}/gate" "{\"run_id\":\"${run_id}\"}")"
+    expect_http_any "POST scenario gate mismatch" 400 404 200
+    if [[ "$LAST_HTTP" == "400" ]]; then
+      ok "scenario gate rejects mismatched run/scenario"
+    elif [[ "$LAST_HTTP" == "200" ]] && printf '%s' "$body" | grep -Eq '"ok"[[:space:]]*:[[:space:]]*false'; then
+      soft "scenario gate returned 200 ok=false (binding may be soft)"
+    else
+      soft "scenario gate mismatch HTTP $LAST_HTTP (ClickHouse eventual consistency?)"
+    fi
+  else
+    soft "skip scenario gate mismatch (missing ids)"
+  fi
+
+  # Metrics POST without runner/admin token — soft-skip when auth off (compose default).
+  if [[ -n "$run_id" ]]; then
+    body="$(post_json "/api/perf/runs/${run_id}/metrics" '{"status":"passed","summary":{"requests":1,"p95_ms":1,"error_rate":0}}')"
+    expect_http_any "POST metrics without token" 200 403 404
+    if [[ "$LAST_HTTP" == "403" ]]; then
+      ok "metrics POST rejected without runner/admin token"
+    elif [[ "$LAST_HTTP" == "200" ]]; then
+      soft "metrics POST allowed (OPA_AUTH_REQUIRED off — admin soft-open; set auth + OPA_PERF_RUNNER_TOKEN to enforce)"
+    else
+      soft "metrics POST HTTP $LAST_HTTP"
+    fi
+  fi
+
   # Optional fan-out with simulate so peer path is exercised without multi-second load.
   body="$(post_json /api/perf/runs "$(cat <<EOF
 {"scenario_id":"${scn_id:-smoke}","vus":1,"profile":"soak","fanout":true}
 EOF
 )")"
   # May exceed default 5s curl budget when local sample runs — soft if timed out.
-  expect_http_any "POST /api/perf/runs fanout" 200 0
+  expect_http_any "POST /api/perf/runs fanout" 200 0 403
   if [[ "$LAST_HTTP" == "200" ]]; then
     expect_json_key "$body" "fanout_peers" "perf fanout_peers (fanout)"
     if printf '%s' "$body" | grep -Eq '"fanout_peers"[[:space:]]*:[[:space:]]*\[\]'; then
@@ -646,6 +717,8 @@ EOF
     else
       soft "fanout_peers present but unexpected shape"
     fi
+  elif [[ "$LAST_HTTP" == "403" ]]; then
+    soft "perf runs fanout HTTP 403 (admin required when auth on)"
   else
     soft "perf runs fanout HTTP $LAST_HTTP (local load exceeds SMOKE_TIMEOUT — expected under 5s budget)"
   fi
@@ -666,12 +739,14 @@ EOF
 
   # Peer remote-load ack with simulate=true (instant; no live HTTP load).
   body="$(post_json /api/federation/remote-load "$(cat <<EOF
-{"scenario_id":"${scn_id:-smoke}","load_run_id":"${run_id:-smoke-run}","vus":1,"duration_seconds":1,"target_url":"http://127.0.0.1:8080/api/health","simulate":true}
+{"scenario_id":"${scn_id:-smoke}","load_run_id":"${run_id:-smoke-run}","vus":1,"duration_seconds":1,"target_url":"https://example.com/","simulate":true}
 EOF
 )")"
-  expect_http_any "POST /api/federation/remote-load" 200 400 404
+  expect_http_any "POST /api/federation/remote-load" 200 400 401 404
   if [[ "$LAST_HTTP" == "200" ]]; then
     ok "federation remote-load ack (simulate)"
+  elif [[ "$LAST_HTTP" == "401" ]]; then
+    soft "federation remote-load HTTP 401 (token required when auth enforced / token empty)"
   else
     soft "federation remote-load HTTP $LAST_HTTP"
   fi
@@ -684,19 +759,19 @@ EOF
     soft "performance baselines HTTP $LAST_HTTP"
   fi
 
-  # Wave 31 — multi-step upsert + validate + import-jmx (JMeter engine optional)
-  body="$(post_json /api/perf/scenarios "$(cat <<EOF
-{"name":"smoke-steps","target_url":"http://127.0.0.1:8080/api/health","method":"GET","vus":1,"duration_seconds":5,"steps":[{"type":"http","name":"health","method":"GET","url":"http://127.0.0.1:8080/api/health","think_ms":10}],"sla":{"p95_ms":5000,"error_rate_max":1},"datasets":{}}
+  # Wave 31 — multi-step upsert + validate private URL block + import-jmx
+  body="$(post_json /api/perf/scenarios/upsert "$(cat <<EOF
+{"name":"smoke-steps","target_url":"https://example.com/","method":"GET","vus":1,"duration_seconds":5,"steps":[{"type":"http","name":"health","method":"GET","url":"https://example.com/","think_ms":10}],"sla":{"p95_ms":5000,"error_rate_max":1},"datasets":{}}
 EOF
 )")"
-  expect_http 200 "POST /api/perf/scenarios steps"
+  expect_http_any "POST /api/perf/scenarios/upsert steps" 200 403 404
   expect_json_key "$body" "id" "steps scenario id"
   local steps_id
   steps_id="$(printf '%s' "$body" | sed -n 's/.*"id"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -1)"
 
-  if [[ -n "$steps_id" ]]; then
+  if [[ -n "$steps_id" && "$LAST_HTTP" == "200" ]]; then
     body="$(post_json "/api/perf/scenarios/${steps_id}/validate" "{}")"
-    expect_http_any "POST /api/perf/scenarios/{id}/validate" 200 404 503
+    expect_http_any "POST /api/perf/scenarios/{id}/validate" 200 403 404 503
     if [[ "$LAST_HTTP" == "200" ]]; then
       ok "scenario validate"
     else
@@ -711,14 +786,41 @@ EOF
     fi
   fi
 
-  body="$(post_json /api/perf/scenarios/import-jmx "$(cat <<'EOF'
-{"name":"smoke-jmx","jmx":"<?xml version=\"1.0\"?><jmeterTestPlan version=\"1.2\" properties=\"5.0\" jmeter=\"5.5\"><hashTree><TestPlan testname=\"t\"/><hashTree><ThreadGroup testname=\"tg\" enabled=\"true\"><stringProp name=\"ThreadGroup.num_threads\">1</stringProp><stringProp name=\"ThreadGroup.duration\">5</stringProp></ThreadGroup><hashTree><HTTPSamplerProxy testname=\"h\" enabled=\"true\"><stringProp name=\"HTTPSampler.domain\">127.0.0.1</stringProp><stringProp name=\"HTTPSampler.path\">/api/health</stringProp><stringProp name=\"HTTPSampler.method\">GET</stringProp></HTTPSamplerProxy><hashTree/></hashTree></hashTree></hashTree></jmeterTestPlan>"}
+  # Validate blocks private URL (127.0.0.1) in step result.
+  body="$(post_json /api/perf/scenarios/upsert "$(cat <<EOF
+{"name":"smoke-private","target_url":"http://127.0.0.1:8080/api/health","method":"GET","vus":1,"duration_seconds":5,"steps":[{"type":"http","name":"loopback","method":"GET","url":"http://127.0.0.1:8080/api/health"}],"sla":{"p95_ms":5000}}
 EOF
 )")"
-  expect_http_any "POST /api/perf/scenarios/import-jmx" 200 400 404
+  local priv_id=""
+  if [[ "$LAST_HTTP" == "200" ]]; then
+    priv_id="$(printf '%s' "$body" | sed -n 's/.*"id"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -1)"
+  fi
+  if [[ -n "$priv_id" ]]; then
+    body="$(post_json "/api/perf/scenarios/${priv_id}/validate" "{}")"
+    expect_http_any "POST validate private URL" 200 403 404 503
+    if [[ "$LAST_HTTP" == "200" ]]; then
+      if printf '%s' "$body" | grep -Eqi 'url blocked|not allowed|private|loopback'; then
+        ok "validate blocks private URL"
+      elif printf '%s' "$body" | grep -Eq '"ok"[[:space:]]*:[[:space:]]*false'; then
+        ok "validate private URL marked not ok"
+      else
+        soft "validate private URL response missing block signal: $body"
+      fi
+    else
+      soft "validate private URL HTTP $LAST_HTTP"
+    fi
+  else
+    soft "skip private URL validate (upsert failed)"
+  fi
+
+  body="$(post_json /api/perf/scenarios/import-jmx "$(cat <<'EOF'
+{"name":"smoke-jmx","jmx":"<?xml version=\"1.0\"?><jmeterTestPlan version=\"1.2\" properties=\"5.0\" jmeter=\"5.5\"><hashTree><TestPlan testname=\"t\"/><hashTree><ThreadGroup testname=\"tg\" enabled=\"true\"><stringProp name=\"ThreadGroup.num_threads\">1</stringProp><stringProp name=\"ThreadGroup.duration\">5</stringProp></ThreadGroup><hashTree><HTTPSamplerProxy testname=\"h\" enabled=\"true\"><stringProp name=\"HTTPSampler.domain\">example.com</stringProp><stringProp name=\"HTTPSampler.path\">/</stringProp><stringProp name=\"HTTPSampler.method\">GET</stringProp><stringProp name=\"HTTPSampler.protocol\">https</stringProp></HTTPSamplerProxy><hashTree/></hashTree></hashTree></hashTree></jmeterTestPlan>"}
+EOF
+)")"
+  expect_http_any "POST /api/perf/scenarios/import-jmx" 200 400 403 404
   if [[ "$LAST_HTTP" == "200" ]]; then
     expect_json_key "$body" "ok" "import-jmx ok"
-    ok "import-jmx"
+    ok "import-jmx safe HTTP JMX"
   else
     soft "import-jmx HTTP $LAST_HTTP (admin auth may be required)"
   fi
