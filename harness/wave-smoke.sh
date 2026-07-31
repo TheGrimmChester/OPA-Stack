@@ -1,15 +1,18 @@
 #!/usr/bin/env bash
-# Wave 17–30 (plus light 13–16 baseline) API smoke suite against a running agent.
+# Wave 17–31 (plus light 13–16 baseline) API smoke suite against a running agent.
 #
 # Prerequisites:
 #   Agent healthy at AGENT_HTTP (default http://127.0.0.1:8080).
 #   Auth off unless OPA_AUTH_REQUIRED=1 (compose leaves auth open).
 #   Prefer agent image built from wave28-30-verticals (see harness/rebuild-smoke-images.sh).
+#   Wave 31 live JMeter: agent must have docker.sock + OPA_JMETER_IMAGE (compose default).
+#   Skip with SKIP_JMETER_LIVE=1 only when containers cannot be spawned.
 #
 # Usage:
 #   ./harness/wave-smoke.sh
 #   AGENT_HTTP=http://127.0.0.1:8080 ./harness/wave-smoke.sh
 #   docker compose --profile wave-smoke run --rm wave-smoke
+#   SCENARIO_ID=... ./harness/jmeter-perf-gate.sh   # standalone Docker JMeter gate
 #
 # Exit 0 if FAIL==0 (SOFT empty-data warnings are non-fatal unless SMOKE_STRICT=1).
 set -euo pipefail
@@ -1035,15 +1038,21 @@ EOF
     fi
   fi
 
-  # Wave 31 — Docker-first JMeter dispatch + workers scale
-  smoke_wave31_docker_jmeter "${scn_id:-}"
+  # Docker JMeter live run is smoke_wave31() in main (hard fail if containers don't complete).
 }
 
 # ---------------------------------------------------------------------------
+# Wave 31 — Docker-first JMeter: real dispatch must complete (not soft-skip).
+# Set SKIP_JMETER_LIVE=1 only when the agent cannot spawn containers.
 smoke_wave31_docker_jmeter() {
-  section "Wave 31 — Docker JMeter dispatch + scale"
+  section "Wave 31 — Docker JMeter live run (dispatch → passed → gate → samples)"
+  if [[ "${SKIP_JMETER_LIVE:-0}" == "1" ]]; then
+    soft "SKIP_JMETER_LIVE=1 — skipping Docker JMeter live run"
+    return 0
+  fi
+
   local seed_scn="${1:-}"
-  local body scn_id run_id mode workers_n
+  local body scn_id run_id mode workers_n status="" i requests="" gate_ok=""
 
   body="$(post_json /api/perf/scenarios/upsert "$(cat <<EOF
 {"name":"smoke-docker-jmeter","target_url":"https://example.com/","method":"GET","vus":2,"duration_seconds":8,"steps":[{"type":"http","name":"ex","method":"GET","url":"https://example.com/","think_ms":10}],"sla":{"p95_ms":30000,"error_rate_max":1},"thresholds":{"p95_ms":30000,"error_rate_max":1}}
@@ -1051,7 +1060,7 @@ EOF
 )")"
   expect_http_any "POST upsert docker-jmeter scenario" 200 403 404
   if [[ "$LAST_HTTP" != "200" ]]; then
-    soft "docker-jmeter upsert HTTP $LAST_HTTP — skip Docker dispatch smoke"
+    fail "docker-jmeter upsert HTTP $LAST_HTTP (required for live JMeter smoke)"
     return 0
   fi
   scn_id="$(printf '%s' "$body" | sed -n 's/.*"id"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -1)"
@@ -1059,9 +1068,10 @@ EOF
     scn_id="$seed_scn"
   fi
   if [[ -z "$scn_id" ]]; then
-    soft "docker-jmeter scenario id missing — skip"
+    fail "docker-jmeter scenario id missing"
     return 0
   fi
+  ok "docker-jmeter scenario id=${scn_id}"
   sleep 2
 
   # Engine=node without allow flag must not be production path.
@@ -1080,76 +1090,126 @@ EOF
     fi
   fi
 
-  # Primary path: Docker JMeter dispatch
+  # Primary path: Docker JMeter dispatch (workers=1)
   body="$(post_json /api/perf/runs "$(cat <<EOF
 {"scenario_id":"${scn_id}","vus":2,"dispatch":true,"engine":"jmeter","workers":1}
 EOF
 )")"
-  expect_http_any "POST runs Docker JMeter dispatch" 200 403 404
-  if [[ "$LAST_HTTP" != "200" ]]; then
-    soft "Docker JMeter dispatch HTTP $LAST_HTTP — skip"
-    return 0
-  fi
+  expect_http 200 "POST runs Docker JMeter dispatch"
   expect_json_key "$body" "dispatch" "dispatch object"
-  mode="$(printf '%s' "$body" | sed -n 's/.*"mode"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -1)"
-  if printf '%s' "$body" | grep -Eq '"dispatched"[[:space:]]*:[[:space:]]*true'; then
-    ok "JMeter dispatched=true"
-    if [[ "$mode" == "docker" ]]; then
-      ok "JMeter mode=docker (container runner)"
-    elif [[ "$mode" == "bin" || "$mode" == "path" ]]; then
-      soft "JMeter mode=$mode (host bin — expected only with OPA_PERF_ALLOW_HOST_JMETER=1)"
-    else
-      soft "JMeter mode missing/unexpected: $mode body=$body"
-    fi
-  else
-    soft "JMeter not dispatched: $body"
+  if ! printf '%s' "$body" | grep -Eq '"dispatched"[[:space:]]*:[[:space:]]*true'; then
+    fail "JMeter dispatched!=true: $body"
     return 0
   fi
+  ok "JMeter dispatched=true"
+  mode="$(printf '%s' "$body" | sed -n 's/.*"mode"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -1)"
+  if [[ "$mode" != "docker" ]]; then
+    fail "JMeter mode=$mode (want docker)"
+    return 0
+  fi
+  ok "JMeter mode=docker (container runner)"
 
   run_id="$(printf '%s' "$body" | sed -n 's/.*"load_run_id"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -1)"
   if [[ -z "$run_id" ]]; then
     run_id="$(printf '%s' "$body" | sed -n 's/.*"id"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -1)"
   fi
+  if [[ -z "$run_id" ]]; then
+    fail "Docker JMeter run id missing after dispatch"
+    return 0
+  fi
+  ok "Docker JMeter run_id=${run_id}"
 
-  # Scale: workers=2 splits VUs across containers
+  # Poll until terminal — cold JVM / image can take >60s
+  status=""
+  for i in $(seq 1 90); do
+    body="$(get_json "/api/perf/runs/${run_id}")"
+    status="$(printf '%s' "$body" | sed -n 's/.*"status"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -1)"
+    if [[ "$status" == "passed" || "$status" == "failed" || "$status" == "completed" || "$status" == "error" ]]; then
+      break
+    fi
+    sleep 2
+  done
+  if [[ "$status" != "passed" && "$status" != "completed" ]]; then
+    fail "Docker JMeter run terminal status=${status:-unknown} (want passed) body=$body"
+    return 0
+  fi
+  ok "Docker JMeter run status=${status}"
+
+  requests="$(printf '%s' "$body" | python3 -c "
+import json,sys
+d=json.load(sys.stdin)
+sj=d.get('summary_json') or d.get('summary') or {}
+if isinstance(sj,str):
+  try: sj=json.loads(sj)
+  except Exception: sj={}
+print(int(sj.get('requests') or 0))
+" 2>/dev/null || echo 0)"
+  if [[ -n "$requests" && "$requests" -gt 0 ]]; then
+    ok "Docker JMeter summary requests=${requests}"
+  else
+    fail "Docker JMeter summary missing requests>0: $body"
+  fi
+
+  # Gate may lag ClickHouse briefly after status flips to passed
+  gate_ok=""
+  for i in $(seq 1 15); do
+    body="$(get_json "/api/perf/runs/${run_id}/gate")"
+    expect_http 200 "GET Docker JMeter run gate"
+    if printf '%s' "$body" | grep -Eq '"ok"[[:space:]]*:[[:space:]]*true'; then
+      gate_ok=1
+      break
+    fi
+    sleep 2
+  done
+  if [[ "$gate_ok" == "1" ]]; then
+    ok "Docker JMeter SLA gate ok=true"
+  else
+    fail "Docker JMeter SLA gate not ok after poll: $body"
+  fi
+
+  body="$(get_json "/api/perf/runs/${run_id}/samples?limit=5")"
+  expect_http 200 "GET Docker JMeter run samples"
+  if printf '%s' "$body" | grep -Eq '"samples"[[:space:]]*:[[:space:]]*\[\{'; then
+    ok "Docker JMeter samples ingested"
+  else
+    fail "Docker JMeter samples empty/missing: $body"
+  fi
+
+  # Scale: workers=2 splits VUs across containers and must also finish
   body="$(post_json /api/perf/runs "$(cat <<EOF
 {"scenario_id":"${scn_id}","vus":2,"dispatch":true,"engine":"jmeter","workers":2}
 EOF
 )")"
-  expect_http_any "POST runs Docker JMeter workers=2" 200 403 404
-  if [[ "$LAST_HTTP" == "200" ]]; then
-    workers_n="$(printf '%s' "$body" | sed -n 's/.*"workers"[[:space:]]*:[[:space:]]*\([0-9][0-9]*\).*/\1/p' | head -1)"
-    if [[ "$workers_n" == "2" ]] && printf '%s' "$body" | grep -Eq '"dispatched"[[:space:]]*:[[:space:]]*true'; then
-      ok "JMeter workers=2 scale dispatch"
-    else
-      soft "workers scale unexpected: workers=$workers_n body=$body"
+  expect_http 200 "POST runs Docker JMeter workers=2"
+  workers_n="$(printf '%s' "$body" | sed -n 's/.*"workers"[[:space:]]*:[[:space:]]*\([0-9][0-9]*\).*/\1/p' | head -1)"
+  if [[ "$workers_n" != "2" ]] || ! printf '%s' "$body" | grep -Eq '"dispatched"[[:space:]]*:[[:space:]]*true'; then
+    fail "workers=2 dispatch unexpected: workers=$workers_n body=$body"
+    return 0
+  fi
+  ok "JMeter workers=2 scale dispatch"
+  local run2
+  run2="$(printf '%s' "$body" | sed -n 's/.*"load_run_id"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -1)"
+  if [[ -z "$run2" ]]; then
+    run2="$(printf '%s' "$body" | sed -n 's/.*"id"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -1)"
+  fi
+  status=""
+  for i in $(seq 1 90); do
+    body="$(get_json "/api/perf/runs/${run2}")"
+    status="$(printf '%s' "$body" | sed -n 's/.*"status"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -1)"
+    if [[ "$status" == "passed" || "$status" == "failed" || "$status" == "completed" || "$status" == "error" ]]; then
+      break
     fi
+    sleep 2
+  done
+  if [[ "$status" == "passed" || "$status" == "completed" ]]; then
+    ok "Docker JMeter workers=2 run status=${status}"
   else
-    soft "workers=2 dispatch HTTP $LAST_HTTP"
+    fail "Docker JMeter workers=2 terminal status=${status:-unknown}"
   fi
+}
 
-  # Reduce JMeter terminal poll so wave-smoke doesn't hang forever on cold JVM.
-  if [[ -n "$run_id" ]]; then
-    local i status=""
-    for i in $(seq 1 30); do
-      body="$(get_json "/api/perf/runs/${run_id}")"
-      status="$(printf '%s' "$body" | sed -n 's/.*"status"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -1)"
-      if [[ "$status" == "passed" || "$status" == "failed" || "$status" == "completed" || "$status" == "error" ]]; then
-        break
-      fi
-      sleep 2
-    done
-    if [[ "$status" == "passed" || "$status" == "completed" || "$status" == "failed" ]]; then
-      ok "Docker JMeter run reached terminal status=$status"
-      body="$(get_json "/api/perf/runs/${run_id}/gate")"
-      expect_http_any "GET Docker JMeter run gate" 200 404
-      if [[ "$LAST_HTTP" == "200" ]]; then
-        ok "Docker JMeter SLA gate reachable"
-      fi
-    else
-      soft "Docker JMeter run still status=${status:-unknown} after poll (image pull / JVM cold start?)"
-    fi
-  fi
+smoke_wave31() {
+  smoke_wave31_docker_jmeter
 }
 
 # ---------------------------------------------------------------------------
@@ -1285,6 +1345,7 @@ main() {
   smoke_wave28
   smoke_wave29
   smoke_wave30
+  smoke_wave31
   smoke_dashboard_exhaustive
 
   smoke_summary
