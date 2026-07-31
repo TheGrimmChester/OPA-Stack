@@ -60,7 +60,7 @@ services:
       WS_PORT: "8082"
       # auth.go now fails closed if JWT_SECRET is unset/placeholder/<32 bytes.
       # OPA_AUTH_REQUIRED is intentionally unset so smoke can hit APIs without login.
-      # JWT_SECRET (or OPA_CONNECTOR_SECRET) also AES-GCM-encrypts Repo Watch PATs + AI Review API key in CH.
+      # JWT_SECRET (or OPA_CONNECTOR_SECRET) also AES-GCM-encrypts Repo Watch PATs + OPA Review API key in CH.
       JWT_SECRET: "smoke-test-jwt-secret-please-change-in-prod-0123456789"
       OPA_WS_ALLOWED_ORIGINS: "http://localhost:8088"
       OPA_REDACT: "1"
@@ -83,12 +83,15 @@ services:
       OPA_SECURITY_WORKSPACE: "/workspace"
       # Optional override if gitleaks is not on PATH: OPA_GITLEAKS_BIN: "/usr/local/bin/gitleaks"
       # Wave 34 — Repo Watch / AI
-      # SKIP_CURSOR_AI defaults to 0 so persisted/env AI Review keys actually run.
+      # SKIP_CURSOR_AI defaults to 0 so persisted/env OPA Review keys actually run.
       # Smoke without a key still records ai.status=skipped honestly. Set SKIP_CURSOR_AI=1 to force skip.
       # AI agent binary is baked into opa-agent:smoke (glibc/debian). Override path if needed.
       OPA_CURSOR_AGENT_BIN: "${OPA_CURSOR_AGENT_BIN:-/usr/local/bin/agent}"
       OPA_SCM_MOCK_GITHUB: "1"
       SKIP_CURSOR_AI: "${SKIP_CURSOR_AI:-0}"
+      OPA_REVIEW_STACK_CONCURRENCY: "${OPA_REVIEW_STACK_CONCURRENCY:-1}"
+      OPA_REVIEW_BROWSER_MCP: "${OPA_REVIEW_BROWSER_MCP:-1}"
+      # OPA_REVIEW_PREVIEW_URL / OPA_REVIEW_MCP_CONFIG optional for UI visual MCP
       OPA_GITHUB_WEBHOOK_SECRET: "${OPA_GITHUB_WEBHOOK_SECRET:-smoke-webhook-secret}"
       OPA_SCM_ALLOW_UNSIGNED: "${OPA_SCM_ALLOW_UNSIGNED:-0}"
       OPA_PUBLIC_URL: "http://127.0.0.1:8080"
