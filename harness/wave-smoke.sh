@@ -681,6 +681,20 @@ print(meta.get('span_count') or len(spans))
       soft "Dashboard /traces/{id} shell check skipped"
     fi
   fi
+
+  # Wave 32 — trace replay capability catalog
+  body="$(get_json "/api/traces/${tid}/replay")"
+  expect_http 200 "GET /api/traces/{id}/replay"
+  expect_json_key "$body" "modes" "trace replay modes"
+  expect_json_key "$body" "trace_id" "trace replay trace_id"
+  if printf '%s' "$body" | grep -q '"id":"waterfall"'; then
+    ok "replay catalog includes waterfall mode"
+  else
+    fail "replay catalog missing waterfall mode"
+  fi
+  body="$(get_json "/api/traces/${tid}/replay/steps")"
+  expect_http 200 "GET /api/traces/{id}/replay/steps"
+  expect_json_key "$body" "steps" "trace replay steps"
 }
 
 # ---------------------------------------------------------------------------
@@ -1290,6 +1304,62 @@ EOF
     ok "pr-check responded with gate fields"
   else
     soft "pr-check body missing expected gate keys: $body"
+  fi
+
+  # Wave 33 — first-class Security runs (create → dispatch lite scanners → completed).
+  body="$(get_json /api/security/profiles)"
+  expect_http 200 "GET /api/security/profiles"
+  expect_json_key "$body" "profiles" "security profiles"
+  expect_json_key "$body" "scanners" "security scanner catalog"
+
+  body="$(post_json /api/security/runs "$(cat <<EOF
+{"service":"smoke-shop","profile":"full","dispatch":true,"image":"smoke-shop:latest"}
+EOF
+)")"
+  expect_http 200 "POST /api/security/runs"
+  expect_json_key "$body" "ok" "security run create"
+  expect_json_key "$body" "security_run_id" "security_run_id"
+  if ! printf '%s' "$body" | grep -Eq '"dispatched"[[:space:]]*:[[:space:]]*true'; then
+    fail "security run dispatched!=true: $body"
+  else
+    ok "security run dispatched=true"
+  fi
+  local srun_id status="" i counts=""
+  srun_id="$(printf '%s' "$body" | sed -n 's/.*"security_run_id"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -1)"
+  if [[ -z "$srun_id" ]]; then
+    srun_id="$(printf '%s' "$body" | sed -n 's/.*"id"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -1)"
+  fi
+  if [[ -z "$srun_id" ]]; then
+    fail "security run id missing"
+  else
+    ok "security_run_id=${srun_id}"
+    status=""
+    for i in $(seq 1 30); do
+      body="$(get_json "/api/security/runs/${srun_id}")"
+      status="$(printf '%s' "$body" | sed -n 's/.*"status"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -1)"
+      if [[ "$status" == "completed" || "$status" == "completed_with_errors" || "$status" == "failed" || "$status" == "error" ]]; then
+        break
+      fi
+      sleep 1
+    done
+    if [[ "$status" == "completed" || "$status" == "completed_with_errors" ]]; then
+      ok "security run status=${status}"
+    else
+      fail "security run did not complete (status=${status:-empty}): $body"
+    fi
+    body="$(get_json "/api/security/runs/${srun_id}/findings")"
+    expect_http 200 "GET /api/security/runs/{id}/findings"
+    expect_json_key "$body" "counts" "run findings counts"
+    # Workspace fixture should yield at least one secret or sast or iac finding.
+    if printf '%s' "$body" | grep -Eq '"secrets"[[:space:]]*:[[:space:]]*[1-9]|"sast"[[:space:]]*:[[:space:]]*[1-9]|"iac"[[:space:]]*:[[:space:]]*[1-9]'; then
+      ok "security run produced findings (lite/stub)"
+    else
+      # Empty workspace mount is still a completed run — soft so local without mount can pass partially.
+      soft "security run findings empty (is /workspace mounted?): $body"
+    fi
+    body="$(get_json "/api/security/secrets?security_run_id=${srun_id}")"
+    expect_http 200 "GET /api/security/secrets?security_run_id="
+    expect_json_key_or_soft_empty "$body" "findings" "secrets filtered by run"
   fi
 
   # Notebook execute (Wave 26 deepen) — create TQL notebook then execute.
