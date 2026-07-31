@@ -76,6 +76,8 @@ services:
       OPA_JMETER_VOLUME: "${COMPOSE_PROJECT_NAME:-opa-stack}_jmeter-work"
       OPA_JMETER_NETWORK: "${COMPOSE_PROJECT_NAME:-opa-stack}_default"
       OPA_JMETER_WORKERS: "1"
+      # Allow JMeter → instrumented node-app (private Docker DNS) for load_run_id traces.
+      OPA_PERF_INTERNAL_HOSTS: "node-app"
     volumes:
       - ./harness/fixtures:/fixtures:ro
       - jmeter-work:/opa-jmeter
