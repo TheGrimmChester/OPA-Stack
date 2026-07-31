@@ -980,10 +980,10 @@ EOF
     soft "workers=2 dispatch HTTP $LAST_HTTP"
   fi
 
-  # Poll first docker run to terminal (async JMeter container)
+  # Reduce JMeter terminal poll so wave-smoke doesn't hang forever on cold JVM.
   if [[ -n "$run_id" ]]; then
     local i status=""
-    for i in $(seq 1 45); do
+    for i in $(seq 1 30); do
       body="$(get_json "/api/perf/runs/${run_id}")"
       status="$(printf '%s' "$body" | sed -n 's/.*"status"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -1)"
       if [[ "$status" == "passed" || "$status" == "failed" || "$status" == "completed" || "$status" == "error" ]]; then
@@ -1096,6 +1096,21 @@ EOF
 }
 
 # ---------------------------------------------------------------------------
+smoke_dashboard_exhaustive() {
+  section "Dashboard exhaustive panels (SPA + APIs)"
+  local dash_script="$ROOT/harness/dashboard-smoke.sh"
+  if [[ ! -f "$dash_script" ]]; then
+    soft "dashboard-smoke.sh missing — skip exhaustive panel coverage"
+    return 0
+  fi
+  export DASH_HTTP="${DASH_HTTP:-http://127.0.0.1:8088}"
+  export SKIP_BROWSER="${SKIP_BROWSER:-1}"
+  # shellcheck disable=SC1090
+  source "$dash_script"
+  run_dashboard_smoke_nested
+}
+
+# ---------------------------------------------------------------------------
 main() {
   smoke_reset_counters
   printf 'OPA wave smoke → %s (org=%s project=%s)\n' "$AGENT_HTTP" "$ORG_ID" "$PROJECT_ID"
@@ -1121,6 +1136,7 @@ main() {
   smoke_wave28
   smoke_wave29
   smoke_wave30
+  smoke_dashboard_exhaustive
 
   smoke_summary
 }

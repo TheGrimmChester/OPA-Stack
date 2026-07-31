@@ -206,10 +206,14 @@ services:
     depends_on:
       agent:
         condition: service_healthy
+      dashboard:
+        condition: service_started
     volumes:
       - ./harness:/harness:ro
     environment:
       AGENT_HTTP: "http://agent:8080"
+      DASH_HTTP: "http://dashboard"
+      SKIP_BROWSER: "1"
       ORG_ID: "test-org"
       PROJECT_ID: "default-project"
       SMOKE_TIMEOUT_S: "10"
