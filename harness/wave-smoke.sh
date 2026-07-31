@@ -544,8 +544,9 @@ EOF
 # ---------------------------------------------------------------------------
 # Browser RUM vitals (Wave 12 SLO path used by Dashboard). Regression for
 # ClickHouse Code 47 when outer SELECT referenced web_vitals after rumDedupe.
+# Also asserts CrUX-style field p75, thresholds, and attribution endpoint.
 smoke_rum_vitals() {
-  section "RUM vitals — /api/rum/slo + /api/rum/metrics"
+  section "RUM vitals — /api/rum/slo + /api/rum/metrics + attribution"
 
   local sid="smoke-vitals-$(date +%s)"
   local pv="pv-vitals-$(date +%s)"
@@ -553,7 +554,7 @@ smoke_rum_vitals() {
   now_ms="$(($(date +%s) * 1000))"
 
   body="$(http_req POST /api/rum "${JSON_HDR[@]}" "${ORG_HDR[@]}" "${PROJ_HDR[@]}" --data "$(cat <<EOF
-{"organization_id":"${ORG_ID}","project_id":"${PROJECT_ID}","session_id":"${sid}","page_view_id":"${pv}","page_url":"https://shop.example.com/checkout","user_agent":"Mozilla/5.0 smoke","timestamp":${now_ms},"navigation_timing":{"total":1284,"dom":743,"ttfb":188},"web_vitals":{"lcp":1450,"cls":0.042,"inp":96,"fcp":820,"ttfb":188,"fid":12},"resource_timing":[],"ajax_requests":[],"errors":[],"viewport":{"width":1440,"height":900}}
+{"organization_id":"${ORG_ID}","project_id":"${PROJECT_ID}","session_id":"${sid}","page_view_id":"${pv}","page_url":"https://shop.example.com/checkout","route":"/checkout","user_agent":"Mozilla/5.0 smoke","timestamp":${now_ms},"navigation_timing":{"total":1284,"dom":743,"ttfb":188},"web_vitals":{"lcp":1450,"cls":0.042,"inp":96,"fcp":820,"ttfb":188,"fid":12},"web_vitals_elements":{"lcp":{"value":1450,"element":"img.hero","url":"https://cdn.example.com/hero.webp","size":42000},"inp":{"value":96,"element":"button#pay","name":"click","interactionId":7},"cls":[{"value":0.042,"element":"div.banner"}]},"resource_timing":[],"ajax_requests":[],"errors":[],"viewport":{"width":1440,"height":900}}
 EOF
 )")"
   expect_http_any "POST /api/rum" 200 204
@@ -561,6 +562,15 @@ EOF
     fail "RUM beacon ingest HTTP $LAST_HTTP"
     return 0
   fi
+
+  # Second beacon: poor LCP / INP so histogram buckets are exercised.
+  local sid2="smoke-vitals-poor-$(date +%s)"
+  local pv2="pv-vitals-poor-$(date +%s)"
+  body="$(http_req POST /api/rum "${JSON_HDR[@]}" "${ORG_HDR[@]}" "${PROJ_HDR[@]}" --data "$(cat <<EOF
+{"organization_id":"${ORG_ID}","project_id":"${PROJECT_ID}","session_id":"${sid2}","page_view_id":"${pv2}","page_url":"https://shop.example.com/slow","route":"/slow","user_agent":"Mozilla/5.0 smoke","timestamp":${now_ms},"navigation_timing":{"total":5200,"dom":2100,"ttfb":900},"web_vitals":{"lcp":5100,"cls":0.31,"inp":620,"fcp":2400,"ttfb":900},"web_vitals_elements":{"lcp":{"value":5100,"element":"div.slow-hero","url":"","size":0},"inp":{"value":620,"element":"a.nav","name":"pointerdown","interactionId":3},"cls":[{"value":0.31,"element":"aside.ads"}]},"resource_timing":[],"ajax_requests":[],"errors":[],"viewport":{"width":1280,"height":800}}
+EOF
+)")"
+  expect_http_any "POST /api/rum (poor vitals)" 200 204
 
   sleep 2
 
@@ -575,6 +585,21 @@ EOF
     else
       soft "GET /api/rum/slo missing lcp (empty window OK)"
     fi
+    if printf '%s' "$body" | grep -q '"thresholds"'; then
+      ok "GET /api/rum/slo includes thresholds"
+    else
+      soft "GET /api/rum/slo missing thresholds (older agent?)"
+    fi
+    if printf '%s' "$body" | grep -q '"histogram"'; then
+      ok "GET /api/rum/slo includes histogram shares"
+    else
+      soft "GET /api/rum/slo missing histogram"
+    fi
+    if printf '%s' "$body" | grep -q '"source":"field"\|"source": "field"'; then
+      ok "GET /api/rum/slo declares field source"
+    else
+      soft "GET /api/rum/slo missing source=field"
+    fi
   else
     fail "GET /api/rum/slo missing .slo: $body"
   fi
@@ -585,8 +610,31 @@ EOF
     fail "GET /api/rum/metrics ClickHouse error: $body"
   elif printf '%s' "$body" | grep -q 'core_web_vitals'; then
     ok "GET /api/rum/metrics has core_web_vitals"
+    if printf '%s' "$body" | grep -q '"samples"'; then
+      ok "GET /api/rum/metrics includes sample counts"
+    else
+      soft "GET /api/rum/metrics missing samples"
+    fi
+    if printf '%s' "$body" | grep -Eqi 'UNKNOWN_IDENTIFIER'; then
+      fail "GET /api/rum/metrics still Code 47"
+    fi
   else
     fail "GET /api/rum/metrics missing core_web_vitals: $body"
+  fi
+
+  body="$(get_json '/api/rum/vitals/attribution?hours=24')"
+  expect_http 200 "GET /api/rum/vitals/attribution"
+  if printf '%s' "$body" | grep -Eqi 'UNKNOWN_IDENTIFIER|ClickHouse error'; then
+    fail "GET /api/rum/vitals/attribution ClickHouse error: $body"
+  elif printf '%s' "$body" | grep -q 'lcp_elements'; then
+    ok "GET /api/rum/vitals/attribution has lcp_elements"
+    if printf '%s' "$body" | grep -q 'by_route'; then
+      ok "GET /api/rum/vitals/attribution has by_route"
+    else
+      soft "GET /api/rum/vitals/attribution missing by_route"
+    fi
+  else
+    fail "GET /api/rum/vitals/attribution missing lcp_elements: $body"
   fi
 }
 
@@ -1432,6 +1480,15 @@ EOF
     body="$(get_json "/api/connectors/${conn_id}/watched")"
     expect_http 200 "GET watched repos"
     expect_json_key "$body" "watched" "watched list"
+
+    body="$(get_json "/api/connectors/${conn_id}/repos")"
+    expect_http 200 "GET connector repos"
+    expect_json_key "$body" "repos" "installable repos"
+    if printf '%s' "$body" | grep -q 'local/smoke-repo'; then
+      ok "mock/installable repos include local/smoke-repo"
+    else
+      soft "repos list missing local/smoke-repo (ok if real GitHub PAT): $body"
+    fi
 
     body="$(post_json /api/scm/simulate "$(cat <<EOF
 {"repo":"local/smoke-repo","pr":42,"service":"smoke-shop","profile":"full"}
