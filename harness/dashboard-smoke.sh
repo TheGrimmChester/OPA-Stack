@@ -179,6 +179,8 @@ smoke_dashboard_apis() {
   panel_api "/api/security/iac?limit=50" "security iac"
   panel_api "/api/security/policies" "security policies"
   panel_api "/api/security/pr-check" "security pr-check"
+  panel_api "/api/security/profiles" "security profiles"
+  panel_api "/api/security/runs?limit=20" "security runs"
   panel_api "/api/diagnostics/suspect-commits?hours=24" "diagnostics suspects"
   panel_api "/api/diagnostics/heap" "diagnostics heap"
   panel_api "/api/diagnostics/threads" "diagnostics threads"
