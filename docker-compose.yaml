@@ -78,8 +78,9 @@ services:
       OPA_JMETER_WORKERS: "1"
       # Allow JMeter → instrumented node-app (private Docker DNS) for load_run_id traces.
       OPA_PERF_INTERNAL_HOSTS: "node-app"
-      # Wave 33 — Security runs: scan workspace mount for embedded lite scanners.
+      # Wave 33 — Security runs: scan workspace mount (secrets via gitleaks in image, else lite).
       OPA_SECURITY_WORKSPACE: "/workspace"
+      # Optional override if gitleaks is not on PATH: OPA_GITLEAKS_BIN: "/usr/local/bin/gitleaks"
       # Wave 34 — Repo Watch / AI (smoke: mock GitHub + skip Cursor CLI)
       OPA_SCM_MOCK_GITHUB: "1"
       SKIP_CURSOR_AI: "${SKIP_CURSOR_AI:-1}"

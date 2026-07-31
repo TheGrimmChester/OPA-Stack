@@ -1401,7 +1401,7 @@ EOF
     expect_json_key "$body" "counts" "run findings counts"
     # Workspace fixture should yield at least one secret or sast or iac finding.
     if printf '%s' "$body" | grep -Eq '"secrets"[[:space:]]*:[[:space:]]*[1-9]|"sast"[[:space:]]*:[[:space:]]*[1-9]|"iac"[[:space:]]*:[[:space:]]*[1-9]'; then
-      ok "security run produced findings (lite/stub)"
+      ok "security run produced findings (gitleaks|lite/stub)"
     else
       # Empty workspace mount is still a completed run — soft so local without mount can pass partially.
       soft "security run findings empty (is /workspace mounted?): $body"
@@ -1409,6 +1409,21 @@ EOF
     body="$(get_json "/api/security/secrets?security_run_id=${srun_id}")"
     expect_http 200 "GET /api/security/secrets?security_run_id="
     expect_json_key_or_soft_empty "$body" "findings" "secrets filtered by run"
+    # Soft: prefer gitleaks detector when binary is in the Agent image; older images keep lite.
+    if printf '%s' "$body" | grep -Eq '"detector"[[:space:]]*:[[:space:]]*"gitleaks"'; then
+      ok "secrets detector=gitleaks"
+    elif printf '%s' "$body" | grep -Eq '"detector"[[:space:]]*:[[:space:]]*"embedded-secret-scan"'; then
+      soft "secrets detector=embedded-secret-scan (gitleaks binary missing in image — ok for older smoke images)"
+    else
+      soft "secrets detector not visible yet (CH lag or empty findings)"
+    fi
+    # Profiles catalog should advertise gitleaks availability honestly.
+    body="$(get_json /api/security/profiles)"
+    if printf '%s' "$body" | grep -Eq '"mode"[[:space:]]*:[[:space:]]*"gitleaks"'; then
+      ok "security profiles secrets mode=gitleaks"
+    else
+      soft "security profiles secrets mode!=gitleaks (binary not in Agent image)"
+    fi
   fi
 
   # Notebook execute (Wave 26 deepen) — create TQL notebook then execute.
