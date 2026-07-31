@@ -82,9 +82,11 @@ services:
       # Wave 33 — Security runs: scan workspace mount (secrets via gitleaks in image, else lite).
       OPA_SECURITY_WORKSPACE: "/workspace"
       # Optional override if gitleaks is not on PATH: OPA_GITLEAKS_BIN: "/usr/local/bin/gitleaks"
-      # Wave 34 — Repo Watch / AI (smoke: mock GitHub + skip Cursor CLI)
+      # Wave 34 — Repo Watch / AI
+      # SKIP_CURSOR_AI defaults to 0 so persisted/env Cursor keys actually run AI Review.
+      # Smoke without a key still records ai.status=skipped honestly. Set SKIP_CURSOR_AI=1 to force skip.
       OPA_SCM_MOCK_GITHUB: "1"
-      SKIP_CURSOR_AI: "${SKIP_CURSOR_AI:-1}"
+      SKIP_CURSOR_AI: "${SKIP_CURSOR_AI:-0}"
       OPA_GITHUB_WEBHOOK_SECRET: "${OPA_GITHUB_WEBHOOK_SECRET:-smoke-webhook-secret}"
       OPA_SCM_ALLOW_UNSIGNED: "${OPA_SCM_ALLOW_UNSIGNED:-0}"
       OPA_PUBLIC_URL: "http://127.0.0.1:8080"
