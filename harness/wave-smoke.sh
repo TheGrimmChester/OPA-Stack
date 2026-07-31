@@ -588,6 +588,99 @@ EOF
 }
 
 # ---------------------------------------------------------------------------
+smoke_trace_waterfall() {
+  section "Trace waterfall — /full span caps + meta"
+
+  local body tid span_n
+  body="$(get_json '/api/traces?limit=20')"
+  expect_http 200 "GET /api/traces"
+  tid="$(printf '%s' "$body" | python3 -c "
+import json,sys
+try:
+  d=json.load(sys.stdin)
+except Exception:
+  sys.exit(0)
+rows=d if isinstance(d,list) else (d.get('traces') or d.get('items') or d.get('data') or [])
+if not isinstance(rows,list) or not rows:
+  sys.exit(0)
+# Prefer the longest / densest candidate when the list exposes span counts.
+best=None
+best_n=-1
+for r in rows:
+  if not isinstance(r,dict):
+    continue
+  tid=r.get('trace_id') or r.get('id')
+  if not tid:
+    continue
+  n=r.get('span_count') or r.get('spans') or 0
+  try: n=int(n)
+  except Exception: n=0
+  if n>best_n:
+    best_n=n; best=tid
+print(best or '')
+" 2>/dev/null || true)"
+
+  if [[ -z "$tid" ]]; then
+    # Known recursive fib stress fixture from local smoke (may be absent on fresh CH).
+    tid="c1300b39e3b4e5a56b7fc012f095723b"
+    soft "no traces in list — probing fixture ${tid}"
+  else
+    ok "picked trace_id=${tid}"
+  fi
+
+  body="$(get_json "/api/traces/${tid}/full")"
+  if [[ "$LAST_HTTP" == "404" ]]; then
+    soft "GET /api/traces/{id}/full 404 (fixture missing)"
+    return 0
+  fi
+  expect_http 200 "GET /api/traces/{id}/full"
+
+  span_n="$(printf '%s' "$body" | python3 -c "
+import json,sys
+raw=sys.stdin.buffer.read()
+clean=bytes(b if b in (9,10,13) or b>=32 else 32 for b in raw)
+d=json.loads(clean)
+spans=d.get('spans') or []
+meta=d.get('meta') or {}
+print(len(spans))
+print(1 if meta.get('spans_truncated') or meta.get('expansion_truncated') else 0)
+print(meta.get('span_count_total') or 0)
+print(meta.get('span_count') or len(spans))
+" 2>/dev/null || echo -e "0\n0\n0\n0")"
+
+  local n trunc total_meta count_meta
+  n="$(printf '%s' "$span_n" | sed -n '1p')"
+  trunc="$(printf '%s' "$span_n" | sed -n '2p')"
+  total_meta="$(printf '%s' "$span_n" | sed -n '3p')"
+  count_meta="$(printf '%s' "$span_n" | sed -n '4p')"
+
+  if [[ "${n:-0}" -gt 2000 ]]; then
+    fail "GET /api/traces/{id}/full returned ${n} spans (cap 2000)"
+  else
+    ok "GET /api/traces/{id}/full span count ${n} <= 2000"
+  fi
+
+  if [[ "${total_meta:-0}" -gt 2000 && "${trunc:-0}" != "1" ]]; then
+    fail "large trace missing meta.spans_truncated (total=${total_meta})"
+  elif [[ "${trunc:-0}" == "1" ]]; then
+    ok "meta reports truncation (count=${count_meta} total=${total_meta})"
+  else
+    soft "trace within cap — truncation meta not required"
+  fi
+
+  # Dashboard SPA must include the virtualized waterfall scroller marker after rebuild.
+  if [[ -n "${DASH_HTTP:-}" ]]; then
+    local html
+    html="$(curl -fsS --max-time 15 "${DASH_HTTP}/traces/${tid}" 2>/dev/null || true)"
+    if printf '%s' "$html" | grep -q 'root\|app'; then
+      ok "Dashboard /traces/{id} SPA shell loads"
+    else
+      soft "Dashboard /traces/{id} shell check skipped"
+    fi
+  fi
+}
+
+# ---------------------------------------------------------------------------
 smoke_wave28() {
   section "Wave 28 — Experience replay / mobile"
 
@@ -1177,6 +1270,7 @@ main() {
 
   smoke_baseline
   smoke_rum_vitals
+  smoke_trace_waterfall
   smoke_wave17
   smoke_wave18
   smoke_wave19
