@@ -539,6 +539,55 @@ EOF
 }
 
 # ---------------------------------------------------------------------------
+# Browser RUM vitals (Wave 12 SLO path used by Dashboard). Regression for
+# ClickHouse Code 47 when outer SELECT referenced web_vitals after rumDedupe.
+smoke_rum_vitals() {
+  section "RUM vitals — /api/rum/slo + /api/rum/metrics"
+
+  local sid="smoke-vitals-$(date +%s)"
+  local pv="pv-vitals-$(date +%s)"
+  local now_ms body
+  now_ms="$(($(date +%s) * 1000))"
+
+  body="$(http_req POST /api/rum "${JSON_HDR[@]}" "${ORG_HDR[@]}" "${PROJ_HDR[@]}" --data "$(cat <<EOF
+{"organization_id":"${ORG_ID}","project_id":"${PROJECT_ID}","session_id":"${sid}","page_view_id":"${pv}","page_url":"https://shop.example.com/checkout","user_agent":"Mozilla/5.0 smoke","timestamp":${now_ms},"navigation_timing":{"total":1284,"dom":743,"ttfb":188},"web_vitals":{"lcp":1450,"cls":0.042,"inp":96,"fcp":820,"ttfb":188,"fid":12},"resource_timing":[],"ajax_requests":[],"errors":[],"viewport":{"width":1440,"height":900}}
+EOF
+)")"
+  expect_http_any "POST /api/rum" 200 204
+  if [[ "$LAST_HTTP" != "204" && "$LAST_HTTP" != "200" ]]; then
+    fail "RUM beacon ingest HTTP $LAST_HTTP"
+    return 0
+  fi
+
+  sleep 2
+
+  body="$(get_json '/api/rum/slo?hours=24')"
+  expect_http 200 "GET /api/rum/slo"
+  if printf '%s' "$body" | grep -Eqi 'UNKNOWN_IDENTIFIER|ClickHouse error'; then
+    fail "GET /api/rum/slo ClickHouse error: $body"
+  elif printf '%s' "$body" | grep -q '"slo"'; then
+    ok "GET /api/rum/slo has .slo"
+    if printf '%s' "$body" | grep -q '"lcp"'; then
+      ok "GET /api/rum/slo has lcp budget block"
+    else
+      soft "GET /api/rum/slo missing lcp (empty window OK)"
+    fi
+  else
+    fail "GET /api/rum/slo missing .slo: $body"
+  fi
+
+  body="$(get_json /api/rum/metrics)"
+  expect_http 200 "GET /api/rum/metrics"
+  if printf '%s' "$body" | grep -Eqi 'UNKNOWN_IDENTIFIER|ClickHouse error'; then
+    fail "GET /api/rum/metrics ClickHouse error: $body"
+  elif printf '%s' "$body" | grep -q 'core_web_vitals'; then
+    ok "GET /api/rum/metrics has core_web_vitals"
+  else
+    fail "GET /api/rum/metrics missing core_web_vitals: $body"
+  fi
+}
+
+# ---------------------------------------------------------------------------
 smoke_wave28() {
   section "Wave 28 — Experience replay / mobile"
 
@@ -837,6 +886,122 @@ EOF
   else
     soft "import-jmx HTTP $LAST_HTTP (admin auth may be required)"
   fi
+
+  # Wave 31 — Docker-first JMeter dispatch + workers scale
+  smoke_wave31_docker_jmeter "${scn_id:-}"
+}
+
+# ---------------------------------------------------------------------------
+smoke_wave31_docker_jmeter() {
+  section "Wave 31 — Docker JMeter dispatch + scale"
+  local seed_scn="${1:-}"
+  local body scn_id run_id mode workers_n
+
+  body="$(post_json /api/perf/scenarios/upsert "$(cat <<EOF
+{"name":"smoke-docker-jmeter","target_url":"https://example.com/","method":"GET","vus":2,"duration_seconds":8,"steps":[{"type":"http","name":"ex","method":"GET","url":"https://example.com/","think_ms":10}],"sla":{"p95_ms":30000,"error_rate_max":1},"thresholds":{"p95_ms":30000,"error_rate_max":1}}
+EOF
+)")"
+  expect_http_any "POST upsert docker-jmeter scenario" 200 403 404
+  if [[ "$LAST_HTTP" != "200" ]]; then
+    soft "docker-jmeter upsert HTTP $LAST_HTTP — skip Docker dispatch smoke"
+    return 0
+  fi
+  scn_id="$(printf '%s' "$body" | sed -n 's/.*"id"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -1)"
+  if [[ -z "$scn_id" ]]; then
+    scn_id="$seed_scn"
+  fi
+  if [[ -z "$scn_id" ]]; then
+    soft "docker-jmeter scenario id missing — skip"
+    return 0
+  fi
+  sleep 2
+
+  # Engine=node without allow flag must not be production path.
+  body="$(post_json /api/perf/runs "$(cat <<EOF
+{"scenario_id":"${scn_id}","vus":1,"dispatch":true,"engine":"node"}
+EOF
+)")"
+  expect_http_any "POST runs engine=node (gated)" 200 403 404
+  if [[ "$LAST_HTTP" == "200" ]]; then
+    if printf '%s' "$body" | grep -Eqi 'OPA_PERF_ALLOW_NODE_FALLBACK|dev-only|disabled|Node engine is dev-only'; then
+      ok "Node engine gated without OPA_PERF_ALLOW_NODE_FALLBACK"
+    elif printf '%s' "$body" | grep -Eq '"dispatched"[[:space:]]*:[[:space:]]*true'; then
+      soft "Node dispatch succeeded without allow flag (agent may have OPA_PERF_ALLOW_NODE_FALLBACK=1)"
+    else
+      ok "Node engine not auto-dispatched (gated)"
+    fi
+  fi
+
+  # Primary path: Docker JMeter dispatch
+  body="$(post_json /api/perf/runs "$(cat <<EOF
+{"scenario_id":"${scn_id}","vus":2,"dispatch":true,"engine":"jmeter","workers":1}
+EOF
+)")"
+  expect_http_any "POST runs Docker JMeter dispatch" 200 403 404
+  if [[ "$LAST_HTTP" != "200" ]]; then
+    soft "Docker JMeter dispatch HTTP $LAST_HTTP — skip"
+    return 0
+  fi
+  expect_json_key "$body" "dispatch" "dispatch object"
+  mode="$(printf '%s' "$body" | sed -n 's/.*"mode"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -1)"
+  if printf '%s' "$body" | grep -Eq '"dispatched"[[:space:]]*:[[:space:]]*true'; then
+    ok "JMeter dispatched=true"
+    if [[ "$mode" == "docker" ]]; then
+      ok "JMeter mode=docker (container runner)"
+    elif [[ "$mode" == "bin" || "$mode" == "path" ]]; then
+      soft "JMeter mode=$mode (host bin — expected only with OPA_PERF_ALLOW_HOST_JMETER=1)"
+    else
+      soft "JMeter mode missing/unexpected: $mode body=$body"
+    fi
+  else
+    soft "JMeter not dispatched: $body"
+    return 0
+  fi
+
+  run_id="$(printf '%s' "$body" | sed -n 's/.*"load_run_id"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -1)"
+  if [[ -z "$run_id" ]]; then
+    run_id="$(printf '%s' "$body" | sed -n 's/.*"id"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -1)"
+  fi
+
+  # Scale: workers=2 splits VUs across containers
+  body="$(post_json /api/perf/runs "$(cat <<EOF
+{"scenario_id":"${scn_id}","vus":2,"dispatch":true,"engine":"jmeter","workers":2}
+EOF
+)")"
+  expect_http_any "POST runs Docker JMeter workers=2" 200 403 404
+  if [[ "$LAST_HTTP" == "200" ]]; then
+    workers_n="$(printf '%s' "$body" | sed -n 's/.*"workers"[[:space:]]*:[[:space:]]*\([0-9][0-9]*\).*/\1/p' | head -1)"
+    if [[ "$workers_n" == "2" ]] && printf '%s' "$body" | grep -Eq '"dispatched"[[:space:]]*:[[:space:]]*true'; then
+      ok "JMeter workers=2 scale dispatch"
+    else
+      soft "workers scale unexpected: workers=$workers_n body=$body"
+    fi
+  else
+    soft "workers=2 dispatch HTTP $LAST_HTTP"
+  fi
+
+  # Poll first docker run to terminal (async JMeter container)
+  if [[ -n "$run_id" ]]; then
+    local i status=""
+    for i in $(seq 1 45); do
+      body="$(get_json "/api/perf/runs/${run_id}")"
+      status="$(printf '%s' "$body" | sed -n 's/.*"status"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -1)"
+      if [[ "$status" == "passed" || "$status" == "failed" || "$status" == "completed" || "$status" == "error" ]]; then
+        break
+      fi
+      sleep 2
+    done
+    if [[ "$status" == "passed" || "$status" == "completed" || "$status" == "failed" ]]; then
+      ok "Docker JMeter run reached terminal status=$status"
+      body="$(get_json "/api/perf/runs/${run_id}/gate")"
+      expect_http_any "GET Docker JMeter run gate" 200 404
+      if [[ "$LAST_HTTP" == "200" ]]; then
+        ok "Docker JMeter SLA gate reachable"
+      fi
+    else
+      soft "Docker JMeter run still status=${status:-unknown} after poll (image pull / JVM cold start?)"
+    fi
+  fi
 }
 
 # ---------------------------------------------------------------------------
@@ -941,6 +1106,7 @@ main() {
   fi
 
   smoke_baseline
+  smoke_rum_vitals
   smoke_wave17
   smoke_wave18
   smoke_wave19

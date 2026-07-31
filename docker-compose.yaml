@@ -67,8 +67,18 @@ services:
       OPA_CLOUD_REQUIRED_TAGS: "env,service,owner"
       OPA_NETWORK_SAMPLER: "1"
       OPA_REGION: "eu-west-1"
+      # Wave 31 — Docker-first JMeter Perf Lab (ephemeral containers via docker.sock)
+      OPA_PERF_ENGINE: "jmeter"
+      OPA_JMETER_IMAGE: "${OPA_JMETER_IMAGE:-justb4/jmeter:5.5}"
+      OPA_JMETER_WORK: "/opa-jmeter"
+      # Named volume as seen by the Docker daemon (compose project prefix).
+      OPA_JMETER_VOLUME: "${COMPOSE_PROJECT_NAME:-opa-stack}_jmeter-work"
+      OPA_JMETER_NETWORK: "${COMPOSE_PROJECT_NAME:-opa-stack}_default"
+      OPA_JMETER_WORKERS: "1"
     volumes:
       - ./harness/fixtures:/fixtures:ro
+      - jmeter-work:/opa-jmeter
+      - /var/run/docker.sock:/var/run/docker.sock
     ports:
       - "8080:8080"   # admin/query API
       - "2112:2112"   # prometheus metrics
@@ -209,3 +219,7 @@ services:
         set -e
         apk add --no-cache bash curl >/dev/null
         exec bash /harness/wave-smoke.sh
+
+volumes:
+  jmeter-work:
+    name: ${COMPOSE_PROJECT_NAME:-opa-stack}_jmeter-work
