@@ -1492,6 +1492,35 @@ EOF
   body="$(get_json /api/scm/jobs)"
   expect_http 200 "GET /api/scm/jobs"
   expect_json_key "$body" "jobs" "scm jobs list"
+
+  # Signed webhook fixture (HMAC) → enqueue PR job (mock GitHub checkout).
+  local wh_secret wh_body wh_sig wh_code
+  wh_secret="${OPA_GITHUB_WEBHOOK_SECRET:-smoke-webhook-secret}"
+  wh_body='{"action":"opened","number":7,"pull_request":{"number":7,"title":"smoke PR","body":"wave34","draft":false,"head":{"sha":"abc123deadbeef","ref":"feature/smoke"}},"repository":{"full_name":"local/smoke-repo"},"installation":{"id":0}}'
+  if command -v openssl >/dev/null 2>&1; then
+    wh_sig="sha256=$(printf '%s' "$wh_body" | openssl dgst -sha256 -hmac "$wh_secret" | awk '{print $NF}')"
+  elif command -v python3 >/dev/null 2>&1; then
+    wh_sig="sha256=$(OPA_WH_BODY="$wh_body" OPA_WH_SECRET="$wh_secret" python3 -c 'import os,hmac,hashlib; print(hmac.new(os.environ["OPA_WH_SECRET"].encode(), os.environ["OPA_WH_BODY"].encode(), hashlib.sha256).hexdigest())')"
+  else
+    soft "openssl/python3 missing — skip signed webhook"
+    return 0
+  fi
+  wh_code="$(curl -sS -o /tmp/opa-wh.json -w '%{http_code}' -X POST \
+    -H "Content-Type: application/json" \
+    -H "X-GitHub-Event: pull_request" \
+    -H "X-Hub-Signature-256: ${wh_sig}" \
+    -d "$wh_body" \
+    "${AGENT_HTTP%/}/v1/scm/github/webhook" || echo "000")"
+  LAST_HTTP="$wh_code"
+  body="$(cat /tmp/opa-wh.json 2>/dev/null || true)"
+  if [[ "$wh_code" == "200" ]]; then
+    ok "signed webhook HTTP 200"
+    expect_json_key "$body" "job_id" "webhook job_id"
+  elif [[ "$wh_code" == "401" ]]; then
+    soft "signed webhook 401 (agent secret mismatch) — set OPA_GITHUB_WEBHOOK_SECRET=$wh_secret"
+  else
+    fail "signed webhook unexpected HTTP ${wh_code:-empty}: $body"
+  fi
 }
 
 # ---------------------------------------------------------------------------
