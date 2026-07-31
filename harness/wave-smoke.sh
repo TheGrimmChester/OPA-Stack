@@ -1,16 +1,17 @@
 #!/usr/bin/env bash
-# Wave 17–31 (plus light 13–16 baseline) API smoke suite against a running agent.
+# Wave 17–34 (plus light 13–16 baseline) API smoke suite against the smoke stack.
 #
 # Prerequisites:
 #   Agent healthy at AGENT_HTTP (default http://127.0.0.1:8080).
+#   Orchestrator at ORCHESTRATOR_HTTP (default :8091; falls back to AGENT_HTTP).
+#   Perf Lab at PERF_LAB_HTTP (default :8092; falls back to AGENT_HTTP).
 #   Auth off unless OPA_AUTH_REQUIRED=1 (compose leaves auth open).
-#   Prefer agent image built from wave28-30-verticals (see harness/rebuild-smoke-images.sh).
-#   Wave 31 live JMeter: agent must have docker.sock + OPA_JMETER_IMAGE (compose default).
+#   Wave 31 live JMeter: perf-lab must have docker.sock + OPA_JMETER_IMAGE (compose default).
 #   Skip with SKIP_JMETER_LIVE=1 only when containers cannot be spawned.
 #
 # Usage:
 #   ./harness/wave-smoke.sh
-#   AGENT_HTTP=http://127.0.0.1:8080 ./harness/wave-smoke.sh
+#   AGENT_HTTP=http://127.0.0.1:8080 ORCHESTRATOR_HTTP=http://127.0.0.1:8091 PERF_LAB_HTTP=http://127.0.0.1:8092 ./harness/wave-smoke.sh
 #   docker compose --profile wave-smoke run --rm wave-smoke
 #   SCENARIO_ID=... ./harness/jmeter-perf-gate.sh   # standalone Docker JMeter gate
 #
@@ -1688,7 +1689,7 @@ EOF
     -H "X-GitHub-Event: pull_request" \
     -H "X-Hub-Signature-256: ${wh_sig}" \
     -d "$wh_body" \
-    "${AGENT_HTTP%/}/v1/scm/github/webhook" || echo "000")"
+    "${ORCHESTRATOR_HTTP%/}/v1/scm/github/webhook" || echo "000")"
   LAST_HTTP="$wh_code"
   body="$(cat /tmp/opa-wh.json 2>/dev/null || true)"
   if [[ "$wh_code" == "200" ]]; then
