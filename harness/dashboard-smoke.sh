@@ -98,13 +98,18 @@ smoke_dashboard_routes() {
     /key-transactions \
     /commands \
     /traces \
+    "/traces?load_run_id=smoke-crosslink" \
+    "/traces?session_id=smoke-session" \
+    "/traces?check_id=smoke-check" \
     /profiling \
     /errors \
     /logs \
+    "/logs?service=smoke-shop" \
     /alerts \
     /slos \
     /anomalies \
     /synthetics \
+    "/synthetics?check=smoke-check" \
     /security \
     /diagnostics \
     /sql \
@@ -112,8 +117,10 @@ smoke_dashboard_routes() {
     /service-map \
     /network \
     /rum \
+    "/rum?session=smoke-session&tab=sessions" \
     /performance \
     /perf-lab \
+    "/perf-lab?run=smoke-run" \
     /compare \
     /infrastructure \
     /cloud \
@@ -148,7 +155,10 @@ smoke_dashboard_apis() {
   panel_api "/api/key-transactions" "key-transactions"
   panel_api "/api/commands" "commands"
   panel_api "/api/traces?limit=10" "traces"
+  panel_api "/api/traces?filter=tags.load_run_id:%22smoke-crosslink%22&limit=5" "traces load_run_id filter"
+  panel_api "/api/traces?filter=tags.session_id:%22smoke-session%22&limit=5" "traces session_id filter"
   panel_api "/api/services/metadata" "services metadata"
+  panel_api "/api/search?q=smoke&limit=8" "global search crosslinks"
   panel_api "/api/profiles?limit=20" "profiling"
   panel_api "/api/errors?limit=50" "errors"
   panel_api "/api/logs?limit=50" "logs"
