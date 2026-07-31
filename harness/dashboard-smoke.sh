@@ -207,6 +207,7 @@ smoke_dashboard_apis() {
   panel_api "/api/rum/metrics" "rum metrics"
   panel_api "/api/rum/detail" "rum detail"
   panel_api "/api/rum/slo" "rum slo"
+  panel_api "/api/rum/vitals/attribution" "rum vitals attribution"
   panel_api "/api/rum/facets" "rum facets"
   panel_api "/api/rum/sessions" "rum sessions"
   panel_api "/api/rum/mobile/sessions" "rum mobile sessions"
