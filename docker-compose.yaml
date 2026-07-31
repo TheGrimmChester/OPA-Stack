@@ -60,6 +60,7 @@ services:
       WS_PORT: "8082"
       # auth.go now fails closed if JWT_SECRET is unset/placeholder/<32 bytes.
       # OPA_AUTH_REQUIRED is intentionally unset so smoke can hit APIs without login.
+      # JWT_SECRET (or OPA_CONNECTOR_SECRET) also AES-GCM-encrypts Repo Watch PATs + Cursor API key in CH.
       JWT_SECRET: "smoke-test-jwt-secret-please-change-in-prod-0123456789"
       OPA_WS_ALLOWED_ORIGINS: "http://localhost:8088"
       OPA_REDACT: "1"
