@@ -55,9 +55,64 @@ STATUS=$(curl -sS -o /dev/null -w '%{http_code}' -X POST \
   "$BASE_URL/api/rum")
 
 echo "HTTP $STATUS"
-if [ "$STATUS" = "204" ]; then
-  echo "rum-smoke: OK"
-else
+if [ "$STATUS" != "204" ]; then
   echo "rum-smoke: FAILED (expected 204)" >&2
   exit 1
 fi
+
+# Dashboard Browser RUM hits /api/rum/slo (and metrics). Outer aggregates must use
+# rumDedupe aliases (v_lcp/…) — referencing web_vitals here was ClickHouse Code 47.
+echo "Waiting briefly for ClickHouse ingest…"
+sleep 2
+
+SLO_BODY=$(mktemp)
+SLO_STATUS=$(curl -sS -o "$SLO_BODY" -w '%{http_code}' \
+  -H "X-OPA-Organization-ID: $ORG_ID" -H "X-OPA-Project-ID: $PROJECT_ID" \
+  "$BASE_URL/api/rum/slo?hours=24")
+echo "GET $BASE_URL/api/rum/slo → HTTP $SLO_STATUS"
+if [ "$SLO_STATUS" != "200" ]; then
+  echo "rum-smoke: FAILED /api/rum/slo (want 200)" >&2
+  cat "$SLO_BODY" >&2 || true
+  rm -f "$SLO_BODY"
+  exit 1
+fi
+if grep -Eqi 'UNKNOWN_IDENTIFIER|ClickHouse error' "$SLO_BODY"; then
+  echo "rum-smoke: FAILED /api/rum/slo ClickHouse error (outer web_vitals regression?)" >&2
+  cat "$SLO_BODY" >&2
+  rm -f "$SLO_BODY"
+  exit 1
+fi
+if ! grep -q '"slo"' "$SLO_BODY"; then
+  echo "rum-smoke: FAILED /api/rum/slo missing .slo" >&2
+  cat "$SLO_BODY" >&2
+  rm -f "$SLO_BODY"
+  exit 1
+fi
+rm -f "$SLO_BODY"
+
+MET_BODY=$(mktemp)
+MET_STATUS=$(curl -sS -o "$MET_BODY" -w '%{http_code}' \
+  -H "X-OPA-Organization-ID: $ORG_ID" -H "X-OPA-Project-ID: $PROJECT_ID" \
+  "$BASE_URL/api/rum/metrics")
+echo "GET $BASE_URL/api/rum/metrics → HTTP $MET_STATUS"
+if [ "$MET_STATUS" != "200" ]; then
+  echo "rum-smoke: FAILED /api/rum/metrics (want 200)" >&2
+  cat "$MET_BODY" >&2 || true
+  rm -f "$MET_BODY"
+  exit 1
+fi
+if grep -Eqi 'UNKNOWN_IDENTIFIER|ClickHouse error' "$MET_BODY"; then
+  echo "rum-smoke: FAILED /api/rum/metrics ClickHouse error" >&2
+  cat "$MET_BODY" >&2
+  rm -f "$MET_BODY"
+  exit 1
+fi
+if ! grep -q 'core_web_vitals' "$MET_BODY"; then
+  echo "rum-smoke: FAILED /api/rum/metrics missing core_web_vitals" >&2
+  cat "$MET_BODY" >&2
+  rm -f "$MET_BODY"
+  exit 1
+fi
+rm -f "$MET_BODY"
+
+echo "rum-smoke: OK (ingest + slo + metrics)"

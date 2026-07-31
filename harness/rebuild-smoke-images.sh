@@ -86,6 +86,9 @@ fi
 echo "==> Building opa-agent:smoke from $AGENT_DIR (HEAD=$(git -C "$AGENT_DIR" rev-parse --short HEAD 2>/dev/null || echo '?'))"
 docker build -t opa-agent:smoke "$AGENT_DIR"
 
+echo "==> Pre-pulling JMeter image for Perf Lab Docker runner"
+docker pull "${OPA_JMETER_IMAGE:-justb4/jmeter:5.5}" || true
+
 echo "==> Building opa-dashboard:smoke from $DASH_DIR (HEAD=$(git -C "$DASH_DIR" rev-parse --short HEAD 2>/dev/null || echo '?'))"
 docker build -t opa-dashboard:smoke "$DASH_DIR"
 
