@@ -5,8 +5,9 @@
 #   docker compose up -d clickhouse mysql agent dashboard node-app
 #   docker compose run --rm php-cli # one-shot: runs the PHP smoke harness
 #   docker compose --profile smoke run --rm node-smoke   # one-shot: curls the node demo app
-#   docker compose --profile wave-smoke run --rm wave-smoke  # Waves 17–27 API smoke
+#   docker compose --profile wave-smoke run --rm wave-smoke  # Waves 17–31 API smoke (incl. live Docker JMeter)
 #   harness/wave-smoke.sh           # same wave suite from the host
+#   harness/jmeter-perf-gate.sh     # standalone Docker JMeter dispatch → gate → samples
 #   harness/node-smoke.sh           # same curls, from the host (node-app publishes :3000)
 #   harness/rum-smoke.sh            # POST a canned RUM beacon to the agent
 name: opa-stack
