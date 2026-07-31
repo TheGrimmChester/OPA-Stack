@@ -113,6 +113,7 @@ smoke_dashboard_routes() {
     /network \
     /rum \
     /performance \
+    /perf-lab \
     /compare \
     /infrastructure \
     /cloud \
@@ -199,10 +200,19 @@ smoke_dashboard_apis() {
   panel_api "/api/rum/mobile/sessions" "rum mobile sessions"
   panel_api "/api/mobile/crashes" "mobile crashes"
   panel_api "/api/metrics/network" "performance network"
-  # Perf Lab — light API smoke only (UI/UX owned by sibling agent)
+  # Perf Lab — scenarios/runs + capture APIs (studio panels)
   panel_api "/api/perf/scenarios" "perf-lab scenarios"
   panel_api "/api/perf/runs" "perf-lab runs"
   panel_api "/api/performance/baselines" "perf baselines"
+  # Capture endpoints require POST; probe method rejection so the path exists.
+  code="$(curl -sS -o /dev/null -w '%{http_code}' -X GET "${AGENT_HTTP}/api/perf/scenarios/import-har" || true)"
+  if [[ "$code" == "405" || "$code" == "401" || "$code" == "403" ]]; then
+    ok "perf-lab import-har route present (HTTP $code)"
+  elif [[ "$code" == "404" ]]; then
+    soft "perf-lab import-har HTTP 404 (older agent)"
+  else
+    soft "perf-lab import-har unexpected HTTP $code"
+  fi
 
   # Infra
   panel_api "/api/infra/hosts" "infrastructure hosts"

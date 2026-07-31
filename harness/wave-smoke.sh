@@ -887,6 +887,61 @@ EOF
     soft "import-jmx HTTP $LAST_HTTP (admin auth may be required)"
   fi
 
+  # HAR / XHR capture import (dry_run + persist)
+  body="$(post_json /api/perf/scenarios/import-har "$(cat <<'EOF'
+{"name":"smoke-har","dry_run":true,"har":{"log":{"entries":[{"request":{"method":"GET","url":"https://example.com/api/health","headers":[]}},{"request":{"method":"GET","url":"https://cdn.example.com/app.css"}}]}}}
+EOF
+)")"
+  expect_http_any "POST /api/perf/scenarios/import-har dry_run" 200 403 404
+  if [[ "$LAST_HTTP" == "200" ]]; then
+    expect_json_key "$body" "ok" "import-har dry_run ok"
+    expect_json_key "$body" "count" "import-har count"
+    ok "import-har dry_run maps API entries"
+  else
+    soft "import-har HTTP $LAST_HTTP (admin auth may be required)"
+  fi
+
+  body="$(post_json /api/perf/scenarios/import-xhr "$(cat <<'EOF'
+{"name":"smoke-xhr","xhr":[{"method":"POST","url":"https://example.com/login","body":"{}","selector_type":"css","selector":"#login","ui_action":"click"}]}
+EOF
+)")"
+  expect_http_any "POST /api/perf/scenarios/import-xhr" 200 403 404
+  local xhr_id=""
+  if [[ "$LAST_HTTP" == "200" ]]; then
+    expect_json_key "$body" "ok" "import-xhr ok"
+    expect_json_key "$body" "id" "import-xhr id"
+    xhr_id="$(printf '%s' "$body" | sed -n 's/.*"id"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -1)"
+    ok "import-xhr with CSS selector metadata"
+  else
+    soft "import-xhr HTTP $LAST_HTTP (admin auth may be required)"
+  fi
+
+  if [[ -n "$xhr_id" ]]; then
+    sleep 2
+    body="$(get_json "/api/perf/scenarios/${xhr_id}/export-xhr")"
+    expect_http_any "GET export-xhr" 200 404
+    if [[ "$LAST_HTTP" == "200" ]]; then
+      if printf '%s' "$body" | grep -Eq 'opa-perf-xhr-v1|"entries"'; then
+        ok "export-xhr"
+      else
+        soft "export-xhr missing entries shape"
+      fi
+    else
+      soft "export-xhr HTTP $LAST_HTTP"
+    fi
+    body="$(get_json "/api/perf/scenarios/${xhr_id}/export-har")"
+    expect_http_any "GET export-har" 200 404
+    if [[ "$LAST_HTTP" == "200" ]]; then
+      if printf '%s' "$body" | grep -Eq '"log"|"entries"'; then
+        ok "export-har"
+      else
+        soft "export-har missing log shape"
+      fi
+    else
+      soft "export-har HTTP $LAST_HTTP"
+    fi
+  fi
+
   # Wave 31 — Docker-first JMeter dispatch + workers scale
   smoke_wave31_docker_jmeter "${scn_id:-}"
 }
