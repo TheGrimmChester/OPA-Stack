@@ -81,6 +81,8 @@ services:
       OPA_PERF_INTERNAL_HOSTS: "node-app"
       # Wave 33 — Security runs: scan workspace mount (secrets via gitleaks in image, else lite).
       OPA_SECURITY_WORKSPACE: "/workspace"
+      # OPA Review checkouts (PR jobs + context generate); default /tmp/opa-review
+      OPA_REVIEW_TMP: "${OPA_REVIEW_TMP:-/tmp/opa-review}"
       # Optional override if gitleaks is not on PATH: OPA_GITLEAKS_BIN: "/usr/local/bin/gitleaks"
       # Wave 34 — Repo Watch / AI
       # SKIP_CURSOR_AI defaults to 0 so persisted/env OPA Review keys actually run.
@@ -99,8 +101,9 @@ services:
       OPA_SCM_CRON: "0"
     volumes:
       - ./harness/fixtures:/fixtures:ro
-      # Sample app / repo root for Dashboard "Start scan" + SCM job checkouts (needs write for jobs/).
+      # Sample app / repo root for Dashboard "Start scan" + SCM bare-cache (needs write for cache/).
       - ./harness/fixtures/security-workspace:/workspace
+      # OPA Review PR checkouts live under /tmp/opa-review inside the container (OPA_REVIEW_TMP).
       - jmeter-work:/opa-jmeter
       - /var/run/docker.sock:/var/run/docker.sock
     ports:
