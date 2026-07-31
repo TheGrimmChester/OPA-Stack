@@ -1394,6 +1394,107 @@ EOF
 }
 
 # ---------------------------------------------------------------------------
+smoke_wave34() {
+  section "Wave 34 — Repo Watch / SCM jobs / scoped gate / AI settings"
+
+  local body
+  body="$(get_json /api/connectors)"
+  expect_http 200 "GET /api/connectors"
+  expect_json_key "$body" "connectors" "connectors list"
+
+  body="$(get_json /api/scm/settings)"
+  expect_http 200 "GET /api/scm/settings"
+  expect_json_key "$body" "webhook_url" "scm settings webhook"
+
+  body="$(post_json /api/scm/settings/cursor-key '{"api_key":"cursor_smoke_test_key_not_real"}')"
+  expect_http 200 "POST /api/scm/settings/cursor-key"
+  expect_json_key "$body" "cursor_key_set" "cursor key set"
+
+  body="$(get_json /api/scm/settings)"
+  if printf '%s' "$body" | grep -Eq '"cursor_key_set"[[:space:]]*:[[:space:]]*true'; then
+    ok "cursor_key_set=true"
+  else
+    fail "cursor_key_set not true after save: $body"
+  fi
+  body="$(post_json /api/scm/settings/cursor-key '{"clear":true}')"
+  expect_http 200 "POST cursor-key clear"
+
+  body="$(post_json /api/connectors/github/pat "$(cat <<EOF
+{"token":"ghp_smoke_not_a_real_token_xxxxxxxxxxxx","login":"smoke","repos":["local/smoke-repo"]}
+EOF
+)")"
+  expect_http 200 "POST /api/connectors/github/pat"
+  expect_json_key "$body" "connector" "pat connector"
+  local conn_id
+  conn_id="$(printf '%s' "$body" | sed -n 's/.*"id"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -1)"
+
+  if [[ -n "$conn_id" ]]; then
+    body="$(get_json "/api/connectors/${conn_id}/watched")"
+    expect_http 200 "GET watched repos"
+    expect_json_key "$body" "watched" "watched list"
+
+    body="$(post_json /api/scm/simulate "$(cat <<EOF
+{"repo":"local/smoke-repo","pr":42,"service":"smoke-shop","profile":"full"}
+EOF
+)")"
+    expect_http 200 "POST /api/scm/simulate"
+    expect_json_key "$body" "job_id" "simulate job_id"
+    local job_id status="" i
+    job_id="$(printf '%s' "$body" | sed -n 's/.*"job_id"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -1)"
+    if [[ -z "$job_id" ]]; then
+      fail "simulate job_id missing"
+    else
+      ok "scm job_id=${job_id}"
+      for i in $(seq 1 40); do
+        body="$(get_json "/api/scm/jobs/${job_id}")"
+        # Prefer top-level job status (avoid nested gate.status via greedy sed).
+        status="$(printf '%s' "$body" | python3 -c 'import sys,json; print(json.load(sys.stdin).get("status",""))' 2>/dev/null || true)"
+        if [[ -z "$status" ]]; then
+          status="$(printf '%s' "$body" | sed -n 's/^{.*"status"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -1)"
+        fi
+        if [[ "$status" == "completed" || "$status" == "failed" || "$status" == "error" ]]; then
+          break
+        fi
+        sleep 1
+      done
+      if [[ "$status" == "completed" || "$status" == "failed" ]]; then
+        ok "scm job status=${status}"
+      else
+        fail "scm job did not finish (status=${status:-empty}): $body"
+      fi
+      if printf '%s' "$body" | grep -q 'security_run_id'; then
+        ok "scm job linked security_run_id"
+      else
+        soft "scm job missing security_run_id"
+      fi
+      local srun
+      srun="$(printf '%s' "$body" | python3 -c 'import sys,json; print(json.load(sys.stdin).get("security_run_id",""))' 2>/dev/null || true)"
+      if [[ -z "$srun" ]]; then
+        srun="$(printf '%s' "$body" | sed -n 's/.*"security_run_id"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -1)"
+      fi
+      if [[ -n "$srun" ]]; then
+        body="$(post_json /api/security/pr-check "{\"security_run_id\":\"${srun}\"}")"
+        expect_http 200 "POST scoped pr-check"
+        expect_json_key "$body" "scope" "scoped gate scope"
+        if printf '%s' "$body" | grep -Eq '"scope"[[:space:]]*:[[:space:]]*"security_run"'; then
+          ok "pr-check scope=security_run"
+        else
+          soft "pr-check scope unexpected: $body"
+        fi
+      fi
+      body="$(post_json "/api/scm/jobs/${job_id}/retry" '{}')"
+      expect_http 200 "POST scm job retry"
+    fi
+  else
+    soft "connector id missing — skip watched/simulate"
+  fi
+
+  body="$(get_json /api/scm/jobs)"
+  expect_http 200 "GET /api/scm/jobs"
+  expect_json_key "$body" "jobs" "scm jobs list"
+}
+
+# ---------------------------------------------------------------------------
 smoke_dashboard_exhaustive() {
   section "Dashboard exhaustive panels (SPA + APIs)"
   local dash_script="$ROOT/harness/dashboard-smoke.sh"
@@ -1436,6 +1537,7 @@ main() {
   smoke_wave29
   smoke_wave30
   smoke_wave31
+  smoke_wave34
   smoke_dashboard_exhaustive
 
   smoke_summary

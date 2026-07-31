@@ -1,4 +1,4 @@
-# Example — AppSec PR check against a running OPA Agent.
+# Example — AppSec PR check against a running OPA Agent (prefer /v1 + token).
 name: opa-appsec-pr-check
 on:
   workflow_dispatch:
@@ -10,7 +10,21 @@ jobs:
       - name: OPA security PR check
         env:
           AGENT_URL: ${{ secrets.OPA_AGENT_URL }}
+          OPA_SECURITY_INGEST_TOKEN: ${{ secrets.OPA_SECURITY_INGEST_TOKEN }}
+          SECURITY_RUN_ID: ${{ vars.OPA_SECURITY_RUN_ID }}
         run: |
-          resp=$(curl -fsS "$AGENT_URL/api/security/pr-check")
+          set -euo pipefail
+          HDR=(-H "Content-Type: application/json")
+          if [[ -n "${OPA_SECURITY_INGEST_TOKEN:-}" ]]; then
+            HDR+=(-H "X-OPA-Security-Token: ${OPA_SECURITY_INGEST_TOKEN}" -H "Authorization: Bearer ${OPA_SECURITY_INGEST_TOKEN}")
+            URL="${AGENT_URL%/}/v1/security/pr-check"
+          else
+            URL="${AGENT_URL%/}/api/security/pr-check"
+          fi
+          if [[ -n "${SECURITY_RUN_ID:-}" ]]; then
+            resp=$(curl -fsS -X POST "${HDR[@]}" -d "{\"security_run_id\":\"${SECURITY_RUN_ID}\"}" "$URL")
+          else
+            resp=$(curl -fsS -X POST "${HDR[@]}" "$URL")
+          fi
           echo "$resp"
-          echo "$resp" | grep -q '"status":"fail"' && exit 1 || true
+          echo "$resp" | grep -Eq '"fail"[[:space:]]*:[[:space:]]*true|"status"[[:space:]]*:[[:space:]]*"fail"' && exit 1 || true

@@ -80,10 +80,17 @@ services:
       OPA_PERF_INTERNAL_HOSTS: "node-app"
       # Wave 33 — Security runs: scan workspace mount for embedded lite scanners.
       OPA_SECURITY_WORKSPACE: "/workspace"
+      # Wave 34 — Repo Watch / AI (smoke: mock GitHub + skip Cursor CLI)
+      OPA_SCM_MOCK_GITHUB: "1"
+      SKIP_CURSOR_AI: "${SKIP_CURSOR_AI:-1}"
+      OPA_SCM_ALLOW_UNSIGNED: "1"
+      OPA_PUBLIC_URL: "http://127.0.0.1:8080"
+      OPA_DASHBOARD_URL: "http://127.0.0.1:8088"
+      OPA_SCM_CRON: "0"
     volumes:
       - ./harness/fixtures:/fixtures:ro
-      # Sample app / repo root for Dashboard "Start scan" (secrets/SAST/IaC lite stubs).
-      - ./harness/fixtures/security-workspace:/workspace:ro
+      # Sample app / repo root for Dashboard "Start scan" + SCM job checkouts (needs write for jobs/).
+      - ./harness/fixtures/security-workspace:/workspace
       - jmeter-work:/opa-jmeter
       - /var/run/docker.sock:/var/run/docker.sock
     ports:
