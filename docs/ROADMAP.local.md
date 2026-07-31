@@ -262,6 +262,7 @@ Source: [`docs/AUDIT-2026-07-23.md`](AUDIT-2026-07-23.md) — header notes sever
 | **28 Experience replay** | Deepened vertical | Timeline + markers (nav/longtask/resource/ajax) + player reconstruction; still not rrweb |
 | **29 Perf lab** | Deepened vertical | Profiles + federation `remote-load` fan-out + baselines UI; ≠ multi-cloud load grid |
 | **30 AppSec hub** | Deepened vertical | SAST/IaC tables+ingest+scripts, IAST opt-in block, scanner token; not full commercial AppSec |
+| **33 Security runs** | First-class scan runs | Dashboard Start scan → Agent embedded lite/stub scanners → `security_run_id` findings; workspace mount `/workspace` |
 
 ### Explicitly still deferred (docs honesty)
 

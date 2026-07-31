@@ -1347,6 +1347,7 @@ EOF
     else
       fail "security run did not complete (status=${status:-empty}): $body"
     fi
+    sleep 2
     body="$(get_json "/api/security/runs/${srun_id}/findings")"
     expect_http 200 "GET /api/security/runs/{id}/findings"
     expect_json_key "$body" "counts" "run findings counts"

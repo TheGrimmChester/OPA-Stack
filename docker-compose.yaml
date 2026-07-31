@@ -78,8 +78,12 @@ services:
       OPA_JMETER_WORKERS: "1"
       # Allow JMeter → instrumented node-app (private Docker DNS) for load_run_id traces.
       OPA_PERF_INTERNAL_HOSTS: "node-app"
+      # Wave 33 — Security runs: scan workspace mount for embedded lite scanners.
+      OPA_SECURITY_WORKSPACE: "/workspace"
     volumes:
       - ./harness/fixtures:/fixtures:ro
+      # Sample app / repo root for Dashboard "Start scan" (secrets/SAST/IaC lite stubs).
+      - ./harness/fixtures/security-workspace:/workspace:ro
       - jmeter-work:/opa-jmeter
       - /var/run/docker.sock:/var/run/docker.sock
     ports:
