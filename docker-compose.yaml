@@ -60,7 +60,7 @@ services:
       WS_PORT: "8082"
       # auth.go now fails closed if JWT_SECRET is unset/placeholder/<32 bytes.
       # OPA_AUTH_REQUIRED is intentionally unset so smoke can hit APIs without login.
-      # JWT_SECRET (or OPA_CONNECTOR_SECRET) also AES-GCM-encrypts Repo Watch PATs + OPA Review API key in CH.
+      # Shared with orchestrator + perf-lab (JWT + CH encryption).
       JWT_SECRET: "smoke-test-jwt-secret-please-change-in-prod-0123456789"
       OPA_WS_ALLOWED_ORIGINS: "http://localhost:8088"
       OPA_REDACT: "1"
@@ -69,43 +69,11 @@ services:
       OPA_CLOUD_REQUIRED_TAGS: "env,service,owner"
       OPA_NETWORK_SAMPLER: "1"
       OPA_REGION: "eu-west-1"
-      # Wave 31 — Docker-first JMeter Perf Lab (ephemeral containers via docker.sock)
-      OPA_PERF_ENGINE: "jmeter"
-      OPA_JMETER_IMAGE: "${OPA_JMETER_IMAGE:-justb4/jmeter:5.5}"
-      OPA_JMETER_WORK: "/opa-jmeter"
-      # Named volume as seen by the Docker daemon (compose project prefix).
-      OPA_JMETER_VOLUME: "${COMPOSE_PROJECT_NAME:-opa-stack}_jmeter-work"
-      OPA_JMETER_NETWORK: "${COMPOSE_PROJECT_NAME:-opa-stack}_default"
-      OPA_JMETER_WORKERS: "1"
-      # Allow JMeter → instrumented node-app (private Docker DNS) for load_run_id traces.
+      # Peer load SSRF allowlist (federation remote-load still on Agent)
       OPA_PERF_INTERNAL_HOSTS: "node-app"
-      # Wave 33 — Security runs: scan workspace mount (secrets via gitleaks in image, else lite).
-      OPA_SECURITY_WORKSPACE: "/workspace"
-      # OPA Review checkouts (PR jobs + context generate); default /tmp/opa-review
-      OPA_REVIEW_TMP: "${OPA_REVIEW_TMP:-/tmp/opa-review}"
-      # Optional override if gitleaks is not on PATH: OPA_GITLEAKS_BIN: "/usr/local/bin/gitleaks"
-      # Wave 34 — Repo Watch / AI
-      # SKIP_CURSOR_AI defaults to 0 so persisted/env OPA Review keys actually run.
-      # Smoke without a key still records ai.status=skipped honestly. Set SKIP_CURSOR_AI=1 to force skip.
-      # AI agent binary is baked into opa-agent:smoke (glibc/debian). Override path if needed.
-      OPA_CURSOR_AGENT_BIN: "${OPA_CURSOR_AGENT_BIN:-/usr/local/bin/agent}"
-      OPA_SCM_MOCK_GITHUB: "1"
-      SKIP_CURSOR_AI: "${SKIP_CURSOR_AI:-0}"
-      OPA_REVIEW_STACK_CONCURRENCY: "${OPA_REVIEW_STACK_CONCURRENCY:-1}"
-      OPA_REVIEW_BROWSER_MCP: "${OPA_REVIEW_BROWSER_MCP:-1}"
-      # OPA_REVIEW_PREVIEW_URL / OPA_REVIEW_MCP_CONFIG optional for UI visual MCP
-      OPA_GITHUB_WEBHOOK_SECRET: "${OPA_GITHUB_WEBHOOK_SECRET:-smoke-webhook-secret}"
-      OPA_SCM_ALLOW_UNSIGNED: "${OPA_SCM_ALLOW_UNSIGNED:-0}"
-      OPA_PUBLIC_URL: "http://127.0.0.1:8080"
       OPA_DASHBOARD_URL: "http://127.0.0.1:8088"
-      OPA_SCM_CRON: "0"
     volumes:
       - ./harness/fixtures:/fixtures:ro
-      # Sample app / repo root for Dashboard "Start scan" + SCM bare-cache (needs write for cache/).
-      - ./harness/fixtures/security-workspace:/workspace
-      # OPA Review PR checkouts live under /tmp/opa-review inside the container (OPA_REVIEW_TMP).
-      - jmeter-work:/opa-jmeter
-      - /var/run/docker.sock:/var/run/docker.sock
     ports:
       - "8080:8080"   # admin/query API
       - "2112:2112"   # prometheus metrics
@@ -117,11 +85,77 @@ services:
       timeout: 3s
       retries: 20
 
+  # Wave 33 security runs + Wave 34 Repo Watch / OPA Review
+  orchestrator:
+    image: opa-orchestrator:smoke
+    container_name: opa_orchestrator
+    depends_on:
+      clickhouse:
+        condition: service_healthy
+    environment:
+      HTTP_ADDR: ":8091"
+      CLICKHOUSE_URL: "http://clickhouse:8123"
+      JWT_SECRET: "smoke-test-jwt-secret-please-change-in-prod-0123456789"
+      OPA_SECURITY_WORKSPACE: "/workspace"
+      OPA_REVIEW_TMP: "${OPA_REVIEW_TMP:-/tmp/opa-review}"
+      OPA_CURSOR_AGENT_BIN: "${OPA_CURSOR_AGENT_BIN:-/usr/local/bin/agent}"
+      OPA_SCM_MOCK_GITHUB: "1"
+      SKIP_CURSOR_AI: "${SKIP_CURSOR_AI:-0}"
+      OPA_REVIEW_STACK_CONCURRENCY: "${OPA_REVIEW_STACK_CONCURRENCY:-1}"
+      OPA_REVIEW_BROWSER_MCP: "${OPA_REVIEW_BROWSER_MCP:-1}"
+      OPA_GITHUB_WEBHOOK_SECRET: "${OPA_GITHUB_WEBHOOK_SECRET:-smoke-webhook-secret}"
+      OPA_SCM_ALLOW_UNSIGNED: "${OPA_SCM_ALLOW_UNSIGNED:-0}"
+      OPA_PUBLIC_URL: "http://127.0.0.1:8091"
+      OPA_DASHBOARD_URL: "http://127.0.0.1:8088"
+      OPA_SCM_CRON: "0"
+      OPA_GITLEAKS_CONFIG: "/etc/opa/gitleaks.toml"
+    volumes:
+      - ./harness/fixtures/security-workspace:/workspace
+    ports:
+      - "8091:8091"
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "-", "http://localhost:8091/api/health"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  # Wave 29/31 Perf Lab (Docker JMeter)
+  perf-lab:
+    image: opa-perf-lab:smoke
+    container_name: opa_perf_lab
+    depends_on:
+      clickhouse:
+        condition: service_healthy
+    environment:
+      HTTP_ADDR: ":8092"
+      CLICKHOUSE_URL: "http://clickhouse:8123"
+      JWT_SECRET: "smoke-test-jwt-secret-please-change-in-prod-0123456789"
+      OPA_PERF_ENGINE: "jmeter"
+      OPA_JMETER_IMAGE: "${OPA_JMETER_IMAGE:-justb4/jmeter:5.5}"
+      OPA_JMETER_WORK: "/opa-jmeter"
+      OPA_JMETER_VOLUME: "${COMPOSE_PROJECT_NAME:-opa-stack}_jmeter-work"
+      OPA_JMETER_NETWORK: "${COMPOSE_PROJECT_NAME:-opa-stack}_default"
+      OPA_JMETER_WORKERS: "1"
+      OPA_PERF_INTERNAL_HOSTS: "node-app"
+      OPA_REGION: "eu-west-1"
+    volumes:
+      - jmeter-work:/opa-jmeter
+      - /var/run/docker.sock:/var/run/docker.sock
+    ports:
+      - "8092:8092"
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "-", "http://localhost:8092/api/health"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
   dashboard:
     image: opa-dashboard:smoke
     container_name: opa_dashboard
     depends_on:
       - agent
+      - orchestrator
+      - perf-lab
     ports:
       - "8088:80"     # http://localhost:8088
 
