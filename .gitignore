@@ -4,3 +4,5 @@
 docs/ROADMAP.local.md
 docs/*.local.md
 harness/fixtures/security-workspace/jobs/
+harness/fixtures/security-workspace/cache/
+harness/fixtures/security-workspace/worktrees/
