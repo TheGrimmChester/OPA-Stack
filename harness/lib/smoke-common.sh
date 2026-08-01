@@ -61,7 +61,7 @@ smoke_base_for_path() {
     /api/perf|/api/perf/*)
       printf '%s' "$PERF_LAB_HTTP"
       ;;
-    /api/scm|/api/scm/*|/api/connectors|/api/connectors/*|/api/security/runs|/api/security/runs/*|/api/security/profiles|/v1/scm|/v1/scm/*)
+    /api/scm|/api/scm/*|/api/connectors|/api/connectors/*|/api/ai|/api/ai/*|/api/security/runs|/api/security/runs/*|/api/security/profiles|/v1/scm|/v1/scm/*)
       printf '%s' "$ORCHESTRATOR_HTTP"
       ;;
     *)
