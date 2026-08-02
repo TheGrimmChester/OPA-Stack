@@ -2,6 +2,21 @@
 # Shared helpers for OPA-stack wave smoke scripts.
 
 AGENT_HTTP="${AGENT_HTTP:-http://127.0.0.1:8080}"
+# Default sibling ports when hitting host-published smoke stack; compose sets explicit URLs.
+if [[ -z "${ORCHESTRATOR_HTTP:-}" ]]; then
+  if [[ "$AGENT_HTTP" == "http://127.0.0.1:8080" || "$AGENT_HTTP" == "http://localhost:8080" ]]; then
+    ORCHESTRATOR_HTTP="http://127.0.0.1:8091"
+  else
+    ORCHESTRATOR_HTTP="$AGENT_HTTP"
+  fi
+fi
+if [[ -z "${PERF_LAB_HTTP:-}" ]]; then
+  if [[ "$AGENT_HTTP" == "http://127.0.0.1:8080" || "$AGENT_HTTP" == "http://localhost:8080" ]]; then
+    PERF_LAB_HTTP="http://127.0.0.1:8092"
+  else
+    PERF_LAB_HTTP="$AGENT_HTTP"
+  fi
+fi
 ORG_ID="${ORG_ID:-test-org}"
 PROJECT_ID="${PROJECT_ID:-default-project}"
 SMOKE_TIMEOUT_S="${SMOKE_TIMEOUT_S:-5}"
@@ -39,13 +54,31 @@ soft() {
   printf '  SOFT %s\n' "$1"
 }
 
+# Route extracted verticals to sibling services (fallback Agent URL).
+smoke_base_for_path() {
+  local path="$1"
+  case "$path" in
+    /api/perf|/api/perf/*)
+      printf '%s' "$PERF_LAB_HTTP"
+      ;;
+    /api/scm|/api/scm/*|/api/connectors|/api/connectors/*|/api/ai|/api/ai/*|/api/security/runs|/api/security/runs/*|/api/security/profiles|/v1/scm|/v1/scm/*)
+      printf '%s' "$ORCHESTRATOR_HTTP"
+      ;;
+    *)
+      printf '%s' "$AGENT_HTTP"
+      ;;
+  esac
+}
+
 # http_code METHOD PATH [curl args...]
 # prints body to stdout; sets global LAST_HTTP (and SMOKE_LAST_HTTP_FILE for subshells)
 LAST_HTTP=0
 http_req() {
   local method="$1" path="$2"
   shift 2
-  local url="${AGENT_HTTP}${path}"
+  local base url
+  base="$(smoke_base_for_path "$path")"
+  url="${base}${path}"
   local tmp
   tmp="$(mktemp)"
   set +e

@@ -1,14 +1,20 @@
-# Top-level OPA smoke-test stack: ClickHouse + agent + MySQL + PHP(+extension) + Node + dashboard.
+# Top-level OPA smoke-test stack: ClickHouse + agent + orchestrator + perf-lab + MySQL + PHP + Node + dashboard.
 # Usage:
 #   docker compose build            # (images are prebuilt as *:smoke; build re-creates them)
-#   ./harness/rebuild-smoke-images.sh   # build sibling Agent/Dashboard → *:smoke + recreate
-#   docker compose up -d clickhouse mysql agent dashboard node-app
+#   ./harness/rebuild-smoke-images.sh   # build sibling Agent/Orchestrator/Perf-Lab/Dashboard → *:smoke + recreate
+#   docker compose up -d clickhouse mysql agent orchestrator perf-lab dashboard node-app
 #   docker compose run --rm php-cli # one-shot: runs the PHP smoke harness
 #   docker compose --profile smoke run --rm node-smoke   # one-shot: curls the node demo app
-#   docker compose --profile wave-smoke run --rm wave-smoke  # Waves 17–27 API smoke
+#   docker compose --profile wave-smoke run --rm wave-smoke  # Waves 17–31 API smoke (incl. live Docker JMeter)
 #   harness/wave-smoke.sh           # same wave suite from the host
+#   harness/jmeter-perf-gate.sh     # standalone Docker JMeter dispatch → gate → samples
 #   harness/node-smoke.sh           # same curls, from the host (node-app publishes :3000)
 #   harness/rum-smoke.sh            # POST a canned RUM beacon to the agent
+#
+# Local AppSec defaults (see harness/README.md): OPA_OSV=1 on agent; IAST on php-cli;
+# security workspace + gitleaks + SKIP_CURSOR_AI=0 on orchestrator.
+#
+# Ports: Agent :8080 | AI Orchestrator :8091 | Perf Lab :8092 | Dashboard :8088
 name: opa-stack
 
 services:
@@ -59,6 +65,7 @@ services:
       WS_PORT: "8082"
       # auth.go now fails closed if JWT_SECRET is unset/placeholder/<32 bytes.
       # OPA_AUTH_REQUIRED is intentionally unset so smoke can hit APIs without login.
+      # Shared with orchestrator + perf-lab (JWT + CH encryption).
       JWT_SECRET: "smoke-test-jwt-secret-please-change-in-prod-0123456789"
       OPA_WS_ALLOWED_ORIGINS: "http://localhost:8088"
       OPA_REDACT: "1"
@@ -67,6 +74,14 @@ services:
       OPA_CLOUD_REQUIRED_TAGS: "env,service,owner"
       OPA_NETWORK_SAMPLER: "1"
       OPA_REGION: "eu-west-1"
+      # Peer load SSRF allowlist (federation remote-load still on Agent)
+      OPA_PERF_INTERNAL_HOSTS: "node-app"
+      OPA_DASHBOARD_URL: "http://127.0.0.1:8088"
+      # Wave 19/30 AppSec (needs Agent image from wave28-30-verticals+ via rebuild-smoke-images.sh)
+      OPA_OSV: "1"                                     # POST /api/security/osv/enrich → api.osv.dev
+      OPA_SECURITY_MIN_SEVERITY: "${OPA_SECURITY_MIN_SEVERITY:-high}"
+      OPA_SECURITY_FAIL_OBSERVED: "${OPA_SECURITY_FAIL_OBSERVED:-1}"
+      # Leave OPA_SECURITY_INGEST_TOKEN / OPA_SECURITY_OIDC_REQUIRE unset so local ingest stays open.
     volumes:
       - ./harness/fixtures:/fixtures:ro
     ports:
@@ -80,11 +95,86 @@ services:
       timeout: 3s
       retries: 20
 
+  # Wave 33 security runs + Wave 34 Repo Watch / OPA Review
+  orchestrator:
+    image: opa-orchestrator:smoke
+    container_name: opa_orchestrator
+    depends_on:
+      clickhouse:
+        condition: service_healthy
+    environment:
+      HTTP_ADDR: ":8091"
+      CLICKHOUSE_URL: "http://clickhouse:8123"
+      JWT_SECRET: "smoke-test-jwt-secret-please-change-in-prod-0123456789"
+      OPA_SECURITY_WORKSPACE: "/workspace"
+      OPA_SCM_STATE_DIR: "/workspace/scm-state"
+      OPA_REVIEW_TMP: "${OPA_REVIEW_TMP:-/tmp/opa-review}"
+      OPA_CURSOR_AGENT_BIN: "${OPA_CURSOR_AGENT_BIN:-/usr/local/bin/agent}"
+      OPA_SCM_MOCK_GITHUB: "1"
+      # OPA Review runs when a scoped (user/org) CLI key is set in AI settings — not via env.
+      SKIP_CURSOR_AI: "${SKIP_CURSOR_AI:-0}"
+      # Do NOT wire CURSOR_API_KEY / OPA_*_API_KEY here — process env keys are not used
+      # as tenant fallbacks (they acted as a shared admin pool). Set keys via Account / AI settings.
+      OPA_OPENAI_BASE_URL: "${OPA_OPENAI_BASE_URL:-}"
+      OPA_OPENAI_MODEL: "${OPA_OPENAI_MODEL:-}"
+      OPA_ANTHROPIC_BASE_URL: "${OPA_ANTHROPIC_BASE_URL:-}"
+      OPA_ANTHROPIC_MODEL: "${OPA_ANTHROPIC_MODEL:-}"
+      OPA_REVIEW_STACK_CONCURRENCY: "${OPA_REVIEW_STACK_CONCURRENCY:-1}"
+      OPA_REVIEW_BROWSER_MCP: "${OPA_REVIEW_BROWSER_MCP:-1}"
+      OPA_GITHUB_WEBHOOK_SECRET: "${OPA_GITHUB_WEBHOOK_SECRET:-smoke-webhook-secret}"
+      OPA_SCM_ALLOW_UNSIGNED: "${OPA_SCM_ALLOW_UNSIGNED:-0}"
+      OPA_PUBLIC_URL: "http://127.0.0.1:8091"
+      OPA_DASHBOARD_URL: "http://127.0.0.1:8088"
+      OPA_SCM_CRON: "0"
+      # Image ships gitleaks at /usr/local/bin/gitleaks; config allowlists UI key: FPs
+      OPA_GITLEAKS_CONFIG: "/etc/opa/gitleaks.toml"
+    volumes:
+      - ./harness/fixtures/security-workspace:/workspace
+    ports:
+      - "8091:8091"
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "-", "http://localhost:8091/api/health"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  # Wave 29/31 Perf Lab (Docker JMeter)
+  perf-lab:
+    image: opa-perf-lab:smoke
+    container_name: opa_perf_lab
+    depends_on:
+      clickhouse:
+        condition: service_healthy
+    environment:
+      HTTP_ADDR: ":8092"
+      CLICKHOUSE_URL: "http://clickhouse:8123"
+      JWT_SECRET: "smoke-test-jwt-secret-please-change-in-prod-0123456789"
+      OPA_PERF_ENGINE: "jmeter"
+      OPA_JMETER_IMAGE: "${OPA_JMETER_IMAGE:-justb4/jmeter:5.5}"
+      OPA_JMETER_WORK: "/opa-jmeter"
+      OPA_JMETER_VOLUME: "${COMPOSE_PROJECT_NAME:-opa-stack}_jmeter-work"
+      OPA_JMETER_NETWORK: "${COMPOSE_PROJECT_NAME:-opa-stack}_default"
+      OPA_JMETER_WORKERS: "1"
+      OPA_PERF_INTERNAL_HOSTS: "node-app"
+      OPA_REGION: "eu-west-1"
+    volumes:
+      - jmeter-work:/opa-jmeter
+      - /var/run/docker.sock:/var/run/docker.sock
+    ports:
+      - "8092:8092"
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "-", "http://localhost:8092/api/health"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
   dashboard:
     image: opa-dashboard:smoke
     container_name: opa_dashboard
     depends_on:
       - agent
+      - orchestrator
+      - perf-lab
     ports:
       - "8088:80"     # http://localhost:8088
 
@@ -123,6 +213,9 @@ services:
       # is captured, not just userland calls.
       OPA_COLLECT_INTERNAL_FUNCTIONS: "1"
       OPA_DEBUG_LOG: "1"
+      # Wave 19/30 IAST — detect (+ local-only block) for smoke / iast-block-smoke.php
+      OPA_IAST: "1"
+      OPA_IAST_BLOCK: "1"
       OPA_SERVICE: "php-smoke"
       OPA_ORGANIZATION_ID: "test-org"
       OPA_PROJECT_ID: "default-project"
@@ -135,7 +228,7 @@ services:
       REDIS_HOST: "redis"
       REDIS_PORT: "6379"
     entrypoint: ["/usr/local/bin/docker-entrypoint-custom.sh"]
-    command: ["php", "-d", "apc.enable_cli=1", "/harness/smoke.php"]
+    command: ["php", "-d", "apc.enable_cli=1", "-d", "opa.iast=1", "-d", "opa.iast_block=1", "/harness/smoke.php"]
 
   # Always-on Node demo app instrumented with opa-node (zero-dependency, so the
   # sibling repo can be bind-mounted read-only and run straight off the stock
@@ -156,6 +249,8 @@ services:
       OPA_SERVICE: "node-smoke"
       OPA_ORGANIZATION_ID: "test-org"
       OPA_PROJECT_ID: "default-project"
+      # opa-node IAST is API-driven (opa.iast.checkSQL / installHooks); flag kept for parity docs
+      OPA_IAST: "1"
       PORT: "3000"                     # example/app.js reads process.env.PORT
     command: ["node", "example/app.js"]
     ports:
@@ -196,16 +291,31 @@ services:
     depends_on:
       agent:
         condition: service_healthy
+      orchestrator:
+        condition: service_healthy
+      perf-lab:
+        condition: service_healthy
+      dashboard:
+        condition: service_started
     volumes:
       - ./harness:/harness:ro
     environment:
       AGENT_HTTP: "http://agent:8080"
+      ORCHESTRATOR_HTTP: "http://orchestrator:8091"
+      PERF_LAB_HTTP: "http://perf-lab:8092"
+      DASH_HTTP: "http://dashboard"
+      SKIP_BROWSER: "1"
       ORG_ID: "test-org"
       PROJECT_ID: "default-project"
       SMOKE_TIMEOUT_S: "10"
+      OPA_GITHUB_WEBHOOK_SECRET: "${OPA_GITHUB_WEBHOOK_SECRET:-smoke-webhook-secret}"
     entrypoint: ["/bin/sh", "-c"]
     command:
       - |
         set -e
-        apk add --no-cache bash curl >/dev/null
+        apk add --no-cache bash curl openssl python3 >/dev/null
         exec bash /harness/wave-smoke.sh
+
+volumes:
+  jmeter-work:
+    name: ${COMPOSE_PROJECT_NAME:-opa-stack}_jmeter-work

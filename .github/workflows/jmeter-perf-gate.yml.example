@@ -1,0 +1,32 @@
+# Example — JMeter SLA gate against a Perf Lab run (copy into app repo).
+name: opa-jmeter-perf-gate
+on:
+  workflow_dispatch:
+  pull_request:
+jobs:
+  gate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Create scenario + run + SLA gate
+        env:
+          AGENT_URL: ${{ secrets.OPA_AGENT_URL }}
+          SCENARIO_ID: ${{ secrets.OPA_PERF_SCENARIO_ID }}
+        run: |
+          set -euo pipefail
+          # Create run (dispatch JMeter on Agent if configured)
+          curl -fsS -X POST "$AGENT_URL/api/perf/runs" \
+            -H 'content-type: application/json' \
+            -d "{\"scenario_id\":\"$SCENARIO_ID\",\"vus\":5,\"dispatch\":true,\"engine\":\"jmeter\"}" \
+            -o run.json
+          cat run.json
+          RUN_ID=$(python3 -c 'import json;print(json.load(open("run.json")).get("load_run_id") or json.load(open("run.json")).get("id",""))')
+          # Poll briefly then gate
+          for i in $(seq 1 30); do
+            curl -fsS "$AGENT_URL/api/perf/runs/$RUN_ID" -o status.json || true
+            grep -Eq '"status"[[:space:]]*:[[:space:]]*"(passed|failed|completed)"' status.json && break
+            sleep 2
+          done
+          curl -fsS "$AGENT_URL/api/perf/runs/$RUN_ID/gate" -o gate.json
+          cat gate.json
+          grep -Eq '"ok"[[:space:]]*:[[:space:]]*false|"status"[[:space:]]*:[[:space:]]*"failed"' gate.json && exit 1 || true
