@@ -5,6 +5,8 @@ Single entry point for the self-hosted observability stack.
 ## Quick links
 
 - [Five-minute quickstart](../harness/quickstart.sh) (run from repo root via `./harness/quickstart.sh`)
+- [Rebuild smoke images](../harness/rebuild-smoke-images.sh) (`./harness/rebuild-smoke-images.sh`)
+- [Waves 17–27 API smoke](../harness/wave-smoke.sh) (`./harness/wave-smoke.sh` or `WAVE_SMOKE=1 ./harness/quickstart.sh`)
 - [Licensing FAQ](LICENSING.md)
 - [Architecture](architecture.md)
 - [Data model](data-model.md)
@@ -12,6 +14,19 @@ Single entry point for the self-hosted observability stack.
 - [Distribution](distribution.md)
 - [OTLP compatibility](otlp-compatibility.md)
 - [Benchmarks](../benchmarks/README.md)
+
+## Wave smoke (17–27)
+
+With Agent + ClickHouse up (prefer agent built from `wave27-diagnostics`):
+
+```bash
+./harness/rebuild-smoke-images.sh
+docker compose up -d clickhouse agent dashboard
+./harness/wave-smoke.sh
+# or: docker compose --profile wave-smoke run --rm wave-smoke
+```
+
+Auth stays off unless `OPA_AUTH_REQUIRED=1`. Empty list payloads soft-fail; unexpected status codes fail the suite.
 
 ## Component docs (canonical repos)
 
