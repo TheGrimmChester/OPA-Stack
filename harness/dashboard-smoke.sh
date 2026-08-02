@@ -331,7 +331,7 @@ main() {
   smoke_summary
 }
 
-# Library mode for wave-smoke (source then call run_dashboard_smoke_nested).
+# Library mode for api-smoke (source then call run_dashboard_smoke_nested).
 run_dashboard_smoke_nested() {
   smoke_dashboard_routes
   smoke_dashboard_apis

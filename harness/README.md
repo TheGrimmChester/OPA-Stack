@@ -13,7 +13,7 @@ Compose turns on practical AppSec knobs so Dashboard Security / OSV / IAST / sca
 | **php-cli** | `OPA_IAST=1` / `opa.iast=1` + `OPA_IAST_BLOCK=1` / `opa.iast_block=1` (local smoke only — do not copy block to prod). |
 | **node-app** | `OPA_IAST=1` (parity; opa-node IAST is API/`installHooks`-driven). |
 
-Rebuild Agent from `wave28-30-verticals` (or newer) via `./harness/rebuild-smoke-images.sh` so OSV / AppSec code is in `opa-agent:smoke`.
+Rebuild Agent from a current tip via `./harness/rebuild-smoke-images.sh` so OSV / AppSec code is in `opa-agent:smoke`.
 
 Optional after recreate — seed SBOM then enrich:
 

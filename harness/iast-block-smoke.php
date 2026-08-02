@@ -1,6 +1,6 @@
 <?php
 /**
- * Wave 30 IAST detect + optional block smoke for opa-php:smoke.
+ * AppSec IAST detect + optional block smoke for opa-php:smoke.
  *
  * Runs inside php-cli with:
  *   OPA_IAST=1 OPA_IAST_BLOCK=1 (or -d opa.iast=1 -d opa.iast_block=1)

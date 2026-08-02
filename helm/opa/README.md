@@ -1,4 +1,4 @@
-# Helm packaging (Wave 15-1)
+# Helm packaging (HA / scale)
 
 Additive Kubernetes packaging for the agent. **Does not replace** `docker compose up`.
 
@@ -15,4 +15,4 @@ Scale replicas:
 helm upgrade opa ./helm/opa --set replicaCount=3
 ```
 
-For TailBuffer-correct multi-ingest, set `OPA_INGEST_SHARDS` to the shard count and run one Deployment per shard index (or use sticky LB + single shard until you split). See Agent `docs/wave15-ha-scale.md`.
+For TailBuffer-correct multi-ingest, set `OPA_INGEST_SHARDS` to the shard count and run one Deployment per shard index (or use sticky LB + single shard until you split). See Agent `docs/ha-scale.md`.

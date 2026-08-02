@@ -1,4 +1,4 @@
-# Optional multi-replica agent overlay (Wave 15-0).
+# Optional multi-replica agent overlay (HA / scale).
 # Usage: docker compose -f docker-compose.yaml -f docker-compose.ha.yaml up -d
 # Still one ClickHouse; three agent processes with leader election.
 # For TailBuffer sharding use OPA_INGEST_SHARDS=3 and distinct SHARD_INDEX per agent

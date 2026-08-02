@@ -5,8 +5,8 @@
 #   docker compose up -d clickhouse mysql agent orchestrator perf-lab dashboard node-app
 #   docker compose run --rm php-cli # one-shot: runs the PHP smoke harness
 #   docker compose --profile smoke run --rm node-smoke   # one-shot: curls the node demo app
-#   docker compose --profile wave-smoke run --rm wave-smoke  # Waves 17–31 API smoke (incl. live Docker JMeter)
-#   harness/wave-smoke.sh           # same wave suite from the host
+#   docker compose --profile api-smoke run --rm api-smoke  # API smoke (incl. live Docker JMeter)
+#   harness/api-smoke.sh           # same API smoke suite from the host
 #   harness/jmeter-perf-gate.sh     # standalone Docker JMeter dispatch → gate → samples
 #   harness/node-smoke.sh           # same curls, from the host (node-app publishes :3000)
 #   harness/rum-smoke.sh            # POST a canned RUM beacon to the agent
@@ -69,7 +69,7 @@ services:
       JWT_SECRET: "smoke-test-jwt-secret-please-change-in-prod-0123456789"
       OPA_WS_ALLOWED_ORIGINS: "http://localhost:8088"
       OPA_REDACT: "1"
-      # Wave 23–25 demo knobs (safe for local smoke; no cloud credentials required)
+      # Cloud coverage–25 demo knobs (safe for local smoke; no cloud credentials required)
       OPA_CLOUD_MONITOR_CONFIG: "/fixtures/cloud-monitor.smoke.json"
       OPA_CLOUD_REQUIRED_TAGS: "env,service,owner"
       OPA_NETWORK_SAMPLER: "1"
@@ -77,7 +77,7 @@ services:
       # Peer load SSRF allowlist (federation remote-load still on Agent)
       OPA_PERF_INTERNAL_HOSTS: "node-app"
       OPA_DASHBOARD_URL: "http://127.0.0.1:8088"
-      # Wave 19/30 AppSec (needs Agent image from wave28-30-verticals+ via rebuild-smoke-images.sh)
+      # Vulnerability / IAST and AppSec (needs Agent image via rebuild-smoke-images.sh)
       OPA_OSV: "1"                                     # POST /api/security/osv/enrich → api.osv.dev
       OPA_SECURITY_MIN_SEVERITY: "${OPA_SECURITY_MIN_SEVERITY:-high}"
       OPA_SECURITY_FAIL_OBSERVED: "${OPA_SECURITY_FAIL_OBSERVED:-1}"
@@ -95,7 +95,7 @@ services:
       timeout: 3s
       retries: 20
 
-  # Wave 33 security runs + Wave 34 Repo Watch / OPA Review
+  # Security runs + Repo Watch / OPA Review
   orchestrator:
     image: opa-orchestrator:smoke
     container_name: opa_orchestrator
@@ -120,7 +120,11 @@ services:
       OPA_ANTHROPIC_BASE_URL: "${OPA_ANTHROPIC_BASE_URL:-}"
       OPA_ANTHROPIC_MODEL: "${OPA_ANTHROPIC_MODEL:-}"
       OPA_REVIEW_STACK_CONCURRENCY: "${OPA_REVIEW_STACK_CONCURRENCY:-1}"
+      # UI OPA Review visual MCP — Node/npx + Playwright Chromium are required in the image.
       OPA_REVIEW_BROWSER_MCP: "${OPA_REVIEW_BROWSER_MCP:-1}"
+      OPA_REVIEW_BROWSER_DEPS_OK: "${OPA_REVIEW_BROWSER_DEPS_OK:-1}"
+      OPA_REVIEW_PREVIEW_URL: "${OPA_REVIEW_PREVIEW_URL:-}"
+      OPA_REVIEW_MCP_CONFIG: "${OPA_REVIEW_MCP_CONFIG:-}"
       OPA_GITHUB_WEBHOOK_SECRET: "${OPA_GITHUB_WEBHOOK_SECRET:-smoke-webhook-secret}"
       OPA_SCM_ALLOW_UNSIGNED: "${OPA_SCM_ALLOW_UNSIGNED:-0}"
       OPA_PUBLIC_URL: "http://127.0.0.1:8091"
@@ -138,7 +142,7 @@ services:
       timeout: 3s
       retries: 20
 
-  # Wave 29/31 Perf Lab (Docker JMeter)
+  # Perf Lab (Docker JMeter)
   perf-lab:
     image: opa-perf-lab:smoke
     container_name: opa_perf_lab
@@ -213,7 +217,7 @@ services:
       # is captured, not just userland calls.
       OPA_COLLECT_INTERNAL_FUNCTIONS: "1"
       OPA_DEBUG_LOG: "1"
-      # Wave 19/30 IAST — detect (+ local-only block) for smoke / iast-block-smoke.php
+      # Vulnerability / IAST — detect (+ local-only block) for smoke / iast-block-smoke.php
       OPA_IAST: "1"
       OPA_IAST_BLOCK: "1"
       OPA_SERVICE: "php-smoke"
@@ -282,12 +286,12 @@ services:
         done
         echo "node-smoke: OK"
 
-  # Waves 17–27 API smoke: `docker compose --profile wave-smoke run --rm wave-smoke`
-  # Prefer building agent from wave27-diagnostics via harness/rebuild-smoke-images.sh.
-  wave-smoke:
+  # API smoke: `docker compose --profile api-smoke run --rm api-smoke`
+  # Prefer building agent via harness/rebuild-smoke-images.sh.
+  api-smoke:
     image: alpine:3.20
-    container_name: opa_wave_smoke
-    profiles: ["wave-smoke"]
+    container_name: opa_api_smoke
+    profiles: ["api-smoke"]
     depends_on:
       agent:
         condition: service_healthy
@@ -314,7 +318,7 @@ services:
       - |
         set -e
         apk add --no-cache bash curl openssl python3 >/dev/null
-        exec bash /harness/wave-smoke.sh
+        exec bash /harness/api-smoke.sh
 
 volumes:
   jmeter-work:

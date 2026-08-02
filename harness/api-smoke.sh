@@ -1,18 +1,18 @@
 #!/usr/bin/env bash
-# Wave 17–34 (plus light 13–16 baseline) API smoke suite against the smoke stack.
+# API (plus light 13–16 baseline) API smoke suite against the smoke stack.
 #
 # Prerequisites:
 #   Agent healthy at AGENT_HTTP (default http://127.0.0.1:8080).
 #   Orchestrator at ORCHESTRATOR_HTTP (default :8091; falls back to AGENT_HTTP).
 #   Perf Lab at PERF_LAB_HTTP (default :8092; falls back to AGENT_HTTP).
 #   Auth off unless OPA_AUTH_REQUIRED=1 (compose leaves auth open).
-#   Wave 31 live JMeter: perf-lab must have docker.sock + OPA_JMETER_IMAGE (compose default).
+#   Live JMeter: perf-lab must have docker.sock + OPA_JMETER_IMAGE (compose default).
 #   Skip with SKIP_JMETER_LIVE=1 only when containers cannot be spawned.
 #
 # Usage:
-#   ./harness/wave-smoke.sh
-#   AGENT_HTTP=http://127.0.0.1:8080 ORCHESTRATOR_HTTP=http://127.0.0.1:8091 PERF_LAB_HTTP=http://127.0.0.1:8092 ./harness/wave-smoke.sh
-#   docker compose --profile wave-smoke run --rm wave-smoke
+#   ./harness/api-smoke.sh
+#   AGENT_HTTP=http://127.0.0.1:8080 ORCHESTRATOR_HTTP=http://127.0.0.1:8091 PERF_LAB_HTTP=http://127.0.0.1:8092 ./harness/api-smoke.sh
+#   docker compose --profile api-smoke run --rm api-smoke
 #   SCENARIO_ID=... ./harness/jmeter-perf-gate.sh   # standalone Docker JMeter gate
 #
 # Exit 0 if FAIL==0 (SOFT empty-data warnings are non-fatal unless SMOKE_STRICT=1).
@@ -101,13 +101,13 @@ smoke_baseline() {
     expect_json_key "$body" "ok" "tql dry_run"
     expect_json_key "$body" "sql" "tql dry_run sql"
   else
-    soft "tql dry_run HTTP $LAST_HTTP (Wave 13 optional)"
+    soft "tql dry_run HTTP $LAST_HTTP (TQL optional)"
   fi
 }
 
 # ---------------------------------------------------------------------------
-smoke_wave17() {
-  section "Wave 17 — DB monitoring"
+smoke_db_monitoring() {
+  section "Database monitoring"
 
   local body
   body="$(get_json /api/db/instances)"
@@ -129,8 +129,8 @@ smoke_wave17() {
 }
 
 # ---------------------------------------------------------------------------
-smoke_wave18() {
-  section "Wave 18 — FaaS / serverless"
+smoke_serverless() {
+  section "Serverless / FaaS"
 
   local body
   body="$(post_json /v1/ndjson "$(cat <<EOF
@@ -161,8 +161,8 @@ EOF
 }
 
 # ---------------------------------------------------------------------------
-smoke_wave19() {
-  section "Wave 19 — Vuln / IAST"
+smoke_vuln() {
+  section "Vulnerability / IAST"
 
   local sbom="{}"
   if [[ -f "$FIXTURES/sbom.smoke.json" ]]; then
@@ -206,8 +206,8 @@ EOF
 }
 
 # ---------------------------------------------------------------------------
-smoke_wave20() {
-  section "Wave 20 — Synthetics"
+smoke_synthetics() {
+  section "Synthetics"
 
   local body
   body="$(get_json /api/synthetics)"
@@ -236,8 +236,8 @@ EOF
 }
 
 # ---------------------------------------------------------------------------
-smoke_wave21() {
-  section "Wave 21 — Service catalog"
+smoke_catalog() {
+  section "Service catalog"
 
   local body
   body="$(get_json /api/catalog)"
@@ -262,8 +262,8 @@ smoke_wave21() {
 }
 
 # ---------------------------------------------------------------------------
-smoke_wave22() {
-  section "Wave 22 — Platform mgmt API"
+smoke_mgmt() {
+  section "Platform automation"
 
   local body
   body="$(get_json /api/mgmt/v1)"
@@ -290,8 +290,8 @@ smoke_wave22() {
 }
 
 # ---------------------------------------------------------------------------
-smoke_wave23() {
-  section "Wave 23 — Cloud coverage"
+smoke_cloud() {
+  section "Cloud coverage"
 
   local body
   body="$(get_json /api/cloud/summary)"
@@ -340,8 +340,8 @@ EOF
 }
 
 # ---------------------------------------------------------------------------
-smoke_wave24() {
-  section "Wave 24 — Network / eBPF"
+smoke_network() {
+  section "Network / eBPF"
 
   local body
   body="$(post_json /v1/network/flows "$(cat <<EOF
@@ -383,8 +383,8 @@ EOF
 }
 
 # ---------------------------------------------------------------------------
-smoke_wave25() {
-  section "Wave 25 — Federation / residency"
+smoke_federation() {
+  section "Federation / residency"
 
   local body
   body="$(get_json /api/federation/summary)"
@@ -405,7 +405,7 @@ smoke_wave25() {
   # Pin org to a foreign region, expect 451 on ND-JSON write; federation reads still 200.
   local foreign="smoke-foreign-region-zz"
   body="$(post_json /api/residency/policy/upsert "$(cat <<EOF
-{"organization_id":"${ORG_ID}","project_id":"${PROJECT_ID}","home_region":"${foreign}","allowed_regions":["${foreign}"],"transfer_policy":"deny","notes":"wave-smoke locality"}
+{"organization_id":"${ORG_ID}","project_id":"${PROJECT_ID}","home_region":"${foreign}","allowed_regions":["${foreign}"],"transfer_policy":"deny","notes":"api-smoke locality"}
 EOF
 )")"
   expect_http 200 "POST /api/residency/policy/upsert"
@@ -436,22 +436,22 @@ EOF
     local_region="default"
   fi
   body="$(post_json /api/residency/policy/upsert "$(cat <<EOF
-{"organization_id":"${ORG_ID}","project_id":"${PROJECT_ID}","home_region":"${local_region}","allowed_regions":["${local_region}"],"transfer_policy":"deny","notes":"wave-smoke restore"}
+{"organization_id":"${ORG_ID}","project_id":"${PROJECT_ID}","home_region":"${local_region}","allowed_regions":["${local_region}"],"transfer_policy":"deny","notes":"api-smoke restore"}
 EOF
 )")"
   expect_http 200 "POST /api/residency/policy/upsert restore"
 }
 
 # ---------------------------------------------------------------------------
-smoke_wave26() {
-  section "Wave 26 — Collaboration"
+smoke_collab() {
+  section "Collaboration"
 
   local body ts slug
   ts="$(date +%s)"
   slug="smoke-${ts}"
 
   body="$(post_json /api/notebooks "$(cat <<EOF
-{"title":"Smoke notebook ${ts}","description":"wave-smoke","cells":[{"type":"markdown","content":"hello smoke"}],"created_by":"smoke"}
+{"title":"Smoke notebook ${ts}","description":"api-smoke","cells":[{"type":"markdown","content":"hello smoke"}],"created_by":"smoke"}
 EOF
 )")"
   expect_http 200 "POST /api/notebooks"
@@ -507,8 +507,8 @@ EOF
 
 
 # ---------------------------------------------------------------------------
-smoke_wave27() {
-  section "Wave 27 — Diagnostics"
+smoke_diagnostics() {
+  section "Diagnostics"
 
   local body
   body="$(post_json /api/releases "$(cat <<EOF
@@ -563,7 +563,7 @@ EOF
 }
 
 # ---------------------------------------------------------------------------
-# Browser RUM vitals (Wave 12 SLO path used by Dashboard). Regression for
+# Browser RUM vitals (RUM depth SLO path used by Dashboard). Regression for
 # ClickHouse Code 47 when outer SELECT referenced web_vitals after rumDedupe.
 # Also asserts CrUX-style field p75, thresholds, and attribution endpoint.
 smoke_rum_vitals() {
@@ -751,7 +751,7 @@ print(meta.get('span_count') or len(spans))
     fi
   fi
 
-  # Wave 32 — trace replay capability catalog
+  # Trace replay — trace replay capability catalog
   body="$(get_json "/api/traces/${tid}/replay")"
   expect_http 200 "GET /api/traces/{id}/replay"
   expect_json_key "$body" "modes" "trace replay modes"
@@ -767,8 +767,8 @@ print(meta.get('span_count') or len(spans))
 }
 
 # ---------------------------------------------------------------------------
-smoke_wave28() {
-  section "Wave 28 — Experience replay / mobile"
+smoke_experience_replay() {
+  section "Experience replay / mobile"
 
   local sid="smoke-replay-$(date +%s)"
   local body
@@ -826,8 +826,8 @@ EOF
 }
 
 # ---------------------------------------------------------------------------
-smoke_wave29() {
-  section "Wave 29/31 — Perf lab + harden"
+smoke_perf_lab() {
+  section "Perf lab + harden"
 
   local body scn_id run_id
 
@@ -997,7 +997,7 @@ EOF
     soft "performance baselines HTTP $LAST_HTTP"
   fi
 
-  # Wave 31 — multi-step upsert + validate private URL block + import-jmx
+  # JMeter Perf Lab — multi-step upsert + validate private URL block + import-jmx
   body="$(post_json /api/perf/scenarios/upsert "$(cat <<EOF
 {"name":"smoke-steps","target_url":"https://example.com/","method":"GET","vus":1,"duration_seconds":5,"steps":[{"type":"http","name":"health","method":"GET","url":"https://example.com/","think_ms":10}],"sla":{"p95_ms":5000,"error_rate_max":1},"datasets":{}}
 EOF
@@ -1121,14 +1121,14 @@ EOF
     fi
   fi
 
-  # Docker JMeter live run is smoke_wave31() in main (hard fail if containers don't complete).
+  # Docker JMeter live run is smoke_jmeter() in main (hard fail if containers don't complete).
 }
 
 # ---------------------------------------------------------------------------
-# Wave 31 — Docker-first JMeter: real dispatch must complete (not soft-skip).
+# JMeter Perf Lab — Docker-first JMeter: real dispatch must complete (not soft-skip).
 # Set SKIP_JMETER_LIVE=1 only when the agent cannot spawn containers.
-smoke_wave31_docker_jmeter() {
-  section "Wave 31 — Docker JMeter live run (dispatch → passed → gate → samples)"
+smoke_jmeter_docker() {
+  section "Docker JMeter live run (dispatch → passed → gate → samples)"
   if [[ "${SKIP_JMETER_LIVE:-0}" == "1" ]]; then
     soft "SKIP_JMETER_LIVE=1 — skipping Docker JMeter live run"
     return 0
@@ -1310,17 +1310,17 @@ EOF
   fi
 }
 
-smoke_wave31() {
-  smoke_wave31_docker_jmeter
+smoke_jmeter() {
+  smoke_jmeter_docker
 }
 
 # ---------------------------------------------------------------------------
-smoke_wave30() {
-  section "Wave 30 — AppSec hub (secrets / SAST / IaC / PR-check)"
+smoke_appsec() {
+  section "AppSec hub (secrets / SAST / IaC / PR-check)"
 
   local body
   body="$(post_json /v1/security/secrets "$(cat <<EOF
-{"service":"smoke-shop","findings":[{"rule":"aws-key","file":"config.env","line":3,"severity":"high","snippet":"AKIA****SMOKE","detector":"wave-smoke"}]}
+{"service":"smoke-shop","findings":[{"rule":"aws-key","file":"config.env","line":3,"severity":"high","snippet":"AKIA****SMOKE","detector":"api-smoke"}]}
 EOF
 )")"
   expect_http 200 "POST /v1/security/secrets"
@@ -1375,7 +1375,7 @@ EOF
     soft "pr-check body missing expected gate keys: $body"
   fi
 
-  # Wave 33 — first-class Security runs (create → dispatch lite scanners → completed).
+  # Security runs — first-class Security runs (create → dispatch lite scanners → completed).
   body="$(get_json /api/security/profiles)"
   expect_http 200 "GET /api/security/profiles"
   expect_json_key "$body" "profiles" "security profiles"
@@ -1447,9 +1447,9 @@ EOF
     fi
   fi
 
-  # Notebook execute (Wave 26 deepen) — create TQL notebook then execute.
+  # Notebook execute (Collaboration deepen) — create TQL notebook then execute.
   body="$(post_json /api/notebooks "$(cat <<EOF
-{"title":"Smoke TQL execute","description":"wave30","cells":[{"type":"tql","content":"FIND spans LIMIT 1"}],"created_by":"smoke"}
+{"title":"Smoke TQL execute","description":"api-smoke","cells":[{"type":"tql","content":"FIND spans LIMIT 1"}],"created_by":"smoke"}
 EOF
 )")"
   expect_http 200 "POST /api/notebooks (tql)"
@@ -1478,8 +1478,8 @@ EOF
 }
 
 # ---------------------------------------------------------------------------
-smoke_wave34() {
-  section "Wave 34 — Repo Watch / SCM jobs / scoped gate / AI settings"
+smoke_repo_watch() {
+  section "Repo Watch / SCM jobs / scoped gate / AI settings"
 
   local body
   body="$(get_json /api/connectors)"
@@ -1675,7 +1675,7 @@ EOF
   # Signed webhook fixture (HMAC) → enqueue PR job (mock GitHub checkout).
   local wh_secret wh_body wh_sig wh_code
   wh_secret="${OPA_GITHUB_WEBHOOK_SECRET:-smoke-webhook-secret}"
-  wh_body='{"action":"opened","number":7,"pull_request":{"number":7,"title":"smoke PR","body":"wave34","draft":false,"head":{"sha":"abc123deadbeef","ref":"feature/smoke"}},"repository":{"full_name":"local/smoke-repo"},"installation":{"id":0}}'
+  wh_body='{"action":"opened","number":7,"pull_request":{"number":7,"title":"smoke PR","body":"api-smoke","draft":false,"head":{"sha":"abc123deadbeef","ref":"feature/smoke"}},"repository":{"full_name":"local/smoke-repo"},"installation":{"id":0}}'
   if command -v openssl >/dev/null 2>&1; then
     wh_sig="sha256=$(printf '%s' "$wh_body" | openssl dgst -sha256 -hmac "$wh_secret" | awk '{print $NF}')"
   elif command -v python3 >/dev/null 2>&1; then
@@ -1720,7 +1720,7 @@ smoke_dashboard_exhaustive() {
 # ---------------------------------------------------------------------------
 main() {
   smoke_reset_counters
-  printf 'OPA wave smoke → %s (org=%s project=%s)\n' "$AGENT_HTTP" "$ORG_ID" "$PROJECT_ID"
+  printf 'OPA API smoke → %s (org=%s project=%s)\n' "$AGENT_HTTP" "$ORG_ID" "$PROJECT_ID"
 
   if ! wait_agent; then
     smoke_summary || true
@@ -1730,22 +1730,22 @@ main() {
   smoke_baseline
   smoke_rum_vitals
   smoke_trace_waterfall
-  smoke_wave17
-  smoke_wave18
-  smoke_wave19
-  smoke_wave20
-  smoke_wave21
-  smoke_wave22
-  smoke_wave23
-  smoke_wave24
-  smoke_wave25
-  smoke_wave26
-  smoke_wave27
-  smoke_wave28
-  smoke_wave29
-  smoke_wave30
-  smoke_wave31
-  smoke_wave34
+  smoke_db_monitoring
+  smoke_serverless
+  smoke_vuln
+  smoke_synthetics
+  smoke_catalog
+  smoke_mgmt
+  smoke_cloud
+  smoke_network
+  smoke_federation
+  smoke_collab
+  smoke_diagnostics
+  smoke_experience_replay
+  smoke_perf_lab
+  smoke_appsec
+  smoke_jmeter
+  smoke_repo_watch
   smoke_dashboard_exhaustive
 
   smoke_summary

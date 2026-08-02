@@ -1,4 +1,4 @@
-# Security scan workspace (Wave 33)
+# Security scan workspace (Security runs)
 
 Intentional fixture files for Orchestrator scanners (`OPA_SECURITY_WORKSPACE=/workspace`).
 

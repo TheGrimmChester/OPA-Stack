@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# Wave 31 — gate a Perf Lab run via /api/perf/runs/{id}/gate (fail-closed).
+# JMeter Perf Lab — gate a Perf Lab run via /api/perf/runs/{id}/gate (fail-closed).
 # Asserts Docker-first dispatch (mode=docker) unless OPA_PERF_ALLOW_HOST_JMETER=1.
-# Used standalone or as the reference contract for wave-smoke's smoke_wave31.
+# Used standalone or as the reference contract for api-smoke's smoke_jmeter.
 set -euo pipefail
 AGENT_URL="${AGENT_URL:-http://127.0.0.1:8080}"
 RUN_ID="${RUN_ID:-}"

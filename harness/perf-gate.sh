@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Wave 29 — CI perf gate helper (single-runner honesty).
+# Perf lab — CI perf gate helper (single-runner honesty).
 # Usage:
 #   AGENT_URL=http://127.0.0.1:8080 SERVICE=smoke-shop ./harness/perf-gate.sh
 #   AGENT_URL=... SERVICE=smoke-shop BASELINE_ID=smoke-shop::p95_ms ./harness/perf-gate.sh

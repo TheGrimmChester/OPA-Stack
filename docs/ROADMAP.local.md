@@ -13,7 +13,7 @@ repos: [OPA-Agent, OPA-Dashboard, OPA-PHP-extension, opa-node, opa-rum-js, OPA-s
 ## Executive summary
 
 - **Vision:** Self-hosted APM for PHP and polyglot stacks — traces, errors, logs, RUM, reliability, and thin perf/AppSec verticals without vendor lock-in.
-- **Maturity:** Waves 1–27 scaffolded/shipped on tip branches; Waves 28–30 deepened verticals (replay fidelity, federation load fan-out, SAST/IaC hub) on `wave28-30-verticals`.
+- **Maturity:** Waves 1–27 scaffolded/shipped on tip branches; Experience replay–30 deepened verticals (replay fidelity, federation load fan-out, SAST/IaC hub) on `wave28-30-verticals`.
 - **Honesty:** Late waves are contracts + demos until depth spikes land; do not claim eBPF/cloud inventory/commercial load-test/AppSec parity. Explicitly still deferred: JVM/.NET agents, hundreds of cloud integrations, full ClickHouse Keeper HA as net-new, pixel-perfect commercial session replay.
 
 ---
@@ -251,11 +251,11 @@ Source: [`docs/AUDIT-2026-07-23.md`](AUDIT-2026-07-23.md) — header notes sever
 
 ---
 
-## Waves 12–30 maturity (honest, 2026-07-30)
+## RUM depth–30 maturity (honest, 2026-07-30)
 
 | Wave | Band | Status |
 |------|------|--------|
-| 12 RUM depth / replay ingest | Hard XL | Capture + chunks; **player** in Wave 28 |
+| 12 RUM depth / replay ingest | Hard XL | Capture + chunks; **player** in Experience replay |
 | 13–16 | Hard XL / OSS | Partial; JVM/.NET / full CH cluster still deferred |
 | 17–22 | Mid scaffold | Stronger contracts; TF provider = stub only |
 | 23–27 | Late scaffold | P0 honesty (residency, mock labels, bytes) + depth spikes on tip |
@@ -271,7 +271,7 @@ Source: [`docs/AUDIT-2026-07-23.md`](AUDIT-2026-07-23.md) — header notes sever
 - Full ClickHouse Keeper HA cluster as a net-new program
 - Pixel-perfect commercial session replay (full rrweb)
 
-Depth-review Phase 1 (honesty/smoke) completed on `wave27-diagnostics`. Phase 2–3 + Waves 28–30 deepen on `wave28-30-verticals`.
+Depth-review Phase 1 (honesty/smoke) completed on `wave27-diagnostics`. Phase 2–3 + Experience replay–30 deepen on `wave28-30-verticals`.
 
 ---
 

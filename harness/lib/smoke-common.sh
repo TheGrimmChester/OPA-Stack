@@ -1,5 +1,5 @@
 # shellcheck shell=bash
-# Shared helpers for OPA-stack wave smoke scripts.
+# Shared helpers for OPA-stack API smoke scripts.
 
 AGENT_HTTP="${AGENT_HTTP:-http://127.0.0.1:8080}"
 # Default sibling ports when hitting host-published smoke stack; compose sets explicit URLs.

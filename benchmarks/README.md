@@ -1,4 +1,4 @@
-# Benchmarks (Wave 16-6)
+# Benchmarks (OSS launch)
 
 Reproducible harness stubs. Numbers below are placeholders until CI publishes artifacts.
 

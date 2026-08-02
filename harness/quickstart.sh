@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Wave 16-1: five-minute quickstart — one command to a populated dashboard.
+# OSS launch: five-minute quickstart — one command to a populated dashboard.
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
@@ -40,9 +40,9 @@ done
 echo "==> Generating demo traffic"
 bash harness/demo-traffic.sh
 
-if [[ "${WAVE_SMOKE:-0}" == "1" ]]; then
-  echo "==> Running Waves 17–31 API smoke incl. live Docker JMeter (WAVE_SMOKE=1)"
-  bash harness/wave-smoke.sh
+if [[ "${API_SMOKE:-0}" == "1" ]]; then
+  echo "==> Running API smoke incl. live Docker JMeter (API_SMOKE=1)"
+  bash harness/api-smoke.sh
 fi
 
 echo
@@ -51,7 +51,7 @@ echo "Agent API:  http://127.0.0.1:8080/api/health"
 echo "Version:    $(curl -fsS http://127.0.0.1:8080/api/version 2>/dev/null || echo '{}')"
 echo
 echo "Done. Open the dashboard — Service should already show spans."
-echo "Wave smoke: WAVE_SMOKE=1 ./harness/quickstart.sh   or   ./harness/wave-smoke.sh"
+echo "API smoke: API_SMOKE=1 ./harness/quickstart.sh   or   ./harness/api-smoke.sh"
 echo "JMeter gate: SCENARIO_ID=<id> ./harness/jmeter-perf-gate.sh"
 echo "Rebuild:    ./harness/rebuild-smoke-images.sh"
 echo "Tear down: docker compose -p $COMPOSE_PROJECT_NAME down"

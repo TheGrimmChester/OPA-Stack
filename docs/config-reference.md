@@ -1,6 +1,6 @@
 # Configuration reference
 
-> Generated / curated for Wave 16. Defaults are one-box friendly.
+> Generated / curated for OSS launch. Defaults are one-box friendly.
 
 ## Agent environment
 
