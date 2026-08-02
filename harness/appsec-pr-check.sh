@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# AppSec/34 — PR security check against Agent /v1/security/pr-check (token-gated when set).
+# AppSec / Repo Watch — PR security check against Agent /v1/security/pr-check (token-gated when set).
 set -euo pipefail
 AGENT_URL="${AGENT_URL:-http://127.0.0.1:8080}"
 TOKEN="${OPA_SECURITY_INGEST_TOKEN:-}"

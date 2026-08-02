@@ -69,7 +69,7 @@ services:
       JWT_SECRET: "smoke-test-jwt-secret-please-change-in-prod-0123456789"
       OPA_WS_ALLOWED_ORIGINS: "http://localhost:8088"
       OPA_REDACT: "1"
-      # Cloud coverage–25 demo knobs (safe for local smoke; no cloud credentials required)
+      # Cloud coverage demo knobs (safe for local smoke; no cloud credentials required)
       OPA_CLOUD_MONITOR_CONFIG: "/fixtures/cloud-monitor.smoke.json"
       OPA_CLOUD_REQUIRED_TAGS: "env,service,owner"
       OPA_NETWORK_SAMPLER: "1"

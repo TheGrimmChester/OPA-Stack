@@ -1,7 +1,7 @@
 ---
 name: opa-product-roadmap
 overview: "Open Profiling Agent — local coordinator roadmap"
-currentPhase: wave-6-enterprise-hardening
+currentPhase: enterprise-hardening
 repos: [OPA-Agent, OPA-Dashboard, OPA-PHP-extension, opa-node, opa-rum-js, OPA-stack]
 ---
 
@@ -13,8 +13,8 @@ repos: [OPA-Agent, OPA-Dashboard, OPA-PHP-extension, opa-node, opa-rum-js, OPA-s
 ## Executive summary
 
 - **Vision:** Self-hosted APM for PHP and polyglot stacks — traces, errors, logs, RUM, reliability, and thin perf/AppSec verticals without vendor lock-in.
-- **Maturity:** Waves 1–27 scaffolded/shipped on tip branches; Experience replay–30 deepened verticals (replay fidelity, federation load fan-out, SAST/IaC hub) on `wave28-30-verticals`.
-- **Honesty:** Late waves are contracts + demos until depth spikes land; do not claim eBPF/cloud inventory/commercial load-test/AppSec parity. Explicitly still deferred: JVM/.NET agents, hundreds of cloud integrations, full ClickHouse Keeper HA as net-new, pixel-perfect commercial session replay.
+- **Maturity:** Experience replay and AppSec deepened verticals (replay fidelity, federation load fan-out, SAST/IaC hub) on current tip branches.
+- **Honesty:** Later capabilities are contracts + demos until depth spikes land; do not claim eBPF/cloud inventory/commercial load-test/AppSec parity. Explicitly still deferred: JVM/.NET agents, hundreds of cloud integrations, full ClickHouse Keeper HA as net-new, pixel-perfect commercial session replay.
 
 ---
 
@@ -31,9 +31,9 @@ repos: [OPA-Agent, OPA-Dashboard, OPA-PHP-extension, opa-node, opa-rum-js, OPA-s
 
 ---
 
-## Wave history (completed)
+## History (completed)
 
-### Wave 1 — Security & correctness (Agent)
+### Security & correctness (Agent)
 
 **Commits:** `ce205b3`, `9bcf31a`
 
@@ -41,16 +41,16 @@ repos: [OPA-Agent, OPA-Dashboard, OPA-PHP-extension, opa-node, opa-rum-js, OPA-s
 - Accurate `/api/errors` counts (JOIN dedupe)
 - Unit tests + CI vet/test gate (`utils_test.go`, `.github/workflows/docker-build.yml`)
 
-### Wave 2 — Alerts / SLOs / Anomalies
+### Alerts / SLOs / Anomalies
 
 **Commits:** Agent `0efc747`, `61f2be4`; Dashboard `d849312`
 
-- Alerts, SLOs, Anomalies backends (`alert_worker.go`, `anomaly_detector.go`, `wave2_workers.go`)
+- Alerts, SLOs, Anomalies backends (`alert_worker.go`, `anomaly_detector.go`, `workers.go`)
 - SLO evaluator writes `burn_rate` to `opa.slo_metrics`
 - Anomaly scheduler (env-gated)
 - Dashboard Reliability nav: Alerts, SLOs, Anomalies (`SideRail.jsx`)
 
-### Wave 3 — Dashboard depth & power UX
+### Dashboard depth & power UX
 
 **Commits:** Dashboard `a190085` … `50b53ab`
 
@@ -58,7 +58,7 @@ repos: [OPA-Agent, OPA-Dashboard, OPA-PHP-extension, opa-node, opa-rum-js, OPA-s
 - Flame/call graphs, variable dumps, trace export, threshold editing
 - Saved views, compare cohorts, theme/palette (C5)
 
-### Wave 4 — OTLP ingest + distributed waterfall + RUM detail
+### OTLP ingest + distributed waterfall + RUM detail
 
 **Commits:** Agent `adc5e0a`, `47f8739`; Dashboard `72e8239`, `74b6e37`
 
@@ -66,7 +66,7 @@ repos: [OPA-Agent, OPA-Dashboard, OPA-PHP-extension, opa-node, opa-rum-js, OPA-s
 - **D2:** RUM detail aggregates (`/api/rum/detail`)
 - **D3:** Service-aware distributed waterfall (`TraceExplorer.jsx`)
 
-### Wave 5 — Tenant schema, TTLs, hardened auth profile
+### Tenant schema, TTLs, hardened auth profile
 
 **Commits:** Agent `1eac50e`, `b6d1788`
 
@@ -76,9 +76,9 @@ repos: [OPA-Agent, OPA-Dashboard, OPA-PHP-extension, opa-node, opa-rum-js, OPA-s
 
 ---
 
-## Post-wave shipped (unnumbered)
+## Later shipped (unnumbered)
 
-Shipped after Wave 5, not tied to a wave label:
+Shipped after tenant/auth hardening, not tied to a phase label:
 
 | Area | What shipped | Evidence |
 |------|--------------|----------|
@@ -118,9 +118,9 @@ Shipped after Wave 5, not tied to a wave label:
 
 ---
 
-## Forward waves
+## Forward work
 
-### Wave 6 — Enterprise hardening (near-term)
+### Enterprise hardening (near-term)
 
 Focus: close the gap between "works in dev" and "safe in prod".
 
@@ -128,13 +128,13 @@ Focus: close the gap between "works in dev" and "safe in prod".
 |----|------|---------|-------|
 | F6-1 | Auth-on-by-default migration guide + dashboard guard | Agent, Dashboard, OPA-stack | `OPA_AUTH_REQUIRED` still off; see `OPA-Agent/main.go` ~L1020 |
 | F6-2 | Audit log for write/delete/control ops | Agent | login, key CRUD, trace delete, sampling/config changes |
-| F6-3 | SLO burn-rate → alert conditions | Agent, Dashboard | `burn_rate` in `wave2_workers.go`; alerts static in `alert_worker.go` |
+| F6-3 | SLO burn-rate → alert conditions | Agent, Dashboard | `burn_rate` in `workers.go`; alerts static in `alert_worker.go` |
 | F6-4 | Alert channel expansion (PagerDuty/Opsgenie/Teams) | Agent | webhook/slack/email only today |
 | F6-5 | Document + OpenAPI the undocumented dashboard endpoints | Agent | `/api/http-calls`, `/api/redis/operations`, `/api/filter-suggestions/*` |
 | F6-6 | PHP `full_capture_threshold_ms` — implement or remove | PHP extension | Registered in `opa.c:36`, never read |
 | F6-7 | Production deployment guide (TLS, nginx headers, auth env) | OPA-stack | Smoke compose exists; no prod runbook |
 
-### Wave 7 — Observability completeness
+### Observability completeness
 
 | ID | Task | Repo(s) |
 |----|------|---------|
@@ -144,7 +144,7 @@ Focus: close the gap between "works in dev" and "safe in prod".
 | F7-4 | Per-tenant ingestion quotas + cardinality caps | Agent |
 | F7-5 | Node auto-instrumentation (`pg`, `mysql2`, `ioredis`) | opa-node |
 
-### Wave 8 — Scale & polyglot
+### Scale & polyglot
 
 | ID | Task | Repo(s) |
 |----|------|---------|
@@ -239,7 +239,7 @@ Source: [`docs/AUDIT-2026-07-23.md`](AUDIT-2026-07-23.md) — header notes sever
 
 ---
 
-## Suggested kickoff order (Wave 6)
+## Suggested kickoff order (enterprise hardening)
 
 1. **F6-3** — SLO burn-rate alerts (highest user-visible reliability gap)
 2. **F6-1** — Auth migration guide + enforce in stack harness
@@ -251,18 +251,18 @@ Source: [`docs/AUDIT-2026-07-23.md`](AUDIT-2026-07-23.md) — header notes sever
 
 ---
 
-## RUM depth–30 maturity (honest, 2026-07-30)
+## RUM depth maturity (honest, 2026-07-30)
 
-| Wave | Band | Status |
+| Area | Band | Status |
 |------|------|--------|
-| 12 RUM depth / replay ingest | Hard XL | Capture + chunks; **player** in Experience replay |
-| 13–16 | Hard XL / OSS | Partial; JVM/.NET / full CH cluster still deferred |
-| 17–22 | Mid scaffold | Stronger contracts; TF provider = stub only |
-| 23–27 | Late scaffold | P0 honesty (residency, mock labels, bytes) + depth spikes on tip |
-| **28 Experience replay** | Deepened vertical | Timeline + markers (nav/longtask/resource/ajax) + player reconstruction; still not rrweb |
-| **29 Perf lab** | Deepened vertical | Profiles + federation `remote-load` fan-out + baselines UI; ≠ multi-cloud load grid |
-| **30 AppSec hub** | Deepened vertical | SAST/IaC tables+ingest+scripts, IAST opt-in block, scanner token; not full commercial AppSec |
-| **33 Security runs** | First-class scan runs | Dashboard Start scan → Agent embedded lite/stub scanners → `security_run_id` findings; workspace mount `/workspace` |
+| RUM depth / replay ingest | Hard XL | Capture + chunks; **player** in Experience replay |
+| Agent coverage / TQL / OSS launch | Hard XL / OSS | Partial; JVM/.NET / full CH cluster still deferred |
+| DB → platform automation scaffold | Mid scaffold | Stronger contracts; TF provider = stub only |
+| Cloud → diagnostics scaffold | Late scaffold | P0 honesty (residency, mock labels, bytes) + depth spikes on tip |
+| **Experience replay** | Deepened vertical | Timeline + markers (nav/longtask/resource/ajax) + player reconstruction; still not rrweb |
+| **Perf lab** | Deepened vertical | Profiles + federation `remote-load` fan-out + baselines UI; ≠ multi-cloud load grid |
+| **AppSec hub** | Deepened vertical | SAST/IaC tables+ingest+scripts, IAST opt-in block, scanner token; not full commercial AppSec |
+| **Security runs** | First-class scan runs | Dashboard Start scan → Agent embedded lite/stub scanners → `security_run_id` findings; workspace mount `/workspace` |
 
 ### Explicitly still deferred (docs honesty)
 
@@ -271,7 +271,7 @@ Source: [`docs/AUDIT-2026-07-23.md`](AUDIT-2026-07-23.md) — header notes sever
 - Full ClickHouse Keeper HA cluster as a net-new program
 - Pixel-perfect commercial session replay (full rrweb)
 
-Depth-review Phase 1 (honesty/smoke) completed on `wave27-diagnostics`. Phase 2–3 + Experience replay–30 deepen on `wave28-30-verticals`.
+Depth-review Phase 1 (honesty/smoke) completed on the diagnostics tip. Phase 2–3 + Experience replay deepen on current verticals tips.
 
 ---
 
