@@ -1,0 +1,6 @@
+{
+  "name": "security-smoke-fixture",
+  "dependencies": {
+    "lodash": "4.17.20"
+  }
+}

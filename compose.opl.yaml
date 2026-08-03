@@ -1,0 +1,38 @@
+# OPL product profile — api + orchestrator + dashboard.
+name: opl
+
+services:
+  clickhouse:
+    image: clickhouse/clickhouse-server:24.3
+    profiles: ["opl"]
+    volumes:
+      - ./clickhouse/init-databases.sql:/docker-entrypoint-initdb.d/init-databases.sql:ro
+
+  opl:
+    image: opl-api:smoke
+    profiles: ["opl"]
+    ports: ["8092:8092"]
+    environment:
+      LISTEN_ADDR: ":8092"
+      CLICKHOUSE_URL: ${CLICKHOUSE_URL:-http://clickhouse:8123}
+      CLICKHOUSE_DB: opl
+      JWT_SECRET: ${JWT_SECRET:-}
+      AUTH_MODE: ${AUTH_MODE:-standalone}
+      OPEN_SERVICE_JWT_SECRET: ${OPEN_SERVICE_JWT_SECRET:-}
+      PEER_OPA_URL: ${PEER_OPA_URL:-}
+    depends_on: [clickhouse]
+
+  opl-orchestrator:
+    image: opl-api:smoke
+    profiles: ["opl"]
+    command: ["opl-api", "orchestrator"]
+    environment:
+      CLICKHOUSE_URL: ${CLICKHOUSE_URL:-http://clickhouse:8123}
+      CLICKHOUSE_DB: opl
+
+  opl-dashboard:
+    image: opl-dashboard:smoke
+    profiles: ["opl"]
+    ports: ["8095:80"]
+    environment:
+      VITE_API_URL: http://127.0.0.1:8092

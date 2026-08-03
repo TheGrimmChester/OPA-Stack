@@ -1,0 +1,40 @@
+# OPA product profile — hub + edge agent + dashboard.
+# Image tags: use *:smoke on laptop only; *:nas for production/NAS.
+name: opa
+
+services:
+  clickhouse:
+    image: clickhouse/clickhouse-server:24.3
+    profiles: ["opa"]
+    volumes:
+      - ./clickhouse/init-databases.sql:/docker-entrypoint-initdb.d/init-databases.sql:ro
+    ports: ["8123:8123"]
+
+  hub:
+    image: opa-hub:smoke
+    profiles: ["opa"]
+    ports: ["8080:8080"]
+    environment:
+      LISTEN_ADDR: ":8080"
+      CLICKHOUSE_URL: http://clickhouse:8123
+      CLICKHOUSE_DB: opa
+      JWT_SECRET: ${JWT_SECRET:-}
+      AUTH_MODE: ${AUTH_MODE:-standalone}
+      OPEN_SERVICE_JWT_SECRET: ${OPEN_SERVICE_JWT_SECRET:-}
+      PEER_ORA_URL: ${PEER_ORA_URL:-}
+      PEER_OSA_URL: ${PEER_OSA_URL:-}
+      PEER_OPL_URL: ${PEER_OPL_URL:-}
+    depends_on: [clickhouse]
+
+  agent:
+    image: opa-agent:smoke
+    profiles: ["opa"]
+    environment:
+      OPA_HUB_URL: http://hub:8080
+
+  dashboard:
+    image: opa-dashboard:smoke
+    profiles: ["opa"]
+    ports: ["8088:80"]
+    environment:
+      VITE_API_URL: http://127.0.0.1:8080
