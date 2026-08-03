@@ -153,6 +153,8 @@ services:
       OPA_JOB_IMAGE_ALLOW: ${OPA_JOB_IMAGE_ALLOW:-ora-runner-*,osa-runner-*,node:22*,mysql:8.4*,redis:7*,php:8.4*,hebabil/php-8.4-cli*}
       OPA_INSTANCE_ID: ${OPA_INSTANCE_ID:-nas-prod}
       OPA_GITHUB_APP_ID: ${OPA_GITHUB_APP_ID:-}
+      # Installed App slug for reviewer requests. New installs: ora. Production NAS keeps
+      # opa-ai-orchestrator via .env until the GitHub App is renamed — do not override blindly.
       OPA_GITHUB_APP_SLUG: ${OPA_GITHUB_APP_SLUG:-ora}
       OPA_GITHUB_APP_PRIVATE_KEY: ${OPA_GITHUB_APP_PRIVATE_KEY}
       OPA_GITHUB_WEBHOOK_SECRET: ${OPA_GITHUB_WEBHOOK_SECRET}

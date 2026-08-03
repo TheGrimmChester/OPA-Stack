@@ -59,6 +59,12 @@ Co-deployed mode: shared `JWT_SECRET`, `AUTH_MODE=codeployed`, peers set `PEER_O
 
 OPM/OSA GitHub targets: `opm-api` and `osa-api` use `PEER_OPA_URL` (org directory) and `PEER_ORA_URL` (connectors / clone credentials). Configure GitHub App or PAT on **ora-api** (`OPA_GITHUB_APP_*`, `OPA_CONNECTOR_SECRET`). After image upgrades, redeploy `opa-hub`, `ora-api`, `opm-api`, `opm-dashboard`, `osa-api`, and `osa-dashboard` (`*:nas` tags only).
 
+### GitHub App slug (`OPA_GITHUB_APP_SLUG`)
+
+ORA uses `OPA_GITHUB_APP_SLUG` as the GitHub App login when requesting reviewers. The compose default for new installs is `ora`. **Production must set the slug of the App that is actually installed** — do not change a live slug to match a code default.
+
+On this NAS host the installed App slug is `opa-ai-orchestrator` (set in `/mnt/Apps/config-docker/open-stack/.env`). Keep that value until the GitHub App itself is renamed or replaced.
+
 ## Build images on the NAS
 
 From a sibling checkout tree (for example `/mnt/Apps/config-docker/open-stack/src`):
