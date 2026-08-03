@@ -41,6 +41,21 @@ Caller sets `PEER_{OPA|ORA|OSA|OPL|OPM}_URL` and mints a **service JWT** with `O
 | `traces:read` | Trace metadata for correlation |
 | `ingest:load_run` | Load-run correlation |
 | `health:read` | Peer probe |
+| `connectors:read` | List ORA GitHub connectors / repos (OPM → ORA) |
+| `scm:clone` | Short-lived clone credentials for ephemeral job workspaces (OPM → ORA) |
+
+## OPM + Hub + GitHub
+
+OPM projects are **GitHub repositories** only (no local folder registry).
+
+| Concern | Owner |
+|---------|-------|
+| User JWTs / org directory | **OPA-Hub** (`PEER_OPA_URL`) |
+| GitHub App / PAT connectors | **ORA** (`PEER_ORA_URL`; configure `OPA_GITHUB_APP_*` / PAT on `ora-api`) |
+| Kanban / roadmap / task jobs | **OPM** |
+| Code review / Repo Watch | **ORA** (deep-link; do not duplicate) |
+
+NAS/open-family already sets `PEER_OPA_URL` and `PEER_ORA_URL` on `opm-api`. Redeploy `opm-api:nas`, `opa-hub:nas`, and `ora-api:nas` after upgrading images.
 
 ## Allowed peer calls
 
@@ -51,7 +66,8 @@ Caller sets `PEER_{OPA|ORA|OSA|OPL|OPM}_URL` and mints a **service JWT** with `O
 | OSA → OPA hub | runtime context deep links | Optional |
 | ORA → OPA hub | dashboard deep links | Optional |
 | ORA → OPM | Roadmap / task handoff (optional) | Optional |
-| OPM → ORA | Delegate review jobs / deep-link | Optional |
+| OPM → OPA hub | Org directory / identity co-deploy | Recommended in family stacks |
+| OPM → ORA | List connectors/repos; clone credentials; review deep-link | Recommended for GitHub projects |
 | Dashboard → foreign API | **Forbidden** — UI → own API only | — |
 
 ## Config sketch

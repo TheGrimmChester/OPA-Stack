@@ -15,6 +15,9 @@ services:
       PEER_OSA_URL: ${PEER_OSA_URL:-}
       PEER_OPL_URL: ${PEER_OPL_URL:-}
       OPM_RUNNER_TAG: ${OPM_RUNNER_TAG:-smoke}
+      OPM_DATA_DIR: ${OPM_DATA_DIR:-/data}
+      OPM_JOB_TMP: ${OPM_JOB_TMP:-/tmp/opm-jobs}
+      # GitHub credentials stay on ora-api (OPA_GITHUB_APP_* / PAT connectors).
 
   opm-orchestrator:
     image: opm-api:smoke
