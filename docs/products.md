@@ -43,7 +43,8 @@ Removed endpoints are absent (normal HTTP 404). Do not ship redirects, dual path
 
 - [Modules catalog](modules.md)
 - [Interop, auth modes, and ClickHouse databases](interop.md)
-- Compose profile stubs: [`compose.opa.yaml`](../compose.opa.yaml), [`compose.ora.yaml`](../compose.ora.yaml), [`compose.osa.yaml`](../compose.osa.yaml), [`compose.opl.yaml`](../compose.opl.yaml), [`compose.opm.yaml`](../compose.opm.yaml), [`compose.all.yaml`](../compose.all.yaml) (one server, four DBs)
+- [NAS production deploy](nas-deploy.md) — compose project `open-family`, path `/mnt/Apps/config-docker/open-stack`, images `*:nas` only
+- Compose profile stubs: [`compose.opa.yaml`](../compose.opa.yaml), [`compose.ora.yaml`](../compose.ora.yaml), [`compose.osa.yaml`](../compose.osa.yaml), [`compose.opl.yaml`](../compose.opl.yaml), [`compose.opm.yaml`](../compose.opm.yaml), [`compose.all.yaml`](../compose.all.yaml) (laptop `*:smoke`), [`compose.nas.yaml`](../compose.nas.yaml) (production `*:nas`)
 
 ## Gateways
 
