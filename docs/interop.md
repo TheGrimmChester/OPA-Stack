@@ -4,13 +4,28 @@ Products are **optional peers**. No hard dependency at boot. An empty peer URL d
 
 ## User auth
 
-| Mode | Mechanism |
-|------|-----------|
-| Co-deployed | Shared `JWT_SECRET`; **OPA-Hub** issues user JWTs; ORA/OSA/OPL validate |
-| Standalone | Local auth or auth off for lab |
-| CI | Product tokens (not `JWT_SECRET`) |
+| Mode | Mechanism | How to enable |
+|------|-----------|---------------|
+| **Standalone** | Each product issues JWTs with its own `JWT_SECRET` via local `/api/auth/login` | `AUTH_MODE=standalone`, or leave `PEER_OPA_URL` empty |
+| **Co-deployed** | Shared `JWT_SECRET`; **OPA-Hub** issues user JWTs; ORA/OSA/OPL validate | `AUTH_MODE=codeployed`, or set `PEER_OPA_URL` to the hub |
+| **CI** | Product tokens (not `JWT_SECRET`) | Pipeline secrets |
 
 Headers: `Authorization: Bearer <user-jwt>`, `X-Organization-ID`, `X-Project-ID`.
+
+Lab default when standalone: username `admin` / password `admin` (override with `AUTH_ADMIN_USER` / `AUTH_ADMIN_PASSWORD`).
+
+## ClickHouse databases
+
+One ClickHouse server can host all products. Each service sets its own database:
+
+| Product | `CLICKHOUSE_DB` |
+|---------|-----------------|
+| OPA hub | `opa` |
+| ORA | `ora` |
+| OSA | `osa` |
+| OPL | `opl` |
+
+`compose.all.yaml` creates all four databases on first boot (`clickhouse/init-databases.sql`). Solo profiles create the same init script so a shared server stays consistent. Prefer `CLICKHOUSE_DB`; `CLICKHOUSE_DATABASE` is an accepted alias.
 
 ## Service-to-service
 
@@ -41,7 +56,10 @@ Caller sets `PEER_{OPA|ORA|OSA|OPL}_URL` and mints a **service JWT** with `OPEN_
 
 ```bash
 JWT_SECRET=
+AUTH_MODE=                 # standalone | codeployed (auto from PEER_OPA_URL when empty)
 OPEN_SERVICE_JWT_SECRET=
+CLICKHOUSE_URL=http://clickhouse:8123
+CLICKHOUSE_DB=             # opa | ora | osa | opl per service
 PEER_OPA_URL=
 PEER_ORA_URL=
 PEER_OSA_URL=
@@ -51,3 +69,7 @@ ORA_PUBLIC_URL=
 OSA_PUBLIC_URL=
 OPL_PUBLIC_URL=
 ```
+
+## All-in-one compose
+
+See [`compose.all.yaml`](../compose.all.yaml): one ClickHouse, databases `opa`/`ora`/`osa`/`opl`, shared `JWT_SECRET`, hub-issued tokens (`AUTH_MODE=codeployed`).
