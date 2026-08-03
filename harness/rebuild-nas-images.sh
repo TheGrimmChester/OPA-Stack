@@ -99,6 +99,7 @@ fi
 if wants osa-api || wants all; then
   need OSA-API
   need Open-Auth-Go
+  need Open-Client-Go
   need Open-Job-Go
   build_df osa-api.nas.Dockerfile "osa-api:$TAG" --target osa-api
   docker build -f "$DOCKER_DIR/osa-api.nas.Dockerfile" -t "osa-runner-scan:$TAG" --target osa-runner-scan "$FAMILY_ROOT"
@@ -115,6 +116,7 @@ fi
 if wants opm-api || wants all; then
   need OPM-API
   need Open-Auth-Go
+  need Open-Client-Go
   need Open-Job-Go
   build_df opm-api.nas.Dockerfile "opm-api:$TAG" --target opm-api
   docker build -f "$DOCKER_DIR/opm-api.nas.Dockerfile" -t "opm-runner-task:$TAG" --target opm-runner-task "$FAMILY_ROOT"

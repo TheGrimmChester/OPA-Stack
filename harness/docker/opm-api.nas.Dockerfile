@@ -6,11 +6,13 @@ WORKDIR /src
 ENV GOPROXY=https://proxy.golang.org,direct
 ENV GOSUMDB=sum.golang.org
 COPY Open-Auth-Go /modules/Open-Auth-Go
+COPY Open-Client-Go /modules/Open-Client-Go
 COPY Open-Job-Go /modules/Open-Job-Go
 COPY OPM-API/ /src/OPM-API/
 WORKDIR /src/OPM-API
 RUN sed -i \
   -e 's|=> ../Open-Auth-Go|=> /modules/Open-Auth-Go|' \
+  -e 's|=> ../Open-Client-Go|=> /modules/Open-Client-Go|' \
   -e 's|=> ../Open-Job-Go|=> /modules/Open-Job-Go|' \
   go.mod \
   && go mod download \
