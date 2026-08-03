@@ -40,3 +40,8 @@ Removed endpoints are absent (normal HTTP 404). Do not ship redirects, dual path
 - [Modules catalog](modules.md)
 - [Interop and peer auth](interop.md)
 - Compose profile stubs: [`compose.opa.yaml`](../compose.opa.yaml), [`compose.ora.yaml`](../compose.ora.yaml), [`compose.osa.yaml`](../compose.osa.yaml), [`compose.opl.yaml`](../compose.opl.yaml), [`compose.all.yaml`](../compose.all.yaml)
+
+## Gateways
+
+Optional peel docs: [gateways.md](gateways.md).
+

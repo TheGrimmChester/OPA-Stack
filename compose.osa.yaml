@@ -27,3 +27,7 @@ services:
     ports: ["8094:80"]
     environment:
       VITE_API_URL: http://127.0.0.1:8093
+
+# Runners are ephemeral (spawned by osa-orchestrator), not always-on services:
+#   docker build --target osa-runner-scan -t osa-runner-scan:smoke ../OSA-API
+# Production/NAS: osa-api:nas, osa-runner-scan:nas only.
