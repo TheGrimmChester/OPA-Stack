@@ -7,7 +7,7 @@ Products are **optional peers**. No hard dependency at boot. An empty peer URL d
 | Mode | Mechanism | How to enable |
 |------|-----------|---------------|
 | **Standalone** | Each product issues JWTs with its own `JWT_SECRET` via local `/api/auth/login` | `AUTH_MODE=standalone`, or leave `PEER_OPA_URL` empty |
-| **Co-deployed** | Shared `JWT_SECRET`; **OPA-Hub** issues user JWTs; ORA/OSA/OPL validate | `AUTH_MODE=codeployed`, or set `PEER_OPA_URL` to the hub |
+| **Co-deployed** | Shared `JWT_SECRET`; **OPA-Hub** issues user JWTs; ORA/OSA/OPL/OPM validate | `AUTH_MODE=codeployed`, or set `PEER_OPA_URL` to the hub |
 | **CI** | Product tokens (not `JWT_SECRET`) | Pipeline secrets |
 
 Headers: `Authorization: Bearer <user-jwt>`, `X-Organization-ID`, `X-Project-ID`.
@@ -29,7 +29,7 @@ One ClickHouse server can host all products. Each service sets its own database:
 
 ## Service-to-service
 
-Caller sets `PEER_{OPA|ORA|OSA|OPL}_URL` and mints a **service JWT** with `OPEN_SERVICE_JWT_SECRET` (prefer distinct from user `JWT_SECRET`):
+Caller sets `PEER_{OPA|ORA|OSA|OPL|OPM}_URL` and mints a **service JWT** with `OPEN_SERVICE_JWT_SECRET` (prefer distinct from user `JWT_SECRET`):
 
 - Claims: `iss`, `aud`, `sub=service`, `scope`, short `exp`, optional `org_id`
 - Callee rejects bad `aud` / unknown `iss` / missing scope
@@ -50,6 +50,8 @@ Caller sets `PEER_{OPA|ORA|OSA|OPL}_URL` and mints a **service JWT** with `OPEN_
 | ORA → OSA | findings / `security_run_id` / gate status | Optional |
 | OSA → OPA hub | runtime context deep links | Optional |
 | ORA → OPA hub | dashboard deep links | Optional |
+| ORA → OPM | Roadmap / task handoff (optional) | Optional |
+| OPM → ORA | Delegate review jobs / deep-link | Optional |
 | Dashboard → foreign API | **Forbidden** — UI → own API only | — |
 
 ## Config sketch
@@ -64,10 +66,12 @@ PEER_OPA_URL=
 PEER_ORA_URL=
 PEER_OSA_URL=
 PEER_OPL_URL=
+PEER_OPM_URL=
 OPA_PUBLIC_URL=
 ORA_PUBLIC_URL=
 OSA_PUBLIC_URL=
 OPL_PUBLIC_URL=
+OPM_PUBLIC_URL=
 ```
 
 ## All-in-one compose

@@ -1,6 +1,6 @@
 # Open-* products
 
-The Open-* family is four optional products plus shared modules. Install only what you need. Each product ships its own API (or hub), dashboard, and (where required) orchestrator + runners.
+The Open-* family is five optional products plus shared modules. Install only what you need. Each product ships its own API (or hub), dashboard, and (where required) orchestrator + runners.
 
 | Short | Full name | Control plane | Dashboard | Owns |
 |-------|-----------|---------------|-----------|------|
@@ -8,6 +8,7 @@ The Open-* family is four optional products plus shared modules. Install only wh
 | **ORA** | Open Review Agent | `ora-api` + `ora-orchestrator` | `ora-dashboard` | Repo Watch, SCM connectors, automated code review, review check-runs, coding agents, roadmaps |
 | **OSA** | Open Security Agent | `osa-api` + `osa-orchestrator` | `osa-dashboard` | AppSec findings (secrets/SAST/IaC), security runs, vulns/IAST, AppSec CI gates |
 | **OPL** | Open Perf Lab | `opl-api` + `opl-orchestrator` | `opl-dashboard` | Load scenarios, runs, HAR/JMX, Docker JMeter, optional OPA correlation |
+| **OPM** | Open Project Manager | `opm-api` + `opm-orchestrator` | `opm-dashboard` | Multi-project registry, kanban, roadmaps, ideation, task specs/plans, task-automation jobs |
 
 ## Topology (OPA)
 
@@ -21,6 +22,7 @@ Hub-and-spoke, push-primary: edge `opa-agent` registers and pushes telemetry out
 | ORA | `8091` |
 | OPL | `8092` |
 | OSA | `8093` |
+| OPM | `8096` |
 
 ## Image tags
 
@@ -41,7 +43,7 @@ Removed endpoints are absent (normal HTTP 404). Do not ship redirects, dual path
 
 - [Modules catalog](modules.md)
 - [Interop, auth modes, and ClickHouse databases](interop.md)
-- Compose profile stubs: [`compose.opa.yaml`](../compose.opa.yaml), [`compose.ora.yaml`](../compose.ora.yaml), [`compose.osa.yaml`](../compose.osa.yaml), [`compose.opl.yaml`](../compose.opl.yaml), [`compose.all.yaml`](../compose.all.yaml) (one server, four DBs)
+- Compose profile stubs: [`compose.opa.yaml`](../compose.opa.yaml), [`compose.ora.yaml`](../compose.ora.yaml), [`compose.osa.yaml`](../compose.osa.yaml), [`compose.opl.yaml`](../compose.opl.yaml), [`compose.opm.yaml`](../compose.opm.yaml), [`compose.all.yaml`](../compose.all.yaml) (one server, four DBs)
 
 ## Gateways
 
