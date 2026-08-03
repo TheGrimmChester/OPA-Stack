@@ -131,11 +131,24 @@ if wants dashboards || wants all; then
   need OSA-Dashboard
   need OPL-Dashboard
   need OPM-Dashboard
+  need Open-Client-JS
+  need Open-UI-JS
+  # OPA dashboard has no file: Open-* deps — build from its own context.
   build_ctx OPA-Dashboard "opa-dashboard:$TAG"
-  build_ctx ORA-Dashboard "ora-dashboard:$TAG"
-  build_ctx OSA-Dashboard "osa-dashboard:$TAG"
-  build_ctx OPL-Dashboard "opl-dashboard:$TAG"
-  build_ctx OPM-Dashboard "opm-dashboard:$TAG"
+  for pair in \
+    "ORA-Dashboard:ora-dashboard" \
+    "OSA-Dashboard:osa-dashboard" \
+    "OPL-Dashboard:opl-dashboard" \
+    "OPM-Dashboard:opm-dashboard"
+  do
+    product="${pair%%:*}"
+    image="${pair##*:}"
+    echo "==> Building ${image}:$TAG (PRODUCT=$product)"
+    docker build -f "$DOCKER_DIR/dashboard.nas.Dockerfile" \
+      --build-arg "PRODUCT=$product" \
+      -t "${image}:$TAG" \
+      "$FAMILY_ROOT"
+  done
 fi
 
 echo "==> Done. Images tagged *:$TAG:"
