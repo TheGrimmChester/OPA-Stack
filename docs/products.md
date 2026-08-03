@@ -29,7 +29,9 @@ Hub-and-spoke, push-primary: edge `opa-agent` registers and pushes telemetry out
 
 ## Repository visibility
 
-Family GitHub repositories are **private** during the product split and migration. Re-opening repositories as public is a deliberate later release step — not part of bootstrap.
+Family GitHub repositories for Open-* products, modules, and SDKs are **public**.
+
+They were held private during the product split and migration, then reopened on 2026-08-03 once the family layout was stable.
 
 ## No compatibility shims
 
