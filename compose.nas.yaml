@@ -343,8 +343,11 @@ services:
       PEER_OPL_URL: http://opl-api:8092
       OPM_RUNNER_TAG: nas
       OPM_DATA_DIR: /data
+      OPM_JOB_TMP: /tmp/opm-jobs
+      # GitHub App/PAT live on ora-api — OPM discovers via PEER_ORA_URL + hub orgs via PEER_OPA_URL
     volumes:
       - opm_data:/data
+      - opm_job_tmp:/tmp/opm-jobs
     ports:
       - "8096:8096"
     networks:
@@ -430,6 +433,7 @@ volumes:
     name: opa-stack_opa_orchestrator_workspace
   jmeter_work:
   opm_data:
+  opm_job_tmp:
 
 networks:
   open_internal:
