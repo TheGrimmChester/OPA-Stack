@@ -1,6 +1,8 @@
-# OPA Stack — smoke rig + quickstart
+# OPA-Stack — smoke rig + quickstart
 
-Self-hosted compose for ClickHouse + Agent + Dashboard (+ optional app harnesses).
+Self-hosted Compose/Helm smoke and quickstart for the Open-* family (OPA, ORA, OSA, OPL).
+
+Product and module catalog: [docs/products.md](docs/products.md) · [docs/modules.md](docs/modules.md) · [docs/interop.md](docs/interop.md).
 
 ## Five-minute quickstart
 

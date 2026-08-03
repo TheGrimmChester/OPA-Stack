@@ -1,0 +1,29 @@
+# OSA product profile stub — api + orchestrator + dashboard.
+name: osa
+
+services:
+  osa:
+    image: osa-api:smoke
+    profiles: ["osa"]
+    ports: ["8093:8093"]
+    environment:
+      LISTEN_ADDR: ":8093"
+      CLICKHOUSE_URL: ${CLICKHOUSE_URL:-http://clickhouse:8123}
+      JWT_SECRET: ${JWT_SECRET:-}
+      OPEN_SERVICE_JWT_SECRET: ${OPEN_SERVICE_JWT_SECRET:-}
+      PEER_OPA_URL: ${PEER_OPA_URL:-}
+      PEER_ORA_URL: ${PEER_ORA_URL:-}
+
+  osa-orchestrator:
+    image: osa-api:smoke
+    profiles: ["osa"]
+    command: ["osa-api", "orchestrator"]
+    environment:
+      CLICKHOUSE_URL: ${CLICKHOUSE_URL:-http://clickhouse:8123}
+
+  osa-dashboard:
+    image: osa-dashboard:smoke
+    profiles: ["osa"]
+    ports: ["8094:80"]
+    environment:
+      VITE_API_URL: http://127.0.0.1:8093

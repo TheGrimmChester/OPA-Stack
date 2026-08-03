@@ -1,5 +1,12 @@
 # Open Profiling Agent documentation
 
+
+## Open-* family
+
+- [Products](products.md) — OPA · ORA · OSA · OPL
+- [Modules catalog](modules.md) — shared `Open-*` libraries and images
+- [Interop](interop.md) — peer URLs, user JWT, service JWT scopes
+
 Single entry point for the self-hosted observability stack.
 
 ## Quick links
