@@ -1,0 +1,439 @@
+# Open-* family — production / NAS compose.
+# Image tags: *:nas only. Never deploy *:smoke on this host.
+#
+# Project name: open-family
+# Typical path on NAS: /mnt/Apps/config-docker/open-stack
+#   (legacy path /mnt/Apps/config-docker/opa may remain as a symlink)
+#
+# ClickHouse data: reuses the pre-split volume by name (external) so production
+# telemetry is not wiped when the compose project renames from opa-stack.
+#
+# Compatibility kept for existing app overlays:
+#   - external network opa_network
+#   - container_name opa_agent (Planner / PHP OPA_SOCKET_PATH)
+
+name: open-family
+
+services:
+  clickhouse:
+    image: clickhouse/clickhouse-server:24.3
+    container_name: open_clickhouse
+    restart: unless-stopped
+    environment:
+      CLICKHOUSE_SKIP_USER_SETUP: "1"
+    ulimits:
+      nofile: { soft: 262144, hard: 262144 }
+    volumes:
+      - ./clickhouse/init:/docker-entrypoint-initdb.d:ro
+      - ./clickhouse/users.d:/etc/clickhouse-server/users.d:ro
+      - ./clickhouse/config.d:/etc/clickhouse-server/config.d:ro
+      - clickhouse_data:/var/lib/clickhouse
+    ports:
+      - "8123:8123"
+    networks:
+      - open_internal
+    healthcheck:
+      test: ["CMD", "clickhouse-client", "--query", "SELECT 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  hub:
+    image: opa-hub:nas
+    container_name: open_hub
+    restart: unless-stopped
+    depends_on:
+      clickhouse:
+        condition: service_healthy
+    environment:
+      LISTEN_ADDR: ":8080"
+      CLICKHOUSE_URL: "http://clickhouse:8123"
+      CLICKHOUSE_DB: opa
+      JWT_SECRET: ${JWT_SECRET}
+      AUTH_MODE: ${AUTH_MODE:-codeployed}
+      OPEN_SERVICE_JWT_SECRET: ${OPEN_SERVICE_JWT_SECRET:-${JWT_SECRET}}
+      OPA_HUB_ENROLL_TOKEN: ${OPA_HUB_ENROLL_TOKEN:-}
+      OPA_AUTH_REQUIRED: ${OPA_AUTH_REQUIRED:-1}
+      PEER_ORA_URL: http://ora-api:8091
+      PEER_OSA_URL: http://osa-api:8093
+      PEER_OPL_URL: http://opl-api:8092
+      PEER_OPM_URL: http://opm-api:8096
+    ports:
+      # Host 8080 is taken (CoreDNS); keep the historical public OPA API port.
+      - "18080:8080"
+    networks:
+      - open_internal
+      - opa_network
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "-", "http://localhost:8080/api/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  # Edge agent — keep container DNS name opa_agent for app overlays.
+  opa_agent:
+    image: opa-agent:nas
+    container_name: opa_agent
+    restart: unless-stopped
+    depends_on:
+      hub:
+        condition: service_healthy
+    environment:
+      TRANSPORT_TCP: ":9090"
+      WS_PORT: "8082"
+      JWT_SECRET: ${JWT_SECRET}
+      OPA_AUTH_REQUIRED: ${OPA_AUTH_REQUIRED:-1}
+      OPA_WS_ALLOWED_ORIGINS: ${OPA_WS_ALLOWED_ORIGINS}
+      OPA_REDACT: ${OPA_REDACT:-1}
+      OPA_HUB_URL: http://hub:8080
+      OPA_HUB_ENROLL_TOKEN: ${OPA_HUB_ENROLL_TOKEN:-}
+      OPA_ORGANIZATION_ID: ${OPA_ORGANIZATION_ID:-nas}
+      OPA_PROJECT_ID: ${OPA_PROJECT_ID:-infra}
+      OPA_AGENT_ID: ${OPA_AGENT_ID:-nas-edge-1}
+      # Same ClickHouse as hub so edge ingest (PHP / collector :9090) keeps
+      # writing full telemetry while the agent also registers with the hub.
+      CLICKHOUSE_URL: "http://clickhouse:8123"
+    ports:
+      # Edge admin API (hub remains on 18080 for the public control-plane URL).
+      - "18081:8080"
+      - "2112:2112"
+      - "8082:8082"
+      - "9090:9090"
+    networks:
+      - open_internal
+      - opa_network
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "-", "http://localhost:8080/api/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  opa-dashboard:
+    image: opa-dashboard:nas
+    container_name: open_opa_dashboard
+    restart: unless-stopped
+    depends_on:
+      hub:
+        condition: service_healthy
+    ports:
+      - "8088:80"
+    networks:
+      - open_internal
+
+  ora-api:
+    image: ora-api:nas
+    container_name: open_ora_api
+    restart: unless-stopped
+    depends_on:
+      clickhouse:
+        condition: service_healthy
+    environment:
+      LISTEN_ADDR: ":8091"
+      HTTP_ADDR: ":8091"
+      CLICKHOUSE_URL: "http://clickhouse:8123"
+      CLICKHOUSE_DB: ora
+      JWT_SECRET: ${JWT_SECRET}
+      AUTH_MODE: ${AUTH_MODE:-codeployed}
+      OPEN_SERVICE_JWT_SECRET: ${OPEN_SERVICE_JWT_SECRET:-${JWT_SECRET}}
+      OPA_AUTH_REQUIRED: ${OPA_AUTH_REQUIRED:-1}
+      PEER_OPA_URL: http://hub:8080
+      PEER_OSA_URL: http://osa-api:8093
+      PEER_OPM_URL: http://opm-api:8096
+      OPA_SECURITY_WORKSPACE: ${OPA_SECURITY_WORKSPACE:-/workspace}
+      OPA_SCM_STATE_DIR: ${OPA_SCM_STATE_DIR:-/workspace/scm-state}
+      OPA_REVIEW_TMP: ${OPA_REVIEW_TMP:-/mnt/Apps/config-docker/open-stack/opa-jobs}
+      OPA_REVIEW_BROWSER_MCP: ${OPA_REVIEW_BROWSER_MCP:-1}
+      OPA_REVIEW_BROWSER_DEPS_OK: ${OPA_REVIEW_BROWSER_DEPS_OK:-1}
+      OPA_CURSOR_AGENT_BIN: /usr/local/bin/agent
+      OPA_SCM_MOCK_GITHUB: ${OPA_SCM_MOCK_GITHUB:-0}
+      SKIP_CURSOR_AI: ${SKIP_CURSOR_AI:-0}
+      OPA_JOB_SANDBOX: ${OPA_JOB_SANDBOX:-off}
+      OPA_JOB_IMAGE_TAG: nas
+      OPA_JOB_EGRESS_PROXY_IMAGE: ${OPA_JOB_EGRESS_PROXY_IMAGE:-open-egress-proxy:nas}
+      OPA_JOB_IMAGE_ALLOW: ${OPA_JOB_IMAGE_ALLOW:-ora-runner-*,osa-runner-*,node:22*,mysql:8.4*,redis:7*,php:8.4*,hebabil/php-8.4-cli*}
+      OPA_INSTANCE_ID: ${OPA_INSTANCE_ID:-nas-prod}
+      OPA_GITHUB_APP_ID: ${OPA_GITHUB_APP_ID:-}
+      OPA_GITHUB_APP_SLUG: ${OPA_GITHUB_APP_SLUG:-ora}
+      OPA_GITHUB_APP_PRIVATE_KEY: ${OPA_GITHUB_APP_PRIVATE_KEY}
+      OPA_GITHUB_WEBHOOK_SECRET: ${OPA_GITHUB_WEBHOOK_SECRET}
+      OPA_SCM_ALLOW_UNSIGNED: ${OPA_SCM_ALLOW_UNSIGNED:-0}
+      OPA_PUBLIC_URL: ${OPA_PUBLIC_URL:-https://ai-orchestrator.clouded.fr}
+      ORA_PUBLIC_URL: ${ORA_PUBLIC_URL:-https://ai-orchestrator.clouded.fr}
+      OPA_DASHBOARD_URL: ${OPA_DASHBOARD_URL:-http://192.168.100.101:8088}
+      OPA_SCM_CRON: ${OPA_SCM_CRON:-1}
+      OPA_GITLEAKS_CONFIG: /etc/opa/gitleaks.toml
+      OPA_CONNECTOR_SECRET: ${JWT_SECRET}
+    volumes:
+      - ora_workspace:/workspace
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /mnt/Apps/config-docker/open-stack/opa-jobs:/mnt/Apps/config-docker/open-stack/opa-jobs
+      - ./secrets/github-app.private-key.pem:/run/secrets/github-app.private-key.pem:ro
+    ports:
+      - "8091:8091"
+    networks:
+      - open_internal
+      - opa_network
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "-", "http://localhost:8091/api/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  ora-orchestrator:
+    image: ora-api:nas
+    container_name: open_ora_orchestrator
+    restart: unless-stopped
+    command: ["ora-api", "orchestrator"]
+    depends_on:
+      clickhouse:
+        condition: service_healthy
+    environment:
+      CLICKHOUSE_URL: "http://clickhouse:8123"
+      CLICKHOUSE_DB: ora
+      JWT_SECRET: ${JWT_SECRET}
+      OPA_JOB_IMAGE_TAG: nas
+      OPA_JOB_EGRESS_PROXY_IMAGE: ${OPA_JOB_EGRESS_PROXY_IMAGE:-open-egress-proxy:nas}
+    volumes:
+      - ora_workspace:/workspace
+      - /var/run/docker.sock:/var/run/docker.sock
+    networks:
+      - open_internal
+
+  ora-dashboard:
+    image: ora-dashboard:nas
+    container_name: open_ora_dashboard
+    restart: unless-stopped
+    depends_on:
+      - ora-api
+    ports:
+      - "8089:80"
+    networks:
+      - open_internal
+
+  osa-api:
+    image: osa-api:nas
+    container_name: open_osa_api
+    restart: unless-stopped
+    depends_on:
+      clickhouse:
+        condition: service_healthy
+    environment:
+      LISTEN_ADDR: ":8093"
+      CLICKHOUSE_URL: "http://clickhouse:8123"
+      CLICKHOUSE_DB: osa
+      JWT_SECRET: ${JWT_SECRET}
+      AUTH_MODE: ${AUTH_MODE:-codeployed}
+      OPEN_SERVICE_JWT_SECRET: ${OPEN_SERVICE_JWT_SECRET:-${JWT_SECRET}}
+      PEER_OPA_URL: http://hub:8080
+      PEER_ORA_URL: http://ora-api:8091
+      OPA_JOB_SANDBOX: ${OPA_JOB_SANDBOX:-off}
+      OSA_RUNNER_TAG: nas
+      OPA_JOB_IMAGE_TAG: nas
+      OPA_JOB_EGRESS_PROXY_IMAGE: ${OPA_JOB_EGRESS_PROXY_IMAGE:-open-egress-proxy:nas}
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    ports:
+      - "8093:8093"
+    networks:
+      - open_internal
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "-", "http://localhost:8093/api/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  osa-orchestrator:
+    image: osa-api:nas
+    container_name: open_osa_orchestrator
+    restart: unless-stopped
+    command: ["osa-api", "orchestrator"]
+    environment:
+      CLICKHOUSE_URL: "http://clickhouse:8123"
+      CLICKHOUSE_DB: osa
+      OSA_RUNNER_TAG: nas
+      OPA_JOB_IMAGE_TAG: nas
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    networks:
+      - open_internal
+
+  osa-dashboard:
+    image: osa-dashboard:nas
+    container_name: open_osa_dashboard
+    restart: unless-stopped
+    depends_on:
+      - osa-api
+    ports:
+      - "8094:80"
+    networks:
+      - open_internal
+
+  opl-api:
+    image: opl-api:nas
+    container_name: open_opl_api
+    restart: unless-stopped
+    depends_on:
+      clickhouse:
+        condition: service_healthy
+    environment:
+      LISTEN_ADDR: ":8092"
+      HTTP_ADDR: ":8092"
+      CLICKHOUSE_URL: "http://clickhouse:8123"
+      CLICKHOUSE_DB: opl
+      JWT_SECRET: ${JWT_SECRET}
+      AUTH_MODE: ${AUTH_MODE:-codeployed}
+      OPEN_SERVICE_JWT_SECRET: ${OPEN_SERVICE_JWT_SECRET:-${JWT_SECRET}}
+      PEER_OPA_URL: http://hub:8080
+      OPA_JOB_IMAGE_TAG: nas
+      OPA_JMETER_IMAGE: ${OPA_JMETER_IMAGE:-justb4/jmeter:5.5}
+      OPA_JMETER_WORK: /opa-jmeter
+      OPA_JMETER_VOLUME: ${COMPOSE_PROJECT_NAME:-open-family}_jmeter_work
+      OPA_JMETER_NETWORK: ${COMPOSE_PROJECT_NAME:-open-family}_open_internal
+    volumes:
+      - jmeter_work:/opa-jmeter
+      - /var/run/docker.sock:/var/run/docker.sock
+    ports:
+      - "8092:8092"
+    networks:
+      - open_internal
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "-", "http://localhost:8092/api/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  opl-orchestrator:
+    image: opl-api:nas
+    container_name: open_opl_orchestrator
+    restart: unless-stopped
+    command: ["opl-api", "orchestrator"]
+    environment:
+      CLICKHOUSE_URL: "http://clickhouse:8123"
+      CLICKHOUSE_DB: opl
+      OPA_JOB_IMAGE_TAG: nas
+    volumes:
+      - jmeter_work:/opa-jmeter
+      - /var/run/docker.sock:/var/run/docker.sock
+    networks:
+      - open_internal
+
+  opl-dashboard:
+    image: opl-dashboard:nas
+    container_name: open_opl_dashboard
+    restart: unless-stopped
+    depends_on:
+      - opl-api
+    ports:
+      - "8095:80"
+    networks:
+      - open_internal
+
+  opm-api:
+    image: opm-api:nas
+    container_name: open_opm_api
+    restart: unless-stopped
+    environment:
+      LISTEN_ADDR: ":8096"
+      JWT_SECRET: ${JWT_SECRET}
+      AUTH_MODE: ${AUTH_MODE:-codeployed}
+      OPEN_SERVICE_JWT_SECRET: ${OPEN_SERVICE_JWT_SECRET:-${JWT_SECRET}}
+      PEER_OPA_URL: http://hub:8080
+      PEER_ORA_URL: http://ora-api:8091
+      PEER_OSA_URL: http://osa-api:8093
+      PEER_OPL_URL: http://opl-api:8092
+      OPM_RUNNER_TAG: nas
+      OPM_DATA_DIR: /data
+    volumes:
+      - opm_data:/data
+    ports:
+      - "8096:8096"
+    networks:
+      - open_internal
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "-", "http://localhost:8096/api/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  opm-orchestrator:
+    image: opm-api:nas
+    container_name: open_opm_orchestrator
+    restart: unless-stopped
+    command: ["opm-api", "orchestrator"]
+    environment:
+      ORCHESTRATOR_LISTEN_ADDR: ":8099"
+      OPM_RUNNER_TAG: nas
+      OPM_DATA_DIR: /data
+    volumes:
+      - opm_data:/data
+      - /var/run/docker.sock:/var/run/docker.sock
+    networks:
+      - open_internal
+
+  opm-dashboard:
+    image: opm-dashboard:nas
+    container_name: open_opm_dashboard
+    restart: unless-stopped
+    depends_on:
+      - opm-api
+    ports:
+      - "8098:80"
+    networks:
+      - open_internal
+
+  open-egress-proxy:
+    image: open-egress-proxy:nas
+    container_name: open_egress_proxy
+    restart: unless-stopped
+    networks:
+      - open_internal
+      - opa_network
+
+  collector:
+    image: opa-collector:nas
+    container_name: open_collector
+    restart: unless-stopped
+    network_mode: host
+    pid: host
+    group_add:
+      - "999"
+    depends_on:
+      opa_agent:
+        condition: service_healthy
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /sys/fs/cgroup:/host/cgroup:ro
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      OPA_AGENT_ADDR: "127.0.0.1:9090"
+      OPA_PROC_PATH: "/host/proc"
+      OPA_SYS_PATH: "/host/sys"
+      OPA_CGROUP_PATH: "/host/cgroup"
+      OPA_ORGANIZATION_ID: "nas"
+      OPA_PROJECT_ID: "infra"
+      OPA_ENVIRONMENT: "production"
+      OPA_HOST: "truenas2012"
+      OPA_COLLECT_INTERVAL: "30s"
+      OPA_PER_CORE_CPU: "false"
+      OPA_COLLECT_CONTAINERS: "true"
+      OPA_COLLECT_PROCESSES: "true"
+      OPA_PROCESS_TOP_N: "25"
+
+volumes:
+  # Preserve production ClickHouse + legacy orchestrator workspace volumes.
+  clickhouse_data:
+    external: true
+    name: opa-stack_opa_clickhouse_data
+  ora_workspace:
+    external: true
+    name: opa-stack_opa_orchestrator_workspace
+  jmeter_work:
+  opm_data:
+
+networks:
+  open_internal:
+    driver: bridge
+  opa_network:
+    external: true
+    name: opa_network

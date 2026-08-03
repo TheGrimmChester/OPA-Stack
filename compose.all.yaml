@@ -1,0 +1,154 @@
+# All-products stack — one ClickHouse server, product databases (OPA/ORA/OSA/OPL; OPM is filesystem-backed).
+# Laptop smoke only. Production/NAS must use *:nas image tags exclusively.
+#
+# Databases created on first boot: opa, ora, osa, opl (see clickhouse/init-databases.sql).
+# Co-deployed auth: set JWT_SECRET shared across services and PEER_OPA_URL=http://hub:8080
+# so ORA/OSA/OPL/OPM validate hub-issued tokens. Standalone: leave PEER_OPA_URL empty
+# (or AUTH_MODE=standalone) for local /api/auth/login on each product.
+name: open-family
+
+services:
+  clickhouse:
+    image: clickhouse/clickhouse-server:24.3
+    ports: ["8123:8123"]
+    volumes:
+      - ./clickhouse/init-databases.sql:/docker-entrypoint-initdb.d/init-databases.sql:ro
+      - clickhouse_data:/var/lib/clickhouse
+
+  hub:
+    image: opa-hub:smoke
+    ports: ["8080:8080"]
+    environment:
+      LISTEN_ADDR: ":8080"
+      CLICKHOUSE_URL: http://clickhouse:8123
+      CLICKHOUSE_DB: opa
+      JWT_SECRET: ${JWT_SECRET:-dev-shared-jwt-secret-at-least-32b}
+      AUTH_MODE: codeployed
+      OPEN_SERVICE_JWT_SECRET: ${OPEN_SERVICE_JWT_SECRET:-dev-service-jwt-secret-at-least-32b}
+      PEER_ORA_URL: http://ora:8091
+      PEER_OSA_URL: http://osa:8093
+      PEER_OPL_URL: http://opl:8092
+      PEER_OPM_URL: http://opm:8096
+    depends_on: [clickhouse]
+
+  agent:
+    image: opa-agent:smoke
+    environment:
+      OPA_HUB_URL: http://hub:8080
+
+  opa-dashboard:
+    image: opa-dashboard:smoke
+    ports: ["8088:80"]
+    environment:
+      VITE_API_URL: http://127.0.0.1:8080
+
+  ora:
+    image: ora-api:smoke
+    ports: ["8091:8091"]
+    environment:
+      LISTEN_ADDR: ":8091"
+      CLICKHOUSE_URL: http://clickhouse:8123
+      CLICKHOUSE_DB: ora
+      JWT_SECRET: ${JWT_SECRET:-dev-shared-jwt-secret-at-least-32b}
+      AUTH_MODE: codeployed
+      OPEN_SERVICE_JWT_SECRET: ${OPEN_SERVICE_JWT_SECRET:-dev-service-jwt-secret-at-least-32b}
+      PEER_OPA_URL: http://hub:8080
+      PEER_OSA_URL: http://osa:8093
+    depends_on: [clickhouse]
+
+  ora-orchestrator:
+    image: ora-api:smoke
+    command: ["ora-api", "orchestrator"]
+    environment:
+      CLICKHOUSE_URL: http://clickhouse:8123
+      CLICKHOUSE_DB: ora
+      JWT_SECRET: ${JWT_SECRET:-dev-shared-jwt-secret-at-least-32b}
+
+  ora-dashboard:
+    image: ora-dashboard:smoke
+    ports: ["8089:80"]
+    environment:
+      VITE_API_URL: http://127.0.0.1:8091
+
+  osa:
+    image: osa-api:smoke
+    ports: ["8093:8093"]
+    environment:
+      LISTEN_ADDR: ":8093"
+      CLICKHOUSE_URL: http://clickhouse:8123
+      CLICKHOUSE_DB: osa
+      JWT_SECRET: ${JWT_SECRET:-dev-shared-jwt-secret-at-least-32b}
+      AUTH_MODE: codeployed
+      OPEN_SERVICE_JWT_SECRET: ${OPEN_SERVICE_JWT_SECRET:-dev-service-jwt-secret-at-least-32b}
+      PEER_OPA_URL: http://hub:8080
+      PEER_ORA_URL: http://ora:8091
+    depends_on: [clickhouse]
+
+  osa-orchestrator:
+    image: osa-api:smoke
+    command: ["osa-api", "orchestrator"]
+    environment:
+      CLICKHOUSE_URL: http://clickhouse:8123
+      CLICKHOUSE_DB: osa
+
+  osa-dashboard:
+    image: osa-dashboard:smoke
+    ports: ["8094:80"]
+    environment:
+      VITE_API_URL: http://127.0.0.1:8093
+
+  opl:
+    image: opl-api:smoke
+    ports: ["8092:8092"]
+    environment:
+      LISTEN_ADDR: ":8092"
+      CLICKHOUSE_URL: http://clickhouse:8123
+      CLICKHOUSE_DB: opl
+      JWT_SECRET: ${JWT_SECRET:-dev-shared-jwt-secret-at-least-32b}
+      AUTH_MODE: codeployed
+      OPEN_SERVICE_JWT_SECRET: ${OPEN_SERVICE_JWT_SECRET:-dev-service-jwt-secret-at-least-32b}
+      PEER_OPA_URL: http://hub:8080
+    depends_on: [clickhouse]
+
+  opl-orchestrator:
+    image: opl-api:smoke
+    command: ["opl-api", "orchestrator"]
+    environment:
+      CLICKHOUSE_URL: http://clickhouse:8123
+      CLICKHOUSE_DB: opl
+
+  opl-dashboard:
+    image: opl-dashboard:smoke
+    ports: ["8095:80"]
+    environment:
+      VITE_API_URL: http://127.0.0.1:8092
+
+  opm:
+    image: opm-api:smoke
+    ports: ["8096:8096"]
+    environment:
+      LISTEN_ADDR: ":8096"
+      JWT_SECRET: ${JWT_SECRET:-dev-shared-jwt-secret-at-least-32b}
+      AUTH_MODE: codeployed
+      OPEN_SERVICE_JWT_SECRET: ${OPEN_SERVICE_JWT_SECRET:-dev-service-jwt-secret-at-least-32b}
+      PEER_OPA_URL: http://hub:8080
+      PEER_ORA_URL: http://ora:8091
+      PEER_OSA_URL: http://osa:8093
+      PEER_OPL_URL: http://opl:8092
+
+  opm-orchestrator:
+    image: opm-api:smoke
+    command: ["opm-api", "orchestrator"]
+    environment:
+      ORCHESTRATOR_LISTEN_ADDR: ":8099"
+      OPM_RUNNER_TAG: smoke
+
+  opm-dashboard:
+    image: opm-dashboard:smoke
+    ports: ["8098:80"]
+    environment:
+      VITE_API_URL: http://127.0.0.1:8096
+
+
+volumes:
+  clickhouse_data:
