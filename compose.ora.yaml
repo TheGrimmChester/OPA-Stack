@@ -1,0 +1,30 @@
+# ORA product profile stub — api + orchestrator + dashboard.
+name: ora
+
+services:
+  ora:
+    image: ora-api:smoke
+    profiles: ["ora"]
+    ports: ["8091:8091"]
+    environment:
+      LISTEN_ADDR: ":8091"
+      CLICKHOUSE_URL: ${CLICKHOUSE_URL:-http://clickhouse:8123}
+      JWT_SECRET: ${JWT_SECRET:-}
+      OPEN_SERVICE_JWT_SECRET: ${OPEN_SERVICE_JWT_SECRET:-}
+      PEER_OPA_URL: ${PEER_OPA_URL:-}
+      PEER_OSA_URL: ${PEER_OSA_URL:-}
+
+  ora-orchestrator:
+    image: ora-api:smoke
+    profiles: ["ora"]
+    command: ["ora-api", "orchestrator"]
+    environment:
+      CLICKHOUSE_URL: ${CLICKHOUSE_URL:-http://clickhouse:8123}
+      JWT_SECRET: ${JWT_SECRET:-}
+
+  ora-dashboard:
+    image: ora-dashboard:smoke
+    profiles: ["ora"]
+    ports: ["8089:80"]
+    environment:
+      VITE_API_URL: http://127.0.0.1:8091
