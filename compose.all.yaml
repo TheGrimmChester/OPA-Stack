@@ -1,9 +1,9 @@
-# All-products stack — one ClickHouse server, four product databases.
+# All-products stack — one ClickHouse server, product databases (OPA/ORA/OSA/OPL; OPM is filesystem-backed).
 # Laptop smoke only. Production/NAS must use *:nas image tags exclusively.
 #
 # Databases created on first boot: opa, ora, osa, opl (see clickhouse/init-databases.sql).
 # Co-deployed auth: set JWT_SECRET shared across services and PEER_OPA_URL=http://hub:8080
-# so ORA/OSA/OPL validate hub-issued tokens. Standalone: leave PEER_OPA_URL empty
+# so ORA/OSA/OPL/OPM validate hub-issued tokens. Standalone: leave PEER_OPA_URL empty
 # (or AUTH_MODE=standalone) for local /api/auth/login on each product.
 name: open-family
 
@@ -28,6 +28,7 @@ services:
       PEER_ORA_URL: http://ora:8091
       PEER_OSA_URL: http://osa:8093
       PEER_OPL_URL: http://opl:8092
+      PEER_OPM_URL: http://opm:8096
     depends_on: [clickhouse]
 
   agent:
@@ -121,6 +122,33 @@ services:
     ports: ["8095:80"]
     environment:
       VITE_API_URL: http://127.0.0.1:8092
+
+  opm:
+    image: opm-api:smoke
+    ports: ["8096:8096"]
+    environment:
+      LISTEN_ADDR: ":8096"
+      JWT_SECRET: ${JWT_SECRET:-dev-shared-jwt-secret-at-least-32b}
+      AUTH_MODE: codeployed
+      OPEN_SERVICE_JWT_SECRET: ${OPEN_SERVICE_JWT_SECRET:-dev-service-jwt-secret-at-least-32b}
+      PEER_OPA_URL: http://hub:8080
+      PEER_ORA_URL: http://ora:8091
+      PEER_OSA_URL: http://osa:8093
+      PEER_OPL_URL: http://opl:8092
+
+  opm-orchestrator:
+    image: opm-api:smoke
+    command: ["opm-api", "orchestrator"]
+    environment:
+      ORCHESTRATOR_LISTEN_ADDR: ":8099"
+      OPM_RUNNER_TAG: smoke
+
+  opm-dashboard:
+    image: opm-dashboard:smoke
+    ports: ["8098:80"]
+    environment:
+      VITE_API_URL: http://127.0.0.1:8096
+
 
 volumes:
   clickhouse_data:

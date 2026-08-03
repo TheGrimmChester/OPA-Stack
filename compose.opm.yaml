@@ -1,0 +1,32 @@
+# OPM product profile stub — api + orchestrator + dashboard.
+name: opm
+
+services:
+  opm:
+    image: opm-api:smoke
+    profiles: ["opm"]
+    ports: ["8096:8096"]
+    environment:
+      LISTEN_ADDR: ":8096"
+      JWT_SECRET: ${JWT_SECRET:-}
+      OPEN_SERVICE_JWT_SECRET: ${OPEN_SERVICE_JWT_SECRET:-}
+      PEER_OPA_URL: ${PEER_OPA_URL:-}
+      PEER_ORA_URL: ${PEER_ORA_URL:-}
+      PEER_OSA_URL: ${PEER_OSA_URL:-}
+      PEER_OPL_URL: ${PEER_OPL_URL:-}
+      OPM_RUNNER_TAG: ${OPM_RUNNER_TAG:-smoke}
+
+  opm-orchestrator:
+    image: opm-api:smoke
+    profiles: ["opm"]
+    command: ["opm-api", "orchestrator"]
+    environment:
+      ORCHESTRATOR_LISTEN_ADDR: ":8099"
+      OPM_RUNNER_TAG: ${OPM_RUNNER_TAG:-smoke}
+
+  opm-dashboard:
+    image: opm-dashboard:smoke
+    profiles: ["opm"]
+    ports: ["8098:80"]
+    environment:
+      VITE_API_URL: http://127.0.0.1:8096
