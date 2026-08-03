@@ -57,6 +57,8 @@ Pre-split review/security/perf tables that still live under database `opa` are l
 
 Co-deployed mode: shared `JWT_SECRET`, `AUTH_MODE=codeployed`, peers set `PEER_OPA_URL=http://hub:8080`. Hub issues user JWTs; product APIs validate them.
 
+OPM GitHub projects: `opm-api` uses `PEER_OPA_URL` (org directory) and `PEER_ORA_URL` (connectors / clone credentials). Configure GitHub App or PAT on **ora-api** (`OPA_GITHUB_APP_*`, `OPA_CONNECTOR_SECRET`). After image upgrades, redeploy `opa-hub`, `ora-api`, `opm-api`, and `opm-dashboard` (`*:nas` tags only).
+
 ## Build images on the NAS
 
 From a sibling checkout tree (for example `/mnt/Apps/config-docker/open-stack/src`):

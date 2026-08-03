@@ -135,6 +135,8 @@ services:
       PEER_ORA_URL: http://ora:8091
       PEER_OSA_URL: http://osa:8093
       PEER_OPL_URL: http://opl:8092
+      OPM_DATA_DIR: /data
+      OPM_JOB_TMP: /tmp/opm-jobs
 
   opm-orchestrator:
     image: opm-api:smoke
