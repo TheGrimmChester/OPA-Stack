@@ -55,7 +55,7 @@ OPM projects are **GitHub repositories** only (no local folder registry).
 | Kanban / roadmap / task jobs | **OPM** |
 | Code review / Repo Watch | **ORA** (deep-link; do not duplicate) |
 
-NAS/open-family already sets `PEER_OPA_URL` and `PEER_ORA_URL` on `opm-api`. Redeploy `opm-api:nas`, `opa-hub:nas`, and `ora-api:nas` after upgrading images.
+NAS/open-family already sets `PEER_OPA_URL` and `PEER_ORA_URL` on `opm-api` and `osa-api`. Redeploy `opm-api:nas`, `osa-api:nas`, `osa-dashboard:nas`, `opa-hub:nas`, and `ora-api:nas` after upgrading images.
 
 ## Allowed peer calls
 
