@@ -1,146 +1,183 @@
 #!/usr/bin/env bash
-# Build opa-agent:smoke + opa-orchestrator:smoke + opa-perf-lab:smoke +
-# opa-dashboard:smoke (+ optional opa-php:smoke) from sibling checkouts and
-# recreate compose services (optionally ClickHouse).
+# Build Open-* family images with *:smoke tags for laptop only.
+# Never run this on the NAS — use harness/rebuild-nas-images.sh (*:nas) there.
 #
-# Usage (from OPA-stack root):
-#   ./harness/rebuild-smoke-images.sh
-#   RECREATE_CLICKHOUSE=1 ./harness/rebuild-smoke-images.sh
-#   BUILD_PHP=1 ./harness/rebuild-smoke-images.sh
+# Usage (from family repos root, e.g. ~/Documents/repos):
+#   OPA-Stack/harness/rebuild-smoke-images.sh
+#   OPA-Stack/harness/rebuild-smoke-images.sh hub ora-api dashboards
 #
-# Sibling paths default to ../OPA-Agent, ../OPA-Dashboard, ../OPA-PHP-extension,
-# ../OPA-AI-Orchestrator, ../OPA-Perf-Lab.
 set -euo pipefail
 
-ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-cd "$ROOT"
+FAMILY_ROOT="${FAMILY_ROOT:-$(cd "$(dirname "$0")/../.." && pwd)}"
+if [[ -d "$FAMILY_ROOT/../OPA-Hub" ]]; then
+  FAMILY_ROOT="$(cd "$FAMILY_ROOT/.." && pwd)"
+elif [[ -d "$FAMILY_ROOT/OPA-Hub" ]]; then
+  :
+elif [[ -d "$(pwd)/OPA-Hub" ]]; then
+  FAMILY_ROOT="$(pwd)"
+else
+  echo "error: set FAMILY_ROOT to the directory that contains OPA-Hub, ORA-API, Open-*, …" >&2
+  exit 1
+fi
 
-AGENT_DIR="${AGENT_DIR:-$ROOT/../OPA-Agent}"
-DASH_DIR="${DASH_DIR:-$ROOT/../OPA-Dashboard}"
-PHP_DIR="${PHP_DIR:-$ROOT/../OPA-PHP-extension}"
-ORCH_DIR="${ORCH_DIR:-$ROOT/../OPA-AI-Orchestrator}"
-PERF_DIR="${PERF_DIR:-$ROOT/../OPA-Perf-Lab}"
-AGENT_REF="${AGENT_REF:-}"
-DASH_REF="${DASH_REF:-}"
-PHP_REF="${PHP_REF:-}"
-BUILD_PHP="${BUILD_PHP:-1}"
-RECREATE_CLICKHOUSE="${RECREATE_CLICKHOUSE:-0}"
-COMPOSE_PROJECT_NAME="${COMPOSE_PROJECT_NAME:-opa-stack}"
+STACK_DIR="${STACK_DIR:-$FAMILY_ROOT/OPA-Stack}"
+DOCKER_DIR="$STACK_DIR/harness/docker"
+TAG=smoke
+COMPOSE_FILE="${COMPOSE_FILE:-$STACK_DIR/compose.all.yaml}"
+COMPOSE_PROJECT_NAME="${COMPOSE_PROJECT_NAME:-open-family}"
 export COMPOSE_PROJECT_NAME
 
-need() { command -v "$1" >/dev/null 2>&1 || { echo "missing dependency: $1" >&2; exit 1; }; }
-need docker
-docker compose version >/dev/null
+echo "==> FAMILY_ROOT=$FAMILY_ROOT"
+echo "==> tagging all builds as *:$TAG (laptop smoke only)"
 
-if [[ ! -f "$AGENT_DIR/Dockerfile" ]]; then
-  echo "OPA-Agent Dockerfile not found at $AGENT_DIR" >&2
-  exit 1
-fi
-if [[ ! -f "$DASH_DIR/Dockerfile" ]]; then
-  echo "OPA-Dashboard Dockerfile not found at $DASH_DIR" >&2
-  exit 1
-fi
-if [[ ! -f "$ORCH_DIR/Dockerfile" ]]; then
-  echo "OPA-AI-Orchestrator Dockerfile not found at $ORCH_DIR" >&2
-  exit 1
-fi
-if [[ ! -f "$PERF_DIR/Dockerfile" ]]; then
-  echo "OPA-Perf-Lab Dockerfile not found at $PERF_DIR" >&2
-  exit 1
-fi
-
-checkout_tip() {
-  local dir="$1" ref="$2" label="$3"
-  if [[ -z "$ref" ]]; then
-    return 0
-  fi
-  echo "==> Checking out $label @ $ref in $dir"
-  git -C "$dir" fetch --quiet origin "$ref" 2>/dev/null || true
-  if git -C "$dir" rev-parse --verify "$ref" >/dev/null 2>&1; then
-    git -C "$dir" checkout -q "$ref"
-  elif git -C "$dir" rev-parse --verify "origin/$ref" >/dev/null 2>&1; then
-    git -C "$dir" checkout -q -B "$ref" "origin/$ref"
-  else
-    echo "    warning: ref $ref not found in $dir — building current HEAD" >&2
+need() {
+  local d="$1"
+  if [[ ! -d "$FAMILY_ROOT/$d" ]]; then
+    echo "error: missing $FAMILY_ROOT/$d" >&2
+    exit 1
   fi
 }
 
-prefer_ref() {
-  local dir="$1"
-  if git -C "$dir" rev-parse --verify wave28-30-verticals >/dev/null 2>&1; then
-    echo wave28-30-verticals
-  elif git -C "$dir" rev-parse --verify wave27-diagnostics >/dev/null 2>&1; then
-    echo wave27-diagnostics
-  else
-    echo ""
-  fi
+build_df() {
+  local dockerfile="$1"
+  local image="$2"
+  shift 2
+  echo "==> Building $image from $dockerfile"
+  docker build -f "$DOCKER_DIR/$dockerfile" -t "$image" "$@" "$FAMILY_ROOT"
 }
 
-if [[ -z "$AGENT_REF" ]]; then
-  AGENT_REF="$(prefer_ref "$AGENT_DIR")"
-fi
-if [[ -z "$DASH_REF" ]]; then
-  DASH_REF="$(prefer_ref "$DASH_DIR")"
-fi
-if [[ -z "$PHP_REF" ]]; then
-  PHP_REF="$(prefer_ref "$PHP_DIR")"
-fi
+build_ctx() {
+  local ctx="$1"
+  local image="$2"
+  shift 2
+  echo "==> Building $image from $ctx"
+  docker build -t "$image" "$@" "$FAMILY_ROOT/$ctx"
+}
 
-checkout_tip "$AGENT_DIR" "$AGENT_REF" "OPA-Agent"
-checkout_tip "$DASH_DIR" "$DASH_REF" "OPA-Dashboard"
-if [[ "$BUILD_PHP" == "1" ]]; then
-  checkout_tip "$PHP_DIR" "$PHP_REF" "OPA-PHP-extension"
+TARGETS=("$@")
+if [[ ${#TARGETS[@]} -eq 0 ]]; then
+  TARGETS=(all)
 fi
 
-echo "==> Building opa-agent:smoke from $AGENT_DIR (HEAD=$(git -C "$AGENT_DIR" rev-parse --short HEAD 2>/dev/null || echo '?'))"
-docker build -t opa-agent:smoke "$AGENT_DIR"
+wants() {
+  local name="$1"
+  local t
+  for t in "${TARGETS[@]}"; do
+    if [[ "$t" == "all" || "$t" == "$name" ]]; then
+      return 0
+    fi
+  done
+  return 1
+}
 
-echo "==> Building opa-orchestrator:smoke from $ORCH_DIR (HEAD=$(git -C "$ORCH_DIR" rev-parse --short HEAD 2>/dev/null || echo '?'))"
-docker build -t opa-orchestrator:smoke "$ORCH_DIR"
-
-echo "==> Building opa-perf-lab:smoke from $PERF_DIR (HEAD=$(git -C "$PERF_DIR" rev-parse --short HEAD 2>/dev/null || echo '?'))"
-docker build -t opa-perf-lab:smoke "$PERF_DIR"
-
-echo "==> Pre-pulling JMeter image for Perf Lab Docker runner"
-docker pull "${OPA_JMETER_IMAGE:-justb4/jmeter:5.5}" || true
-
-echo "==> Building opa-dashboard:smoke from $DASH_DIR (HEAD=$(git -C "$DASH_DIR" rev-parse --short HEAD 2>/dev/null || echo '?'))"
-docker build -t opa-dashboard:smoke "$DASH_DIR"
-
-if [[ "$BUILD_PHP" == "1" ]]; then
-  if [[ -f "$PHP_DIR/docker/Dockerfile" ]]; then
-    echo "==> Building opa-php:smoke from $PHP_DIR (HEAD=$(git -C "$PHP_DIR" rev-parse --short HEAD 2>/dev/null || echo '?'))"
-    docker build -f "$PHP_DIR/docker/Dockerfile" -t opa-php:smoke "$PHP_DIR"
+if wants hub || wants all; then
+  need OPA-Hub
+  need Open-Auth-Go
+  need Open-ClickHouse-Go
+  need Open-HTTP-Go
+  need Open-Logger-Go
+  if [[ -f "$DOCKER_DIR/opa-hub.nas.Dockerfile" ]]; then
+    build_df opa-hub.nas.Dockerfile "opa-hub:$TAG"
   else
-    echo "    warning: $PHP_DIR/docker/Dockerfile missing — skipping opa-php:smoke" >&2
+    build_ctx OPA-Hub "opa-hub:$TAG"
   fi
 fi
 
-if [[ "$RECREATE_CLICKHOUSE" == "1" ]]; then
-  echo "==> Recreating clickhouse + agent + orchestrator + perf-lab + dashboard"
-  docker compose up -d --force-recreate clickhouse agent orchestrator perf-lab dashboard
-else
-  echo "==> Recreating agent + orchestrator + perf-lab + dashboard (ClickHouse left running)"
-  docker compose up -d --force-recreate --no-deps agent orchestrator perf-lab dashboard
+if wants agent || wants all; then
+  need OPA-Agent
+  build_ctx OPA-Agent "opa-agent:$TAG"
 fi
 
-echo "==> Waiting for agent / orchestrator / perf-lab health"
-ok_agent=0 ok_orch=0 ok_perf=0
-for i in $(seq 1 90); do
-  curl -fsS --connect-timeout 2 --max-time 2 http://127.0.0.1:8080/api/health >/dev/null 2>&1 && ok_agent=1 || true
-  curl -fsS --connect-timeout 2 --max-time 2 http://127.0.0.1:8091/api/health >/dev/null 2>&1 && ok_orch=1 || true
-  curl -fsS --connect-timeout 2 --max-time 2 http://127.0.0.1:8092/api/health >/dev/null 2>&1 && ok_perf=1 || true
-  if [[ "$ok_agent" == "1" && "$ok_orch" == "1" && "$ok_perf" == "1" ]]; then
-    echo "    all healthy"
-    echo "Agent:         http://127.0.0.1:8080/api/health"
-    echo "Orchestrator:  http://127.0.0.1:8091/api/health"
-    echo "Perf Lab:      http://127.0.0.1:8092/api/health"
-    echo "Dashboard:     http://127.0.0.1:8088"
-    docker images --format 'table {{.Repository}}\t{{.Tag}}\t{{.ID}}\t{{.CreatedAt}}' | grep -E 'opa-(agent|dashboard|php|orchestrator|perf-lab)|REPOSITORY' || true
-    exit 0
-  fi
-  sleep 2
-done
+if wants collector || wants all; then
+  need opa-collector
+  build_ctx opa-collector "opa-collector:$TAG"
+fi
 
-echo "services did not become healthy in time (agent=$ok_agent orch=$ok_orch perf=$ok_perf)" >&2
-exit 1
+if wants ora-api || wants all; then
+  need ORA-API
+  need Open-Auth-Go
+  need Open-Client-Go
+  need Open-Job-Go
+  if [[ -f "$DOCKER_DIR/ora-api.nas.Dockerfile" ]]; then
+    build_df ora-api.nas.Dockerfile "ora-api:$TAG" --target ora-api
+    docker build -f "$DOCKER_DIR/ora-api.nas.Dockerfile" -t "ora-runner-git:$TAG" --target ora-runner-git "$FAMILY_ROOT"
+  else
+    build_ctx ORA-API "ora-api:$TAG"
+  fi
+fi
+
+if wants osa-api || wants all; then
+  need OSA-API
+  need Open-Auth-Go
+  need Open-Job-Go
+  if [[ -f "$DOCKER_DIR/osa-api.nas.Dockerfile" ]]; then
+    build_df osa-api.nas.Dockerfile "osa-api:$TAG" --target osa-api
+    docker build -f "$DOCKER_DIR/osa-api.nas.Dockerfile" -t "osa-runner-scan:$TAG" --target osa-runner-scan "$FAMILY_ROOT"
+  else
+    build_ctx OSA-API "osa-api:$TAG"
+  fi
+fi
+
+if wants opl-api || wants all; then
+  need OPL-API
+  need Open-Auth-Go
+  need Open-Job-Go
+  if [[ -f "$DOCKER_DIR/opl-api.nas.Dockerfile" ]]; then
+    build_df opl-api.nas.Dockerfile "opl-api:$TAG" --target opl-api
+    docker build -f "$DOCKER_DIR/opl-api.nas.Dockerfile" -t "opl-runner-jmeter:$TAG" --target opl-runner-jmeter "$FAMILY_ROOT"
+  else
+    build_ctx OPL-API "opl-api:$TAG"
+  fi
+fi
+
+if wants opm-api || wants all; then
+  need OPM-API
+  need Open-Auth-Go
+  need Open-Job-Go
+  if [[ -f "$DOCKER_DIR/opm-api.nas.Dockerfile" ]]; then
+    build_df opm-api.nas.Dockerfile "opm-api:$TAG" --target opm-api
+  else
+    build_ctx OPM-API "opm-api:$TAG"
+  fi
+fi
+
+if wants egress || wants all; then
+  need Open-Egress-Proxy
+  build_ctx Open-Egress-Proxy "open-egress-proxy:$TAG"
+fi
+
+if wants dashboards || wants all; then
+  need OPA-Dashboard
+  need ORA-Dashboard
+  need OSA-Dashboard
+  need OPL-Dashboard
+  need OPM-Dashboard
+  need Open-Client-JS
+  need Open-UI-JS
+  build_ctx OPA-Dashboard "opa-dashboard:$TAG"
+  if [[ -f "$DOCKER_DIR/dashboard.nas.Dockerfile" ]]; then
+    for pair in \
+      "ORA-Dashboard:ora-dashboard" \
+      "OSA-Dashboard:osa-dashboard" \
+      "OPL-Dashboard:opl-dashboard" \
+      "OPM-Dashboard:opm-dashboard"
+    do
+      product="${pair%%:*}"
+      image="${pair##*:}"
+      echo "==> Building ${image}:$TAG (PRODUCT=$product)"
+      docker build -f "$DOCKER_DIR/dashboard.nas.Dockerfile" \
+        --build-arg "PRODUCT=$product" \
+        -t "${image}:$TAG" \
+        "$FAMILY_ROOT"
+    done
+  fi
+fi
+
+if [[ "${RECREATE:-0}" == "1" ]]; then
+  echo "==> Recreating compose project $COMPOSE_PROJECT_NAME from $COMPOSE_FILE"
+  docker compose -f "$COMPOSE_FILE" up -d --force-recreate
+fi
+
+echo "==> Done. Images tagged *:$TAG:"
+docker images --format '{{.Repository}}:{{.Tag}}\t{{.ID}}\t{{.CreatedSince}}' \
+  | grep -E ":(smoke)\s" | grep -E '^(opa-|ora-|osa-|opl-|opm-|open-)' || true
