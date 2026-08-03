@@ -1,7 +1,15 @@
-# ORA product profile stub — api + orchestrator + dashboard.
+# ORA product profile — api + orchestrator + dashboard.
+# Standalone: omit PEER_OPA_URL (or set AUTH_MODE=standalone) for local login.
+# Co-deployed: set PEER_OPA_URL + shared JWT_SECRET; hub issues user JWTs.
 name: ora
 
 services:
+  clickhouse:
+    image: clickhouse/clickhouse-server:24.3
+    profiles: ["ora"]
+    volumes:
+      - ./clickhouse/init-databases.sql:/docker-entrypoint-initdb.d/init-databases.sql:ro
+
   ora:
     image: ora-api:smoke
     profiles: ["ora"]
@@ -9,10 +17,13 @@ services:
     environment:
       LISTEN_ADDR: ":8091"
       CLICKHOUSE_URL: ${CLICKHOUSE_URL:-http://clickhouse:8123}
+      CLICKHOUSE_DB: ora
       JWT_SECRET: ${JWT_SECRET:-}
+      AUTH_MODE: ${AUTH_MODE:-standalone}
       OPEN_SERVICE_JWT_SECRET: ${OPEN_SERVICE_JWT_SECRET:-}
       PEER_OPA_URL: ${PEER_OPA_URL:-}
       PEER_OSA_URL: ${PEER_OSA_URL:-}
+    depends_on: [clickhouse]
 
   ora-orchestrator:
     image: ora-api:smoke
@@ -20,6 +31,7 @@ services:
     command: ["ora-api", "orchestrator"]
     environment:
       CLICKHOUSE_URL: ${CLICKHOUSE_URL:-http://clickhouse:8123}
+      CLICKHOUSE_DB: ora
       JWT_SECRET: ${JWT_SECRET:-}
 
   ora-dashboard:

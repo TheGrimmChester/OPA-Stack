@@ -1,7 +1,13 @@
-# OSA product profile stub — api + orchestrator + dashboard.
+# OSA product profile — api + orchestrator + dashboard.
 name: osa
 
 services:
+  clickhouse:
+    image: clickhouse/clickhouse-server:24.3
+    profiles: ["osa"]
+    volumes:
+      - ./clickhouse/init-databases.sql:/docker-entrypoint-initdb.d/init-databases.sql:ro
+
   osa:
     image: osa-api:smoke
     profiles: ["osa"]
@@ -9,10 +15,13 @@ services:
     environment:
       LISTEN_ADDR: ":8093"
       CLICKHOUSE_URL: ${CLICKHOUSE_URL:-http://clickhouse:8123}
+      CLICKHOUSE_DB: osa
       JWT_SECRET: ${JWT_SECRET:-}
+      AUTH_MODE: ${AUTH_MODE:-standalone}
       OPEN_SERVICE_JWT_SECRET: ${OPEN_SERVICE_JWT_SECRET:-}
       PEER_OPA_URL: ${PEER_OPA_URL:-}
       PEER_ORA_URL: ${PEER_ORA_URL:-}
+    depends_on: [clickhouse]
 
   osa-orchestrator:
     image: osa-api:smoke
@@ -20,6 +29,7 @@ services:
     command: ["osa-api", "orchestrator"]
     environment:
       CLICKHOUSE_URL: ${CLICKHOUSE_URL:-http://clickhouse:8123}
+      CLICKHOUSE_DB: osa
 
   osa-dashboard:
     image: osa-dashboard:smoke
@@ -27,7 +37,3 @@ services:
     ports: ["8094:80"]
     environment:
       VITE_API_URL: http://127.0.0.1:8093
-
-# Runners are ephemeral (spawned by osa-orchestrator), not always-on services:
-#   docker build --target osa-runner-scan -t osa-runner-scan:smoke ../OSA-API
-# Production/NAS: osa-api:nas, osa-runner-scan:nas only.

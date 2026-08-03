@@ -40,8 +40,8 @@ Removed endpoints are absent (normal HTTP 404). Do not ship redirects, dual path
 ## Related docs
 
 - [Modules catalog](modules.md)
-- [Interop and peer auth](interop.md)
-- Compose profile stubs: [`compose.opa.yaml`](../compose.opa.yaml), [`compose.ora.yaml`](../compose.ora.yaml), [`compose.osa.yaml`](../compose.osa.yaml), [`compose.opl.yaml`](../compose.opl.yaml), [`compose.all.yaml`](../compose.all.yaml)
+- [Interop, auth modes, and ClickHouse databases](interop.md)
+- Compose profile stubs: [`compose.opa.yaml`](../compose.opa.yaml), [`compose.ora.yaml`](../compose.ora.yaml), [`compose.osa.yaml`](../compose.osa.yaml), [`compose.opl.yaml`](../compose.opl.yaml), [`compose.all.yaml`](../compose.all.yaml) (one server, four DBs)
 
 ## Gateways
 
