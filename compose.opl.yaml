@@ -1,0 +1,28 @@
+# OPL product profile stub — api + orchestrator + dashboard.
+name: opl
+
+services:
+  opl:
+    image: opl-api:smoke
+    profiles: ["opl"]
+    ports: ["8092:8092"]
+    environment:
+      LISTEN_ADDR: ":8092"
+      CLICKHOUSE_URL: ${CLICKHOUSE_URL:-http://clickhouse:8123}
+      JWT_SECRET: ${JWT_SECRET:-}
+      OPEN_SERVICE_JWT_SECRET: ${OPEN_SERVICE_JWT_SECRET:-}
+      PEER_OPA_URL: ${PEER_OPA_URL:-}
+
+  opl-orchestrator:
+    image: opl-api:smoke
+    profiles: ["opl"]
+    command: ["opl-api", "orchestrator"]
+    environment:
+      CLICKHOUSE_URL: ${CLICKHOUSE_URL:-http://clickhouse:8123}
+
+  opl-dashboard:
+    image: opl-dashboard:smoke
+    profiles: ["opl"]
+    ports: ["8095:80"]
+    environment:
+      VITE_API_URL: http://127.0.0.1:8092

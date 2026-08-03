@@ -1,0 +1,7 @@
+# All-products stub — includes per-product compose files.
+# Laptop smoke only. Production/NAS must use *:nas image tags exclusively.
+include:
+  - path: compose.opa.yaml
+  - path: compose.ora.yaml
+  - path: compose.osa.yaml
+  - path: compose.opl.yaml
