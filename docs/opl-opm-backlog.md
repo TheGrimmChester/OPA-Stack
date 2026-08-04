@@ -6,16 +6,26 @@ product `/api/auth/login` is disabled. Auth-on list routes scope to **`default-o
 tenant headers are omitted (Open-Tenant-Go ≥ 0.2.2). See [interop.md](interop.md) and
 [nas-deploy.md](nas-deploy.md).
 
-**Status basis (2026-08-04).** Every **Done** bullet below was re-checked against `origin/main`
-(OPL-API `51b4e87`, OPL-Dashboard `487e2da`, OPM-API `8cd0562`, OPM-Dashboard `6d43452`, ORA-API `5a706fb`) by
-reading the cited file and line. Two caveats that changed several bullets in this revision:
+**Status basis (re-verified 2026-08-04, late pass).** Every **Done** bullet below was checked against
+`origin/main` (OPL-API `3cff6ee`, OPL-Dashboard `cd91121`, OPM-API `5c9dd43`, OPM-Dashboard `4d5e8a2`,
+ORA-API `325df77`) by reading the cited file and line. Three caveats:
 
 - **Deployment verification is unavailable this pass.** Health and index routes answer, but the images report
   unversioned build ids (`opm-api-dev`, `perf-lab-dev`) and capability routes need an operator token this pass
-  does not hold. Nothing here is claimed as verified on the deployed stack.
-- **Local checkouts sit on unmerged branches.** Several of these repos are commonly checked out on a feature
-  branch, so behaviour reproduced locally is not evidence of a merge. Work that exists only on a branch is
-  listed under **On a branch, not merged**, never under **Done**.
+  does not hold. Nothing here is claimed as verified on the deployed stack — several capabilities below are
+  merged in code and **not yet deployed**.
+- **Judge `origin/main`, not the checkout.** These repos are frequently checked out on a feature branch based on
+  an older `main`, so behaviour reproduced locally is not evidence of a merge, and an absent symbol in the
+  working tree is not evidence of an absent feature.
+- **Search output here is unreliable.** A command hook rewrites `git diff`, `grep`, and `rg` output, so an empty
+  result can be a tool artifact. Negatives below were taken with `rtk proxy` and a positive control that fired
+  in the same command, or by reading the whole file from the `origin/main` blob.
+
+**Correction (2026-08-04).** An earlier revision of this file listed skip-to-phase, the roadmap/ideation
+generators, GitHub Issue sync, notification channels, report/trend templates, and CSV dataset binding as absent
+or branch-only. All six have since merged to `origin/main` and are recorded as **Done** below. The wording was
+correct for the `main` of a few hours earlier and became wrong as those PRs landed during the review; it is
+corrected here rather than deleted.
 
 Near-term product PRs may close individual **Next** items; treat **Later** as the durable backlog.
 
@@ -53,13 +63,15 @@ run dispatch and the schedule tick both live in `opl-api` (`main.go:30` → `lab
 - **Notification history** — `opl.run_notifications` + `GET /api/perf/notifications` (and per run); `sent` / `failed` / `logged` / `skipped` with a plain reason; `POST /api/perf/notifications/test`; Notification channels + history panels in the dashboard
 - **Report / trend templates** — `opl.report_templates` + `/api/perf/report-templates` CRUD (org/project scoped); `?template=<id>` on `report`, `bench-pack` and `trends`; picker + editor on Results and Trends
 
-### Not implemented
-
-- **Dataset binding to the executed plan** — inline CSV stored/`data.csv` written, but no generator emits a CSV Data Set element; `${var}` stays unbound with no warning. Highest-impact OPL gap
+- **CSV dataset binding** — the generated plan now carries a CSV Data Set element matching the written
+  `data.csv`, so `${var}` resolves at run time (`jmeter_datasets.go:47`, `:66`, `:317`; `syncJMXCSVDataSet` at
+  `:378` back-fills stored and imported plans; generators take the dataset at `jmeter_engine.go:32`, `:71`,
+  `:110`; dispatch wires it at `:547`, `:559`, `:589`). Honours `variableNames`, `delimiter`, `recycle`,
+  `stop_thread`, `share_mode`, `quoted`, `ignore_first_line`, `encoding`; parse problems come back as
+  `warnings` (`jmeter_datasets.go:94-166`, surfaced `:298`) and dispatch reports `dataset_injected`
+  (`jmeter_engine.go:718`)
 
 ### Next
-
-- **Dataset binding + unbound-variable warning on dispatch** (see Not implemented)
 
 - **Redeploy `opl-api:nas` + `opl-dashboard:nas`** after each OPL pass (sync-nas-src before rebuild)
 - **Baselines / federation peers** — dashboard skips `/api/performance/baselines` and `/api/federation/peers` (edge agent today; `opl-api` 404). Proxy/peer cleanly or drop dead UI affordances
@@ -101,25 +113,33 @@ the next plan subtask to `completed` (`job_runner.go:321-341`) and may append to
 - Job executor writes artifacts for planning / implementation / review / QA / changelog (`job_runner.go:128-152`); **container spawn** of `opm-runner-task` when `spawnReady` (`execution: "container"`, builtin fallback)
 - Runner calls a chat-completions endpoint when `OPM_MODEL_API_KEY` is set (`cmd/opm-runner/main.go:69-100`); applied for planning, implementation, and review **only** (`model_apply.go:17-29`)
 - Stuck/recover (`mark-stuck`, `recover-subtask`); pause/resume (`pause-task`, `resume-task`) — `job_runner.go:137-144`
+- **Skip-to-phase** — `handlers.go:429` declares `targetPhase`, `:441-442` rejects a missing or `<1` value with 400, `:451` assigns it; dispatch `job_runner.go:153-154` → `builtinSkipToPhase` (`:930-995`) resolves the phase, marks earlier phases complete, and rewrites `progress.json`. UI at `TaskDetail.jsx:18`/`:311` and `Jobs.jsx:17`/`:100`/`:179`
+- **Roadmap discovery/features and ideation generators** — `job_runner.go:147-152` dispatches `builtinRoadmapDiscovery` (`:714`), `builtinRoadmapFeatures` (`:769`, bootstraps via discovery at `:779`), and `builtinIdeation` (`:844`); each writes real artifacts through `PutRoadmap` / `PutIdeation`. Honest limit: the content is **fixed template text** composed from the project name and board task titles, not model output — the runner carries no prompts for these actions and `model_apply.go:17-29` does not route them, so a model key changes nothing here
 - Jobs list + enqueue + cancel with operator `message`; filesystem project state under `OPM_DATA_DIR`
 - Orchestrator spawn probe (`/api/spawn-probe`) — `spawnReady: true` when docker CLI + daemon + runner image work
-- NAS verify: `GET :8096/api/health` → **200** `{ status: ok, service: opm-api, auth_mode: codeployed }`; `:8098/` → **200**
 - **GitHub Milestones + Projects v2 bind** — ORA peer `scm:pm`; OPM list/assign/sync; dashboard pickers on Roadmap + task detail; Status sync on board move (best-effort)
 - **Task ↔ GitHub Issue two-way sync** — `…/github/issues/{link,unlink,push,pull}` via ORA peer `scm:pm` (`/api/peer/scm/issues/{get,create,update}`); attach by number or create from task; push title/description/column-state/milestone; pull mirrors state/assignee/labels/milestone and moves the task on the `done`/reopen boundary only. Failures persist on the task (`githubIssueSyncError`) and in the `github-issue-sync` spec log with a machine-readable `status`; title divergence is reported, not silently resolved. Needs only `issues: write`. Dashboard: issue panel on task detail + board badge
 
 ### Not implemented
 
-- **Code delivery / pull requests from a task** — jobs never modify the clone; plan advances only
-- **Orchestrator dispatch + container reaping** — stub only
-- **Projects v2 draft-item title refresh** — ORA returns nil without calling the API; renaming a task never reaches the board
-
+- **Code delivery / pull requests from a task** — the largest real gap. Jobs never modify the clone
+  (`job_runner.go:45-50`); a positive-control search over all of OPM-API finds exactly two `exec.Command…("git"…)`
+  hits, both `git clone` (`workspace.go:57`, `:69`)
+- **Orchestrator dispatch + container reaping** — stub only (`main.go:114`); whole function read from the
+  `origin/main` blob
+- **Projects v2 draft-item title refresh** — `ORA-API/github_projects.go:294-302` returns `nil` without calling
+  the API and the caller discards the error (`peer_scm_pm.go:268`), so renaming a task reports success and never
+  reaches the board
+- **Model-backed roadmap / ideation** — the generators ship but emit fixed template text (see Done)
 
 ### Next
 
-- Merge PR #18 (`feature/agent-roadmap-ideation-skip`) or drop the claims that depend on it
 - Give jobs a code-delivery path (branch + commit + pull request), or state plainly in the product that OPM
   orchestrates planning and tracking rather than producing changes
 - Make the Projects v2 title-refresh no-op either work or report an error
+- Wire roadmap/ideation generation into the runner so it responds to the project, not a template table
+- **Deploy**: several capabilities above are merged in code and not yet on the deployed stack; a rebuild is
+  needed before any of them can be described as live
 
 ### Later
 
