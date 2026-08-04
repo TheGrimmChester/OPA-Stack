@@ -188,26 +188,26 @@ Legend: **Done** = OPM has usable equivalent · **Missing** = gap for implemente
 |------------|--------|-------|
 | Job list / enqueue / cancel | **Done** | `execution` + `message` fields |
 | Optional `specId` on enqueue | **Done** | Jobs page + board/detail |
-| Real runner container + model output | **Missing** | Builtin writes artifacts; spawn probe only |
+| Real runner container + model output | **Done** (when key set) | Runner calls model; persists into plan/progress/logs; fallback without key |
 | Orchestrator spawn/reaper loop | **Partial** | Health + `/api/spawn-probe`; no reaper/spawn yet |
 | `run-planning` (multi-phase) | **Done** (builtin) | Writes `spec.md` + plan; moves for require-review |
 | `run-implementation` + subtask loop | **Done** (builtin) | One subtask per enqueue |
 | Retry / stuck / recover-subtask | **Done** (builtin) | `mark-stuck`, `recover-subtask`; cancel marks stuck |
 | `run-review` / `run-qa-fix` loop | **Done** (builtin) | PASS/FAIL + `QA_FIX_REQUEST.md` |
 | `run-followup-planning` | **Done** | Jobs picker + detail action |
-| Pause / resume / skip-to-phase | **Partial** | Pause/resume done; skip-to-phase missing |
+| Pause / resume / skip-to-phase | **Done** | `pause-task`, `resume-task`, `skip-to-phase` + `targetPhase` |
 | Parallel multi-spec / runner slots | **Missing** | Container runtime model |
 | Autonomous multi-spec build workflow | **Missing** | Orchestrator workflow later |
-| Provider / model selection | **Missing** | Runner image env only |
+| Provider / model selection | **Partial** | Compose `OPM_MODEL_*` env (no dashboard UI yet) |
 
 ### 4.4 Roadmap / ideation / changelog
 
 | Capability | Status | Notes |
 |------------|--------|-------|
 | Roadmap GET/PUT + create phase/feature UI | **Done** | Inline edit/delete shipped |
-| Roadmap discovery/features **agents** | **Missing** (real agents) | Builtin placeholder only |
+| Roadmap discovery/features **agents** | **Done** (builtin) | Writes vision/phases/features; model-backed runner follow-on |
 | Ideation CRUD + promote to task | **Done** | Edit/delete + promote |
-| Ideation type agents | **Missing** (real agents) | Types aligned |
+| Ideation type agents | **Done** (builtin) | Optional `ideationType`; all types when omitted |
 | Changelog read | **Done** | |
 | Changelog generate UX | **Done** | Generate job + edit/save |
 
@@ -253,7 +253,7 @@ Legend: **Done** = OPM has usable equivalent · **Missing** = gap for implemente
 
 ## 5. Suggested implementation order (for coding agents)
 
-1. **Model-backed agents in runner** — container spawn works; prompts/agent CLI inside `opm-runner-task` still follow-on.
+1. ~~**Model-backed agents in runner**~~ — shipped (`OPM_MODEL_API_KEY` / base URL / model ids; honest fallback).
 2. **Roadmap/ideation agents** — replace placeholder enqueue with real generators.
 3. **Skip-to-phase** — finish interruptible pipeline controls (pause/resume done).
 4. **ORA deep-links** — PR/review instead of in-app merge/discard.
@@ -265,18 +265,14 @@ Legend: **Done** = OPM has usable equivalent · **Missing** = gap for implemente
 
 Ranked for an operator using OPM on NAS today:
 
-1. **Model-backed agents in runner** — container `docker run` of `opm-runner-task:nas` works; prompts/agent CLI inside the image still follow-on.
-2. **Roadmap / ideation agent quality** — discovery/features/typed ideation beyond placeholders.
-3. **Skip-to-phase** — pause/resume done; skip still open.
-4. **Live terminals / richer job logs UI** — Jobs list is coarse.
-5. **Create-PR helpers via ORA** — prefer Hub/ORA over in-app merge.
-6. **Provider / model settings** — runner image env only.
-7. **Pre-merge quality gates** — tests/lint before done.
-8. **Insights / context pages** — after automation matures.
+1. ~~**Model-backed agents in runner**~~ — shipped (`OPM_MODEL_*` env; fallback without key).
+2. **Live terminals / richer job logs UI** — Jobs list is coarse.
+3. **Create-PR helpers via ORA** — prefer Hub/ORA over in-app merge.
+4. **Provider / model settings** — runner image env only.
+5. **Pre-merge quality gates** — tests/lint before done.
+6. **Insights / context pages** — after automation matures.
 
-Shipped this pass: containerized task spawn (`spawnReady: true`, `execution: "container"`, builtin fallback); docker CLI in `opm-api:nas`; compose `docker.sock` on api + orchestrator.
-
-Prior pass (NAS-verified): board DnD + stuck/recover + pause/resume; task detail, approve, planning → implementation → review → changelog. Health `:8096` and dashboard `:8098` remain **200** on `*:nas`.
+Shipped this pass: roadmap/ideation agent generators + skip-to-phase; prior: containerized task spawn; board DnD + stuck/recover + pause/resume. Health `:8096` and dashboard `:8098` on `*:nas`.
 
 Honorable mentions: parallel job slots, durable ClickHouse job history, analytics.
 

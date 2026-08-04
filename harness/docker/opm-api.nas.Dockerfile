@@ -23,14 +23,14 @@ RUN sed -i \
   -e 's|=> ../Open-Logger-Go|=> /modules/Open-Logger-Go|' \
   go.mod \
   && go mod download \
-  && CGO_ENABLED=0 GOOS=linux go build -o /out/opm-api .
+  && CGO_ENABLED=0 GOOS=linux go build -o /out/opm-api . \
+  && CGO_ENABLED=0 GOOS=linux go build -o /out/opm-runner ./cmd/opm-runner
 
 FROM debian:bookworm-slim AS opm-runner-task
 RUN apt-get update \
  && apt-get install -y --no-install-recommends ca-certificates \
  && rm -rf /var/lib/apt/lists/*
-COPY OPM-API/scripts/opm-runner-entrypoint.sh /usr/local/bin/opm-runner
-RUN chmod 755 /usr/local/bin/opm-runner
+COPY --from=builder /out/opm-runner /usr/local/bin/opm-runner
 USER 65532:65532
 WORKDIR /home/opm
 ENTRYPOINT ["/usr/local/bin/opm-runner"]
