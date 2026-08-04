@@ -64,6 +64,7 @@ Ports: API `8096`, dashboard `8098`. Control plane: `opm-api` + `opm-orchestrato
 - Jobs list + enqueue + cancel with operator `message`; filesystem project state under `OPM_DATA_DIR`
 - Orchestrator spawn probe (`/api/spawn-probe`) — `spawnReady: true` when docker CLI + daemon + runner image work
 - NAS verify: `GET :8096/api/health` → **200** `{ status: ok, service: opm-api, auth_mode: codeployed }`; `:8098/` → **200**
+- **GitHub Milestones + Projects v2 bind** — ORA peer `scm:pm`; OPM list/assign/sync; dashboard pickers on Roadmap + task detail; Status sync on board move (best-effort)
 
 ### Next
 
@@ -71,7 +72,7 @@ Ports: API `8096`, dashboard `8098`. Control plane: `opm-api` + `opm-orchestrato
 
 ### Later
 
-- GitHub Issues / Projects sync (two-way), multi-repo portfolio views
+- GitHub Issues two-way sync, multi-repo portfolio views
 - Durable job/history store (ClickHouse or equivalent) instead of filesystem-only
 - Deep-link to ORA for review — do not duplicate Repo Watch inside OPM
 - Insights / context / live terminals; pre-merge quality gates
