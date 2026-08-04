@@ -5,6 +5,7 @@
 
 - [Products](products.md) — OPA · ORA · OSA · OPL · OPM (smoke/NAS ports, Alert Test → edge)
 - [OPL + OPM backlog](opl-opm-backlog.md) — Done / Next / Later for Perf Lab and Project Manager
+- [OPM ↔ AutoCursor parity](opm-autocursor-parity.md) — feature inventory for Open Project Manager vs AutoCursor
 - [Modules catalog](modules.md) — shared `Open-*` libraries and images
 - [Interop](interop.md) — peer URLs, co-deployed `/hub-auth` login, service JWT scopes
 - [Security tenant scopes](security-tenant-scopes.md) — cross-product auth/org curl matrix (NAS)

@@ -70,4 +70,5 @@ Ports: API `8096`, dashboard `8098`. Control plane: `opm-api` + `opm-orchestrato
 - [Products](products.md) — port table and ownership
 - [Interop](interop.md) — hub-auth, tenant headers, OPM ↔ hub/ORA
 - [NAS deploy](nas-deploy.md) — `*:nas` images and verify curls
+- [OPM ↔ AutoCursor parity](opm-autocursor-parity.md) — Done / Missing / Different-by-design inventory + top gaps
 - Product docs: [OPL-API](https://github.com/TheGrimmChester/OPL-API/tree/main/docs), [OPL-Dashboard](https://github.com/TheGrimmChester/OPL-Dashboard/tree/main/docs), [OPM-API](https://github.com/TheGrimmChester/OPM-API/tree/main/docs), [OPM-Dashboard](https://github.com/TheGrimmChester/OPM-Dashboard/tree/main/docs)
