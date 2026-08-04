@@ -46,11 +46,21 @@ One ClickHouse server can host all products. Each service sets its own database:
 
 `compose.all.yaml` creates all four databases on first boot (`clickhouse/init-databases.sql`). Solo profiles create the same init script so a shared server stays consistent. Prefer `CLICKHOUSE_DB`; `CLICKHOUSE_DATABASE` is an accepted alias.
 
-### ORA connector backfill (legacy `opa.connectors`)
+### Legacy hub `opa.*` product tables
 
-Co-deployed stacks split databases: hub writes `opa.*`, ORA writes `ora.*`. GitHub connector rows created before the product split may still live only in **`opa.connectors`**. On boot, `ora-api` rewrites new SQL to `ora.connectors`, then **backfills** missing legacy rows from hub `opa.connectors` into the product DB (via `QueryExact` on the hub database). Without this, peer `POST /api/peer/scm/clone-credentials` can return `404 connector not found` after restart even when connectors appear in the UI.
+Before per-product databases (`ora` / `osa` / `opl`), some product APIs wrote SCM, AppSec, and perf rows into the shared hub database (`opa.*`). SQL in those APIs still uses the legacy `opa.<table>` qualifier; the ClickHouse client rewrites it to the product DB (`ora.*`, `osa.*`, `opl.*`) at query time.
 
-After upgrading `ora-api:nas`, recreate the container and confirm hydrate logs report legacy backfill counts. No manual SQL migration is required for normal operation.
+**Hub-only tables** (never rewritten): `opa.organizations`, `opa.projects`, `opa.api_keys`, `opa.federation_peers`, `opa.callgraph_agg`. Use `QueryExact` / `hubTable()` for these.
+
+**Product tables with boot backfill** (when `CLICKHOUSE_DB` ≠ `opa` and hub row count exceeds product):
+
+| Product | Tables | Boot backfill |
+|---------|--------|---------------|
+| ORA | `connectors`, `watched_repos`, `scm_jobs`, `scm_review_stacks`, `scm_webhooks`, `review_contexts`, `scm_secrets`, `ai_reviews`, `agent_prefs` | Row-level for `connectors`; bulk `INSERT SELECT` for the rest |
+| OSA | `security_runs`, `secret_findings`, `sast_findings`, `iac_findings`, `vuln_findings`, `iast_findings`, `service_dependencies` | Bulk `INSERT SELECT` on startup |
+| OPL | `load_scenarios`, `load_runs`, `load_run_samples` | Uses explicit `chTable()` — no rewrite; no backfill needed when empty |
+
+After upgrading ORA/OSA images on a NAS that still has legacy hub rows, restart the API once and confirm product DB counts match hub (or exceed hub when dual-written). OPL already qualifies tables explicitly and does not rely on rewrite.
 
 ## Service-to-service
 
