@@ -20,8 +20,11 @@ Recent hub batches moved dashboard query routes off the edge agent onto **opa-hu
 |-------|-------------------|-----------------|
 | 2 | `GET /api/infra/hosts`, `GET /api/transactions/compare` | Infrastructure, Compare Traces (cohort) |
 | 3 | `GET /api/version`, `GET /api/topology`, `GET /api/ops/status`, `GET /api/audit`, `GET /api/db/*` list surfaces | System, Databases |
+| 4 | *(none — docs audit only)* | Network, Cloud, Catalog, Automation, Compare Traces (call-graph tab) |
 
-The dashboard never calls edge hosts. Filter suggestions and call-graph compare remain edge-only or unimplemented — see [OPA-Hub ownership](https://github.com/TheGrimmChester/OPA-Hub/blob/main/docs/ownership.md).
+Batch 4 audited remaining observability surfaces. **No hub routes were added.** Network, Cloud, Catalog, mgmt (`/api/mgmt/v1/*`), and call-graph compare are dashboard scaffolds with **no agent or hub backend** yet (NAS hub `:18080` → **404**). Filter suggestions exist on the edge agent only (`:18081` on NAS); the dashboard does not call them — stay edge-owned until wired.
+
+The dashboard never calls edge hosts in production. See [OPA-Hub ownership](https://github.com/TheGrimmChester/OPA-Hub/blob/main/docs/ownership.md) for the full deferred table.
 
 ## Smoke ports (laptop)
 
