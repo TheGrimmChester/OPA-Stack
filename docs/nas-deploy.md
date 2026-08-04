@@ -122,6 +122,49 @@ ORA uses `OPA_GITHUB_APP_SLUG` as the GitHub App login when requesting reviewers
 
 On this NAS host the installed App slug is `opa-ai-orchestrator` (set in `/mnt/Apps/config-docker/open-stack/.env`). Keep that value until the GitHub App itself is renamed or replaced.
 
+### Pull request checks
+
+Two checks can block a merge: **OPA AppSec Gate** (findings, evaluated by
+`osa-api`) and **OPA Checkup** (the repository's own tests). Both report three
+conclusions, and only `failure` means the commit is at fault.
+
+| Conclusion | Read it as |
+|------------|------------|
+| `success` | Verified clean |
+| `failure` | The commit violates policy or its tests fail — fix the commit |
+| `neutral` | The check could not run — **the commit was never verified**; fix the platform |
+
+Never merge past a `failure` with an administrator override; a `neutral` result
+is the signal that the platform, not the branch, needs attention. The check
+summary names the cause.
+
+Two settings keep these checks meaningful on this host:
+
+- **`OPEN_SERVICE_JWT_SECRET` must be identical on `ora-api` and `osa-api`.**
+  ORA evaluates the gate over a service token. A mismatch, or a missing value on
+  either side, makes every gate evaluation `neutral` with
+  `reasons=[peer_unavailable]` and a `401` in the summary. Recreate both services
+  together after rotating it.
+- **`OPA_CHECKUP_MODULE_SRC`** points at the family source tree
+  (`/mnt/Apps/config-docker/open-stack/src`), which compose mounts read-only on
+  `ora-api`. Family services pin shared libraries with `go.mod` filesystem
+  replaces, which cannot resolve inside an isolated job checkout on their own.
+  Without it Checkup reports `neutral` (`status=blocked`) and runs no tests.
+
+Verify both after a deploy:
+
+```bash
+# Service auth between ORA and OSA (expects 200 with iss/scope)
+docker exec open_ora_api sh -lc 'wget -qO- http://osa-api:8093/api/health' | head -c 200
+
+# Checkup module sources visible inside ora-api
+docker exec open_ora_api sh -lc 'ls "$OPA_CHECKUP_MODULE_SRC" | head' 
+```
+
+Then open a throwaway documentation pull request on a watched repository and
+confirm the AppSec Gate reaches `success` rather than completing in about a
+second with `peer_unavailable`.
+
 ## Sync source before rebuild
 
 NAS image builds read from sibling checkouts under `src/`. Those trees **must track `origin/main`** — stale rsync copies (no `.git`) have caused rebuilds that ship old code even after PR merges.

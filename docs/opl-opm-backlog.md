@@ -43,35 +43,29 @@ run dispatch and the schedule tick both live in `opl-api` (`main.go:30` → `lab
 - **JMeter visual test case editor** — VU tree (HTTP / Txn / If / While / Loop / ForEach / Fragment+Link) + DnD reorder/nest; JMX round-trip for controllers; archive/duplicate/validate/runners/steps/report in Dashboard
 - **Custom load curve + scheduler UX** — point-curve editor → `schedule.curve` / load-policies custom; Run & scale schedule panel (`enabled` / `every_minutes` / `daily_at`); scenario multi-run history (≤25) + sparklines
 - **Arrivals-accurate load curve** — `curve_mode=arrivals` rate points → open-model ThreadGroup segments (one journey per arrival); honesty vs concurrent VU mode
-- **Collection import** — `POST /api/perf/scenarios/import-postman` + Capture UI (`postman.go:15`)
-- **Validate triage + auto-correlation** — `triage[]` + `correlation_suggestions[]`; Apply extract in Design (`jmeter.go:48`)
-- **Restore archived + JTL import UI** — `POST .../unarchive` (`jmeter.go:63`), list `?archived=1`; Results JTL upload
-- **PDF / HTML report + bench pack ZIP** — `report?format=html|pdf` (`lab_extras.go:1022-1033`), `GET .../bench-pack` (`load.go:478` → `report_export.go:330`)
-- **Trends tab widgets** — latency band, error bars, best/worst/SLA KPIs; `GET .../scenarios/{id}/trends` (`jmeter.go:69` → `report_export.go:382`)
-- **Terminal-run notifications** — webhook on terminal status (`OPL_RUN_WEBHOOK_URL`, `run_notify.go`); health `run_notify`; optional HMAC + status filter
-
-### On a branch, not merged
-
-- **Richer notify channels + notification history** — `feature/notify-channels-report-templates`
-  (`OPL-API/run_notify.go`, `run_notify_history.go`; `OPL-Dashboard/src/components/NotifyChannels.jsx`).
-  `origin/main` has webhook only
-- **Saved report / trend templates** — same branch (`OPL-API/report_templates.go`;
-  `OPL-Dashboard/src/components/ReportTemplateBar.jsx`). `origin/main` has fixed layouts only
+- **Postman import** — `POST /api/perf/scenarios/import-postman` + Capture UI
+- **Validate triage + auto-correlation** — `triage[]` + `correlation_suggestions[]`; Apply extract in Design
+- **Restore archived + JTL import UI** — `POST .../unarchive`, list `?archived=1`; Results JTL upload
+- **PDF / HTML report + bench pack ZIP** — `report?format=html|pdf`, `GET .../bench-pack`
+- **Trends tab widgets** — latency band, error bars, best/worst/SLA KPIs; `GET .../scenarios/{id}/trends`
+- **Terminal-run notifications** — webhook on terminal status (`OPL_RUN_WEBHOOK_URL`); health `run_notify`; optional HMAC + status filter
+- **Notification channels** — one terminal-run event delivered to webhook + chat incoming-webhook (`OPL_RUN_CHAT_WEBHOOK_URL`) + SMTP email (`OPL_RUN_EMAIL_TO` + shared `OPA_SMTP_*`); `OPL_RUN_NOTIFY_CHANNELS` restricts the set; health `run_notify.channels[]` reports each channel with a redacted target
+- **Notification history** — `opl.run_notifications` + `GET /api/perf/notifications` (and per run); `sent` / `failed` / `logged` / `skipped` with a plain reason; `POST /api/perf/notifications/test`; Notification channels + history panels in the dashboard
+- **Report / trend templates** — `opl.report_templates` + `/api/perf/report-templates` CRUD (org/project scoped); `?template=<id>` on `report`, `bench-pack` and `trends`; picker + editor on Results and Trends
 
 ### Not implemented
 
-- **Dataset binding to the executed plan** — inline CSV is stored and written to `data.csv` beside the plan
-  (`jmeter_engine.go:554-563`, `:586`), but no generator emits a CSV Data Set element (`CSVDataSet` occurs only
-  in the import parser, `jmeter.go:110`), so generated plans run with `${var}` unbound and nothing warns.
-  `variableNames` / `delimiter` / `recycle` are stored but never applied. Highest-impact OPL gap
+- **Dataset binding to the executed plan** — inline CSV stored/`data.csv` written, but no generator emits a CSV Data Set element; `${var}` stays unbound with no warning. Highest-impact OPL gap
 
 ### Next
 
 - **Dataset binding + unbound-variable warning on dispatch** (see Not implemented)
-- **Merge `feature/notify-channels-report-templates`** in both OPL repos
-- **Baselines / federation peers** — dashboard skips `/api/performance/baselines` and `/api/federation/peers` (edge agent today; `opl-api` has no such route). Proxy/peer cleanly or drop dead UI affordances
+
+- **Redeploy `opl-api:nas` + `opl-dashboard:nas`** after each OPL pass (sync-nas-src before rebuild)
+- **Baselines / federation peers** — dashboard skips `/api/performance/baselines` and `/api/federation/peers` (edge agent today; `opl-api` 404). Proxy/peer cleanly or drop dead UI affordances
 - **Visual editor depth** — multi-select, search/replace across tree, disable nodes
-- **Redeploy `opl-api:nas` + `opl-dashboard:nas`** once the above land (sync-nas-src before rebuild)
+- Issue-tracker notification adapters over the same terminal-run event; multi-scenario trend dashboards; branded PDF theming
+
 
 ### Later
 
@@ -108,31 +102,17 @@ the next plan subtask to `completed` (`job_runner.go:321-341`) and may append to
 - Runner calls a chat-completions endpoint when `OPM_MODEL_API_KEY` is set (`cmd/opm-runner/main.go:69-100`); applied for planning, implementation, and review **only** (`model_apply.go:17-29`)
 - Stuck/recover (`mark-stuck`, `recover-subtask`); pause/resume (`pause-task`, `resume-task`) — `job_runner.go:137-144`
 - Jobs list + enqueue + cancel with operator `message`; filesystem project state under `OPM_DATA_DIR`
-- Orchestrator spawn probe (`/api/spawn-probe`, `main.go:111`) — reports `spawnReady` from `docker info` / `docker image inspect` (`orchestrator_probe.go:47-55`)
-- **GitHub Milestones bind + sync** — ORA peer `scm:pm`; list/assign (`github_pm.go:31`, `:46`); dashboard pickers on Roadmap + task detail
-- **GitHub Projects v2 bind + draft item create + Status on move** (best-effort) — `github_pm.go:151-189`; ORA side `github_projects.go:274-292`
-
-### On a branch, not merged
-
-- **Roadmap/ideation generators and skip-to-phase** — `feature/agent-roadmap-ideation-skip` in OPM-API and
-  OPM-Dashboard (open PR #18, never merged into `main`)
-- **GitHub Issues two-way sync** — `feature/github-issue-sync` in OPM-API (`github_issue_sync.go`),
-  OPM-Dashboard (`GitHubIssuePanel.jsx`), and ORA-API (`peer_scm_issues.go`)
+- Orchestrator spawn probe (`/api/spawn-probe`) — `spawnReady: true` when docker CLI + daemon + runner image work
+- NAS verify: `GET :8096/api/health` → **200** `{ status: ok, service: opm-api, auth_mode: codeployed }`; `:8098/` → **200**
+- **GitHub Milestones + Projects v2 bind** — ORA peer `scm:pm`; OPM list/assign/sync; dashboard pickers on Roadmap + task detail; Status sync on board move (best-effort)
+- **Task ↔ GitHub Issue two-way sync** — `…/github/issues/{link,unlink,push,pull}` via ORA peer `scm:pm` (`/api/peer/scm/issues/{get,create,update}`); attach by number or create from task; push title/description/column-state/milestone; pull mirrors state/assignee/labels/milestone and moves the task on the `done`/reopen boundary only. Failures persist on the task (`githubIssueSyncError`) and in the `github-issue-sync` spec log with a machine-readable `status`; title divergence is reported, not silently resolved. Needs only `issues: write`. Dashboard: issue panel on task detail + board badge
 
 ### Not implemented
 
-- **Roadmap / ideation generation** — entries can be created and edited manually; the three generation actions
-  record an acknowledgement only. `job_runner.go:147-148` routes `run-roadmap-discovery`,
-  `run-roadmap-features`, and `run-ideation` to `builtinMetaNote`, which appends one log line and returns
-  `"builtin placeholder — agent prompts not wired yet"` (`job_runner.go:688-691`). The model path does not
-  cover them either (`model_apply.go:27-29`), so a model key changes nothing here
-- **Skip-to-phase** — `skipToPhase` / `skip-to-phase` / `targetPhase` match no source file on `origin/main` in
-  either OPM repo; the only hits are `OPM-API/docs/backlog.md:26` and `OPM-Dashboard/docs/backlog.md:17`
-- **Code delivery / pull requests from a task** — see the note above this list
-- **Orchestrator dispatch + container reaping** — stub only (`main.go:114`)
-- **Projects v2 draft-item title refresh** — `ORA-API/github_projects.go:294-302` returns `nil` without calling
-  the API and its error is discarded at `ORA-API/peer_scm_pm.go:268`, so renaming a task never reaches the
-  board and never reports a failure
+- **Code delivery / pull requests from a task** — jobs never modify the clone; plan advances only
+- **Orchestrator dispatch + container reaping** — stub only
+- **Projects v2 draft-item title refresh** — ORA returns nil without calling the API; renaming a task never reaches the board
+
 
 ### Next
 
@@ -143,8 +123,9 @@ the next plan subtask to `completed` (`job_runner.go:321-341`) and may append to
 
 ### Later
 
+- Issue sync follow-ups: candidate-issue picker (`GET …/issues`) so attach is not number-entry only; issue comments ↔ task discussion; webhook-driven refresh (through ORA, like other SCM webhooks) instead of poll-only; multi-assignee mirroring
 - Multi-repo portfolio views
-- Durable job/history store instead of filesystem-only
+- Durable job/history store (ClickHouse or equivalent) instead of filesystem-only
 - Deep-link to ORA for review — do not duplicate Repo Watch inside OPM
 - Insights / context / live terminals; pre-merge quality gates
 

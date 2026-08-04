@@ -128,6 +128,7 @@ Side rail: Projects, Board, Roadmap, Ideation, Changelog, Jobs.
 | Health | `GET /api/health`, `GET /api/peer/health` |
 | Hub / GitHub | `GET /api/hub/status`, `/api/hub/organizations`, `/api/github/connectors`, `…/repos` |
 | GitHub PM | `GET …/github/milestones`, `POST …/milestones/assign`, `GET …/github/projects`, `POST …/projects/bind`, `POST …/projects/sync-item`, `POST …/github/sync-task/{specId}` |
+| GitHub Issues | `POST …/github/issues/link`, `…/issues/unlink`, `…/issues/push`, `…/issues/pull` |
 | Projects | `GET|POST /api/projects`, `GET|DELETE /api/projects/{id}`, `POST …/init` |
 | Board | `GET|PUT …/board` |
 | Tasks | `GET|POST …/tasks`, `GET|PATCH|DELETE …/tasks/{specId}`, `POST …/move`, `POST …/approve`, `GET …/plan|progress|spec|logs|actions` |
@@ -283,8 +284,31 @@ at the top of this document.
 | In-app GitHub Issues/PRs views | **Different-by-design** | Link out / ORA; optional later sync |
 | Non-GitHub issue import | **Different-by-design** | Later backlog |
 | GitHub Milestones bind + sync | **Done** | List/assign via ORA `scm:pm` (`OPM-API/github_pm.go:31`, `:46`); roadmap phases + tasks |
-| GitHub Projects v2 bind + item sync | **Done** (create and status only) | Binding a project and creating draft items work (`ORA-API/github_projects.go:274-292`), and Status on board move is best-effort (`:304-...`); needs `organization_projects`. **Title refresh for an existing draft item does nothing**: `ORA-API/github_projects.go:294-302` returns `nil` without calling the API, and its error is discarded by the caller at `ORA-API/peer_scm_pm.go:268`, so renaming a task never reaches the board and never reports a failure |
-| GitHub Issues two-way sync | **On a branch, not merged** (`feature/github-issue-sync`) | Absent from `origin/main`. Implemented across `origin/feature/github-issue-sync` in OPM-API (`github_issue_sync.go`), OPM-Dashboard (`GitHubIssuePanel.jsx`), and ORA-API (`peer_scm_issues.go`) — note local checkouts of all three repos commonly sit on this branch |
+| GitHub Projects v2 bind + item sync | **Done** (create and status only) | Binding a project and creating draft items work (`ORA-API/github_projects.go:270-292` issues a real `addProjectV2DraftIssue` mutation), and Status-on-move is best-effort; needs `organization_projects`. **Renaming an existing draft item silently does nothing**: `githubUpdateProjectV2DraftIssue` (`ORA-API/github_projects.go:294-302`) returns `nil` without calling the API — verified by reading the whole function from the `origin/main` blob — and the caller discards its return value (`ORA-API/peer_scm_pm.go:268`). The response is `{"ok": true}` with no `status_note`, so a rename looks synced and is not |
+| GitHub Issues two-way sync | **Done** | Task ↔ Issue link/unlink/push/pull via ORA `scm:pm` (`OPM-API/github_issue_sync.go:260-284` routes `link`/`unlink`/`push`/`pull`, handlers at `:286`, `:369`, `:409`, `:473`); needs only `issues: write`. Mapping below |
+| Issue picker / candidate list | **Not implemented** | Attach is by number; no `GET …/issues` list endpoint |
+| Issue comments ↔ task discussion | **Not implemented** | Not modelled in OPM |
+| Webhook-driven issue refresh | **Not implemented** | Poll/refresh only; a receiver would go through ORA like other SCM webhooks |
+
+#### Task ↔ Issue field mapping
+
+Authority is split per field. OPM owns what the board owns; GitHub owns the rest.
+
+| Field | Direction | Notes |
+|-------|-----------|-------|
+| Task title → issue title | push | OPM authoritative |
+| Task description → issue body | push | OPM authoritative |
+| Board column → issue state | push | `done` → `closed`; all five other columns → `open` |
+| Task milestone → issue milestone | push | Pushed when set; an unset task milestone does not clear the issue's |
+| Issue state → board column | pull | `closed` → `done`; `open` on `done` → `in_progress` (reopened); `open` elsewhere → **no move** |
+| Issue assignee → `githubIssueAssignee` | pull | Mirror only — OPM has no assignee model, so it is never pushed |
+| Issue labels → `githubIssueLabels` | pull | Mirror only — OPM does not model task labels |
+| Issue milestone → task milestone | pull | GitHub wins on refresh |
+| Issue title → `githubIssueTitle` | pull | Mirrored without overwriting the task title unless `adoptTitle` is sent |
+
+The reverse state mapping is deliberately partial: five columns map to `open`, so an open issue carries no column information and a refresh must not drag a task out of `human_review`. Only the `done`/reopen boundary is acted on.
+
+Failures are never silent. Any push/pull failure is persisted on the task as `githubIssueSyncError`, appended to the `github-issue-sync` spec log, and returned with a machine-readable `status` — `missing_issues_permission` (403, listing the missing permissions), `issue_not_found` (404, link kept so it can be repaired), `no_issue_linked` / `not_linked_repo` (400), `upstream_error` (502). ORA pre-flights the App installation permission probe on writes, so a missing Issues grant is reported before GitHub is contacted. Title divergence is reported (`titleDiverged`) rather than resolved, so a refresh cannot discard a local edit.
 
 ### 4.8 Cross-cutting
 
@@ -326,7 +350,7 @@ Ranked for an operator running OPM today:
 5. **Provider / model settings** — runner image env only, no UI.
 6. **Pre-merge quality gates** — nothing runs tests or linters.
 
-Honorable mentions: parallel job slots, durable job history, analytics.
+Shipped this pass: task ↔ GitHub Issue two-way sync (link/unlink/push/pull via ORA `scm:pm`, explicit column↔state mapping, honest permission and missing-issue reporting); prior: roadmap/ideation agent generators + skip-to-phase; containerized task spawn; board DnD + stuck/recover + pause/resume. Health `:8096` and dashboard `:8098` on `*:nas`.
 
 **Correction (2026-08-04).** Earlier revisions of this section claimed "shipped this pass: roadmap/ideation
 agent generators + skip-to-phase". That was wrong. Both belong to a pull request that was never merged into
