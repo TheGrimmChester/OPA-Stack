@@ -258,6 +258,41 @@ curl -sf "http://127.0.0.1:18080/api/alerts/$ALERT_ID/history" \
 
 After SMTP is configured, repeat the test and expect `status=sent` (or `failed` if credentials/network are wrong).
 
+## Egress proxies (compose vs orchestrator)
+
+Two long-lived egress containers are expected on NAS — do **not** treat the orchestrator proxy as an open-family leftover:
+
+| Container | Owner | Purpose |
+|-----------|-------|---------|
+| `open_egress_proxy` | Compose project `open-family` (`open-egress-proxy` service) | Stack-internal allowlist proxy (`*:nas` image only) |
+| `open-egress-proxy-<OPA_INSTANCE_ID>` (prod: `open-egress-proxy-nas-prod`) | Orchestrator (`opa.owner=opa-orchestrator`, `opa.role=egress-proxy`) | Shared job-sandbox proxy; ORA attaches it to `opa-egress-<instance>` and per-job `opa-job-*` networks with DNS alias `open-egress-proxy` |
+
+### Safe orphan cleanup
+
+Inspect before deleting:
+
+```bash
+docker ps -a --filter name=egress --format \
+  '{{.Names}}\tproject={{.Label "com.docker.compose.project"}}\toneoff={{.Label "com.docker.compose.oneoff"}}\towner={{.Label "opa.owner"}}\trole={{.Label "opa.role"}}'
+```
+
+**Remove only when clearly stale:**
+
+- `egress-connect-probe` (or similar) with `com.docker.compose.oneoff=True` — leftover from `docker compose run`
+- Pre-rename `opa-egress-proxy-<instance>` once `open-egress-proxy-<instance>` is healthy and in use
+- Empty `opa-job-*` networks that only still list the shared orchestrator proxy (disconnect proxy, then `docker network rm`)
+
+**Keep** `open_egress_proxy` and `open-egress-proxy-<instance>`. If unsure, leave the container and document it — do not delete production unknowns. Never recreate NAS services with `*:smoke` tags.
+
+### Post-cleanup checks
+
+```bash
+docker exec open_egress_proxy wget -qO- http://127.0.0.1:3128/healthz
+# CONNECT to a non-allowlisted host must 403, e.g.:
+# curl -x http://open_egress_proxy:3128 https://example.com/  → CONNECT tunnel failed, response 403
+cd /mnt/Apps/config-docker/open-stack && docker compose -p open-family ps
+```
+
 ## Rollback
 
 1. `docker compose -p open-family down` (does **not** remove the external ClickHouse volume).
