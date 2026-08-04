@@ -35,7 +35,7 @@ CMD ["sleep", "infinity"]
 
 FROM debian:bookworm-slim AS opm-api
 RUN apt-get update \
- && apt-get install -y --no-install-recommends ca-certificates wget \
+ && apt-get install -y --no-install-recommends ca-certificates git wget \
  && rm -rf /var/lib/apt/lists/*
 WORKDIR /root/
 COPY --from=builder /out/opm-api /usr/local/bin/opm-api
