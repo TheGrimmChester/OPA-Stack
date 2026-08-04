@@ -17,8 +17,8 @@ nav:
   - Architecture: architecture.md
   - Products: products.md
   - OPL + OPM backlog: opl-opm-backlog.md
-  - OctoPerf → OPL parity: opl-octoperf-parity.md
-  - OPM ↔ AutoCursor parity: opm-autocursor-parity.md
+  - OPL load lab capabilities: opl-lab-capabilities.md
+  - OPM project manager capabilities: opm-pm-capabilities.md
   - Modules: modules.md
   - Interop: interop.md
   - Security tenant scopes: security-tenant-scopes.md

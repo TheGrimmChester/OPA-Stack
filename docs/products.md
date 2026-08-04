@@ -54,7 +54,7 @@ Dashboard **Test** on an alert rule calls hub `POST /api/alerts/{id}`. The hub q
 
 See [opl-opm-backlog.md](opl-opm-backlog.md) for Done / Next / Later. Short version still open: Agent-owned baselines/federation peers, scenario delete, runner live status, K8s runner, gateway peel.
 
-For feature-by-feature mapping against OctoPerf (sibling implementation guide), see [opl-octoperf-parity.md](opl-octoperf-parity.md) — includes the flagship **JMeter Visual test case editor** gap.
+For the load-lab capability inventory (sibling implementation guide), see [opl-lab-capabilities.md](opl-lab-capabilities.md) — includes the flagship **JMeter Visual test case editor** gap.
 
 ## Image tags
 
@@ -74,7 +74,8 @@ Removed endpoints are absent (normal HTTP 404). Do not ship redirects, dual path
 ## Related docs
 
 - [OPL + OPM remaining backlog](opl-opm-backlog.md) — Done / Next / Later for Perf Lab and Project Manager
-- [OctoPerf → OPL parity](opl-octoperf-parity.md) — Done / Code-ready / Missing / Different-by-design
+- [OPL load lab capabilities](opl-lab-capabilities.md) — Done / Code-ready / Missing / Different-by-design
+- [OPM project manager capabilities](opm-pm-capabilities.md) — Done / Missing / Different-by-design
 - [Modules catalog](modules.md)
 - [Interop, auth modes, and ClickHouse databases](interop.md)
 - [NAS production deploy](nas-deploy.md) — compose project `open-family`, path `/mnt/Apps/config-docker/open-stack`, images `*:nas` only
