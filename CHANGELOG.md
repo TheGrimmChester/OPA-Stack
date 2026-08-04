@@ -3,6 +3,7 @@
 ## [Unreleased]
 
 ### Added
+- OPL terminal-run notification channels in compose: `OPL_RUN_NOTIFY_CHANNELS`, `OPL_RUN_CHAT_WEBHOOK_URL`, `OPL_RUN_EMAIL_TO` / `OPL_RUN_EMAIL_FROM` and the shared `OPA_SMTP_*` relay block passed through to `opl-api` (values stay in `.env`, never in git).
 - Waves 17–27 API smoke suite (`harness/wave-smoke.sh`, `harness/lib/smoke-common.sh`, fixtures) and compose profile `wave-smoke`.
 - `harness/rebuild-smoke-images.sh` to build `opa-agent:smoke` / `opa-dashboard:smoke` from sibling repos and recreate agent/dashboard.
 - Compose agent env for cloud monitor fixture, network sampler, region, and required tags (demo-safe).
