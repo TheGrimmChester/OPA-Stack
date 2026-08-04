@@ -29,7 +29,7 @@ One ClickHouse server can host all products. Each service sets its own database:
 
 ## Service-to-service
 
-Caller sets `PEER_{OPA|ORA|OSA|OPL|OPM}_URL` and mints a **service JWT** with `OPEN_SERVICE_JWT_SECRET` (prefer distinct from user `JWT_SECRET`):
+Caller sets `PEER_{OPA|ORA|OSA|OPL|OPM}_URL` and mints a **service JWT** with `OPEN_SERVICE_JWT_SECRET`. Prefer a secret **distinct from** user `JWT_SECRET`. On NAS (`compose.nas.yaml`), `OPEN_SERVICE_JWT_SECRET` is required in `.env` and is not substituted from `JWT_SECRET`.
 
 - Claims: `iss`, `aud`, `sub=service`, `scope`, short `exp`, optional `org_id`
 - Callee rejects bad `aud` / unknown `iss` / missing scope
