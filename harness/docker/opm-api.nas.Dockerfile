@@ -1,5 +1,6 @@
 # Family-root build for opm-api:nas
 #   docker build -f OPA-Stack/harness/docker/opm-api.nas.Dockerfile -t opm-api:nas --target opm-api .
+# Default final stage is opm-api (not the runner) so bare `docker build -t opm-api:nas` is safe.
 FROM golang:1.22-alpine AS builder
 RUN apk --no-cache add git ca-certificates
 WORKDIR /src
@@ -18,6 +19,14 @@ RUN sed -i \
   && go mod download \
   && CGO_ENABLED=0 GOOS=linux go build -o /out/opm-api .
 
+FROM debian:bookworm-slim AS opm-runner-task
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends ca-certificates \
+ && rm -rf /var/lib/apt/lists/*
+USER 65532:65532
+WORKDIR /home/opm
+CMD ["sleep", "infinity"]
+
 FROM debian:bookworm-slim AS opm-api
 RUN apt-get update \
  && apt-get install -y --no-install-recommends ca-certificates wget \
@@ -28,11 +37,3 @@ ENV LISTEN_ADDR=:8096 \
     OPM_RUNNER_TAG=nas
 EXPOSE 8096
 CMD ["opm-api"]
-
-FROM debian:bookworm-slim AS opm-runner-task
-RUN apt-get update \
- && apt-get install -y --no-install-recommends ca-certificates \
- && rm -rf /var/lib/apt/lists/*
-USER 65532:65532
-WORKDIR /home/opm
-CMD ["sleep", "infinity"]
