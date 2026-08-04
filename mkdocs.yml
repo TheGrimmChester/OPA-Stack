@@ -16,6 +16,7 @@ nav:
   - Home: index.md
   - Architecture: architecture.md
   - Products: products.md
+  - OPL + OPM backlog: opl-opm-backlog.md
   - Modules: modules.md
   - Interop: interop.md
   - NAS deploy: nas-deploy.md
