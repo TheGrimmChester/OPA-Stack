@@ -119,29 +119,16 @@ Ranked for a team that **designs HTTP/API load tests, runs them in lab, gates CI
 
 | Rank | Gap | Why it hurts a lab | Sibling hint |
 |------|-----|--------------------|--------------|
-<<<<<<< HEAD
-| 1 | Arrivals-accurate **curve** / multi-profile | ThreadGroup approximation ≠ realistic arrivals | Honesty-preserving injector path |
-| 2 | Full **trend** report builder | Sparklines exist; no widget/template builder | CH + Trend tab widgets |
-| 3 | **PDF / bench pack** | Shareable offline artifacts incomplete | HTML/PDF from `/report` |
-| 4 | Distributed **scheduler** | In-process tick is single-host only | Orchestrator cron fan-out |
-| 5 | CI/CD **wizards** | Script/harness only slows adoption | Snippets in dashboard |
-| 6 | ModuleController path fidelity | Link expands inline; not JMeter ModuleController | Optional ModuleController emit |
-| 7 | **Variables** store (secret/counter/random) | Parameterization still thin | Variable store + secret refs |
-| 8 | Rendezvous / throughput / JSR223 (gated) | Exotic controllers still missing | Extend VU DSL carefully |
-| 9 | Workspace collaboration polish | Multi-project hygiene | Tags, cross-project copy |
-| 10 | Multi-channel notify (email/Slack beyond webhook) | Webhook Done; ops often want chat/email | Channel adapters |
-=======
 | 1 | Distributed **scheduler** | In-process tick is single-host only | Orchestrator cron fan-out |
 | 2 | CI/CD **wizards** | Script/harness only slows adoption | Snippets in dashboard |
 | 3 | ModuleController path fidelity | Link expands inline; not JMeter ModuleController | Optional ModuleController emit |
 | 4 | **Variables** store (secret/counter/random) | Parameterization still thin | Variable store + secret refs |
 | 5 | Rendezvous / queue / JSR223 (gated) | Exotic controllers still missing | Extend VU DSL carefully |
 | 6 | Workspace collaboration polish | Multi-project hygiene | Tags, cross-project copy |
-| 7 | Richer notify channels | Webhook / none | Email / chat adapters |
+| 7 | Richer notify channels | Webhook Done; ops often want chat/email | Email / chat adapters |
 | 8 | Trend/report **templates** | Packs/widgets may exist; no saved layouts | Persist templates |
 | 9 | Geo / multi-host injectors | Single-host Docker only | Federation ≠ public regions |
 | 10 | Multi-profile campaigns | One scenario → one journey | Campaign / profiles array |
->>>>>>> origin/main
 
 **Honorable mentions (high effort or owned elsewhere):** Playwright/WebDriver VUs; geo cloud locations; infrastructure monitors (use OPA); MCP server.
 
