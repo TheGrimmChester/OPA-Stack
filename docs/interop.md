@@ -10,7 +10,53 @@ Products are **optional peers**. No hard dependency at boot. An empty peer URL d
 | **Co-deployed** | Shared `JWT_SECRET`; **OPA-Hub** issues user JWTs; ORA/OSA/OPL/OPM validate | `AUTH_MODE=codeployed`, or set `PEER_OPA_URL` to the hub |
 | **CI** | Product tokens (not `JWT_SECRET`) | Pipeline secrets |
 
-Headers: `Authorization: Bearer <user-jwt>`, `X-Organization-ID`, `X-Project-ID`.
+Headers: `Authorization: Bearer <user-jwt>`, **`X-Organization-ID`**, **`X-Project-ID`**.
+
+### Tenant headers (required when auth is on)
+
+When `OPA_AUTH_REQUIRED=1` (NAS default on hub + ORA/OSA/OPL/OPM), Open-Tenant scopes ClickHouse list queries to the org/project in those headers. **Omit either header and many list endpoints still return HTTP 200 with an empty array** — not `401`/`403`. That looks like “no data” even when ClickHouse has rows for `default-org` / `default-project`.
+
+Always send both headers with the hub JWT. Canonical names (case-insensitive): `X-Organization-ID`, `X-Project-ID`. Query fallbacks `organization_id` / `project_id` work the same. The `"all"` picker marker is stripped under auth and does not widen scope.
+
+Verified empty-without / populated-with on NAS (`192.168.100.101`; use `127.0.0.1` when curling on the host):
+
+| Product | Port | List path | Without headers | With `default-org` / `default-project` |
+|---------|------|-----------|-----------------|----------------------------------------|
+| OSA | `8093` | `GET /api/security/runs` | `{"runs":[]}` | runs present |
+| OSA | `8093` | `GET /api/security/secrets` | `{"findings":[]}` | findings present |
+| OPL | `8092` | `GET /api/perf/scenarios` | `{"scenarios":[]}` | scenarios present |
+| OPL | `8092` | `GET /api/perf/runs` | `{"runs":[]}` | runs present |
+
+Some ORA admin/SCM surfaces still return broader lists when headers are missing (honesty text may say tenant All). Prefer sending headers anyway so dashboards and scripts match the scoped tenant.
+
+```bash
+# On NAS host — or replace 127.0.0.1 with 192.168.100.101 from the LAN
+TOKEN=$(curl -sf -X POST http://127.0.0.1:18080/api/auth/login \
+  -H 'Content-Type: application/json' \
+  -d '{"username":"admin","password":"admin"}' | jq -r .token)
+
+# Empty without tenant headers (auth on)
+curl -sf "http://127.0.0.1:8093/api/security/runs?limit=5" \
+  -H "Authorization: Bearer $TOKEN" | jq '.runs | length'   # → 0
+
+# Populated with tenant headers
+curl -sf "http://127.0.0.1:8093/api/security/runs?limit=5" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "X-Organization-ID: default-org" \
+  -H "X-Project-ID: default-project" | jq '.runs | length'   # → >0 when CH has rows
+
+curl -sf "http://127.0.0.1:8092/api/perf/scenarios" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "X-Organization-ID: default-org" \
+  -H "X-Project-ID: default-project" | jq '.scenarios | length'
+
+curl -sf "http://127.0.0.1:8092/api/perf/runs?limit=5" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "X-Organization-ID: default-org" \
+  -H "X-Project-ID: default-project" | jq '.runs | length'
+```
+
+Product docs: [OSA api](https://github.com/TheGrimmChester/OSA-API/blob/main/docs/api.md), [OPL interop](https://github.com/TheGrimmChester/OPL-API/blob/main/docs/interop.md), [ORA interop](https://github.com/TheGrimmChester/ORA-API/blob/main/docs/interop.md), [OPM security](https://github.com/TheGrimmChester/OPM-API/blob/main/docs/security.md).
 
 ### Co-deployed browser login (`/hub-auth`)
 
@@ -96,7 +142,7 @@ NAS/open-family already sets `PEER_OPA_URL` and `PEER_ORA_URL` on `opm-api` and 
 
 `GET /api/security/runs` on `osa-api` applies a **server-side `limit` clamp of 200** (default `50`). Requests like `?limit=500` still return at most 200 rows; there is no offset/cursor pagination and no `total` in the JSON. This is intentional — not a ClickHouse or rewrite bug. The dashboard requests `limit=50` for the “Past runs” panel.
 
-Verify on NAS (hub JWT + tenant headers; row counts are per org/project, not global):
+Verify on NAS (hub JWT + tenant headers; row counts are per org/project, not global). Omit the tenant headers and this returns `0` even when ClickHouse has rows — see [Tenant headers](#tenant-headers-required-when-auth-is-on).
 
 ```bash
 TOKEN=$(curl -sf -X POST http://127.0.0.1:18080/api/auth/login \
@@ -105,8 +151,8 @@ TOKEN=$(curl -sf -X POST http://127.0.0.1:18080/api/auth/login \
 # ClickHouse total (all tenants): curl -sf 'http://127.0.0.1:8123/?query=SELECT%20count()%20FROM%20osa.security_runs'
 curl -sf "http://127.0.0.1:8093/api/security/runs?limit=500" \
   -H "Authorization: Bearer $TOKEN" \
-  -H "X-Organization-Id: default-org" \
-  -H "X-Project-Id: default-project" | jq '.runs | length'   # max 200
+  -H "X-Organization-ID: default-org" \
+  -H "X-Project-ID: default-project" | jq '.runs | length'   # max 200
 ```
 
 See [OSA-API api.md](https://github.com/TheGrimmChester/OSA-API/blob/main/docs/api.md) for param details.
