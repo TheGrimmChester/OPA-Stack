@@ -30,13 +30,16 @@ Ports: API `8092`, dashboard `8095`. Control plane: `opl-api` + `opl-orchestrato
 - **PDF / HTML report + bench pack ZIP** — `report?format=html|pdf`, `GET .../bench-pack`
 - **Trends tab widgets** — latency band, error bars, best/worst/SLA KPIs; `GET .../scenarios/{id}/trends`
 - **Terminal-run notifications** — webhook on terminal status (`OPL_RUN_WEBHOOK_URL`); health `run_notify`; optional HMAC + status filter
+- **Notification channels** — one terminal-run event delivered to webhook + chat incoming-webhook (`OPL_RUN_CHAT_WEBHOOK_URL`) + SMTP email (`OPL_RUN_EMAIL_TO` + shared `OPA_SMTP_*`); `OPL_RUN_NOTIFY_CHANNELS` restricts the set; health `run_notify.channels[]` reports each channel with a redacted target
+- **Notification history** — `opl.run_notifications` + `GET /api/perf/notifications` (and per run); `sent` / `failed` / `logged` / `skipped` with a plain reason; `POST /api/perf/notifications/test`; Notification channels + history panels in the dashboard
+- **Report / trend templates** — `opl.report_templates` + `/api/perf/report-templates` CRUD (org/project scoped); `?template=<id>` on `report`, `bench-pack` and `trends`; picker + editor on Results and Trends
 
 ### Next
 
-- **Redeploy `opl-api:nas` + `opl-dashboard:nas`** after PDF/trends + arrivals/notify (sync-nas-src before rebuild)
+- **Redeploy `opl-api:nas` + `opl-dashboard:nas`** after each OPL pass (sync-nas-src before rebuild)
 - **Baselines / federation peers** — dashboard skips `/api/performance/baselines` and `/api/federation/peers` (edge agent today; `opl-api` 404). Proxy/peer cleanly or drop dead UI affordances
 - **Visual editor depth** — multi-select, search/replace across tree, disable nodes
-- Richer notify channels; report/trend templates
+- Issue-tracker notification adapters over the same terminal-run event; multi-scenario trend dashboards; branded PDF theming
 
 ### Later
 
