@@ -29,7 +29,7 @@ This document describes the production Open-* stack on the TrueNAS host.
 | OPM API | `opm-api:nas` | `8096` |
 | OPM Dashboard | `opm-dashboard:nas` | `8098` |
 | Egress proxy | `open-egress-proxy:nas` | (internal) |
-| Collector | `opa-collector:nas` | host network → agent `:9090` |
+| Collector | `opa-collector:nas` (`open_collector`) | host network → agent ND-JSON `:9090` (not OTLP) |
 
 Orchestrators for ORA/OSA/OPL/OPM use the same API images with an `orchestrator` command. Runner images (`ora-runner-git:nas`, `osa-runner-scan:nas`, `opl-runner-jmeter:nas`, `opm-runner-task:nas`) are built for on-demand jobs and are not always-on services.
 
@@ -146,6 +146,7 @@ docker compose ps
 
 ```bash
 curl -sf http://127.0.0.1:18080/api/health   # hub
+curl -sf http://127.0.0.1:18081/api/health   # edge agent
 curl -sf http://127.0.0.1:8091/api/health    # ora
 curl -sf http://127.0.0.1:8093/api/health    # osa
 curl -sf http://127.0.0.1:8092/api/health    # opl
@@ -155,6 +156,24 @@ curl -sf -o /dev/null -w '%{http_code}\n' http://127.0.0.1:8089/
 curl -sf -o /dev/null -w '%{http_code}\n' http://127.0.0.1:8094/
 curl -sf -o /dev/null -w '%{http_code}\n' http://127.0.0.1:8095/
 curl -sf -o /dev/null -w '%{http_code}\n' http://127.0.0.1:8098/
+```
+
+### Host metrics collector (`open_collector`)
+
+`opa-collector` has **no HTTP health endpoint**. It scrapes `/proc`/`/sys` and ships **ND-JSON metric points** to the edge agent at `127.0.0.1:9090` (same TCP ingest as spans — not OTLP `:4317`/`:4318`). Verify:
+
+```bash
+docker inspect open_collector --format '{{.Config.Image}} {{.State.Status}} restarts={{.RestartCount}}'
+# expect: opa-collector:nas running restarts=0
+
+docker logs open_collector --tail 5
+# expect recurring: [DEBUG] sent N points  (no WARN/ERROR)
+
+TOKEN=$(curl -sf -X POST http://127.0.0.1:18080/api/auth/login \
+  -H 'Content-Type: application/json' \
+  -d '{"username":"admin","password":"admin"}' | jq -r .token)
+curl -sf -H "Authorization: Bearer $TOKEN" http://127.0.0.1:18080/api/infra/hosts | jq .
+# expect host truenas2012 with reporting=true and recent last_seen
 ```
 
 ### Hub dashboard routes (authenticated)
