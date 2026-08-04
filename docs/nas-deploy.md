@@ -48,7 +48,7 @@ CREATE DATABASE IF NOT EXISTS opl;
 
 Pre-split review/security/perf tables that still live under database `opa` are left in place. New ORA/OSA/OPL writes go to their own databases. No destructive table moves are performed by this stack rename.
 
-**ORA GitHub connectors:** legacy rows may exist only in `opa.connectors`. On boot, `ora-api:nas` backfills missing connector rows into `ora.connectors` so OPM peer clone-credentials survive restart. Check `ora-api` logs for `legacy backfill` after recreate; no manual SQL is required.
+**Legacy hub product tables:** before per-product databases, some ORA/OSA rows were written only to `opa.*`. On boot, `ora-api:nas` and `osa-api:nas` backfill missing rows into `ora.*` / `osa.*` when hub counts exceed product counts (connectors use row-level backfill; other tables use bulk `INSERT SELECT`). See [interop.md](interop.md#legacy-hub-opa-product-tables). After recreate, check API logs for `legacy backfill` / `table rows backfilled`; no manual SQL is required on new deploys.
 
 ## Networks
 
