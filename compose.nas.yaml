@@ -366,6 +366,7 @@ services:
     volumes:
       - opm_data:/data
       - opm_job_tmp:/tmp/opm-jobs
+      - /var/run/docker.sock:/var/run/docker.sock
     ports:
       - "8096:8096"
     networks:
