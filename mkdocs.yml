@@ -17,6 +17,7 @@ nav:
   - Architecture: architecture.md
   - Products: products.md
   - OPL + OPM backlog: opl-opm-backlog.md
+  - OctoPerf → OPL parity: opl-octoperf-parity.md
   - OPM ↔ AutoCursor parity: opm-autocursor-parity.md
   - Modules: modules.md
   - Interop: interop.md
