@@ -180,10 +180,19 @@ services:
       OPA_SCM_CRON: ${OPA_SCM_CRON:-1}
       OPA_GITLEAKS_CONFIG: /etc/opa/gitleaks.toml
       OPA_CONNECTOR_SECRET: ${JWT_SECRET}
+      # Sibling module sources for OPA Checkup. Family services pin shared
+      # libraries with go.mod filesystem replaces (../Open-Auth-Go); without
+      # this the isolated job checkout cannot compile and the check reports
+      # "could not run". Same path inside and out so job binds resolve.
+      OPA_CHECKUP_MODULE_SRC: ${OPA_CHECKUP_MODULE_SRC:-/mnt/Apps/config-docker/open-stack/src}
+      # How long the AppSec Gate waits for the OSA security run to finish.
+      OPA_GATE_WAIT_TIMEOUT_SEC: ${OPA_GATE_WAIT_TIMEOUT_SEC:-600}
     volumes:
       - ora_workspace:/workspace
       - /var/run/docker.sock:/var/run/docker.sock
       - /mnt/Apps/config-docker/open-stack/opa-jobs:/mnt/Apps/config-docker/open-stack/opa-jobs
+      # Read-only: Checkup copies replace targets into the job layout, never writes here.
+      - /mnt/Apps/config-docker/open-stack/src:/mnt/Apps/config-docker/open-stack/src:ro
       - ./secrets/github-app.private-key.pem:/run/secrets/github-app.private-key.pem:ro
     ports:
       - "8091:8091"
