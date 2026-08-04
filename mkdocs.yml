@@ -19,6 +19,7 @@ nav:
   - OPL + OPM backlog: opl-opm-backlog.md
   - Modules: modules.md
   - Interop: interop.md
+  - Security tenant scopes: security-tenant-scopes.md
   - NAS deploy: nas-deploy.md
   - Data model: data-model.md
   - Config reference: config-reference.md
