@@ -20,7 +20,7 @@ This document describes the production Open-* stack on the TrueNAS host.
 | OPA Hub | `opa-hub:nas` | `18080` → `8080` |
 | OPA edge agent | `opa-agent:nas` (`container_name: opa_agent`) | `18081` → `8080`, plus `9090`, `2112`, `8082` |
 | OPA Dashboard | `opa-dashboard:nas` | `8088` |
-| ORA API | `ora-api:nas` | `8091` (public: `https://ai-orchestrator.clouded.fr`) |
+| ORA API | `ora-api:nas` | `8091` (LAN); public base `ORA_PUBLIC_URL` / `OPA_PUBLIC_URL` — on this host `https://ai-orchestrator.clouded.fr` (legacy DNS name for **ora-api** webhooks and review callbacks; compose service `ora-api` in project `open-family`) |
 | ORA Dashboard | `ora-dashboard:nas` | `8089` |
 | OSA API | `osa-api:nas` | `8093` |
 | OSA Dashboard | `osa-dashboard:nas` | `8094` |
@@ -58,6 +58,10 @@ Pre-split review/security/perf tables that still live under database `opa` are l
 Co-deployed mode: shared `JWT_SECRET`, `AUTH_MODE=codeployed`, peers set `PEER_OPA_URL=http://hub:8080`. Hub issues user JWTs; product APIs validate them.
 
 OPM/OSA GitHub targets: `opm-api` and `osa-api` use `PEER_OPA_URL` (org directory) and `PEER_ORA_URL` (connectors / clone credentials). Configure GitHub App or PAT on **ora-api** (`OPA_GITHUB_APP_*`, `OPA_CONNECTOR_SECRET`). After image upgrades, redeploy `opa-hub`, `ora-api`, `opm-api`, `opm-dashboard`, `osa-api`, and `osa-dashboard` (`*:nas` tags only).
+
+### Public URLs (`ORA_PUBLIC_URL` / `OPA_PUBLIC_URL`)
+
+Compose sets both to the same public base used for GitHub App webhooks and review callbacks. On this NAS host that base is still `https://ai-orchestrator.clouded.fr` — a **legacy DNS name** that fronts **`ora-api`** (not a separate product). New installs should prefer an `ora-api.*` hostname when DNS is updated; until then keep the existing name so webhook deliveries continue. Do not point these variables at `opa-hub` or dashboard ports.
 
 ### GitHub App slug (`OPA_GITHUB_APP_SLUG`)
 
