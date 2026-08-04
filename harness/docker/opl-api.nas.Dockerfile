@@ -10,6 +10,7 @@ COPY Open-Job-Go /modules/Open-Job-Go
 COPY Open-Tenant-Go /modules/Open-Tenant-Go
 COPY Open-ClickHouse-Go /modules/Open-ClickHouse-Go
 COPY Open-HTTP-Go /modules/Open-HTTP-Go
+COPY Open-Logger-Go /modules/Open-Logger-Go
 COPY OPL-API/ /src/OPL-API/
 WORKDIR /src/OPL-API
 RUN sed -i \
@@ -18,6 +19,7 @@ RUN sed -i \
   -e 's|=> ../Open-Tenant-Go|=> /modules/Open-Tenant-Go|' \
   -e 's|=> ../Open-ClickHouse-Go|=> /modules/Open-ClickHouse-Go|' \
   -e 's|=> ../Open-HTTP-Go|=> /modules/Open-HTTP-Go|' \
+  -e 's|=> ../Open-Logger-Go|=> /modules/Open-Logger-Go|' \
   go.mod \
   && go mod download \
   && CGO_ENABLED=0 GOOS=linux go build -o /out/opl-api .
