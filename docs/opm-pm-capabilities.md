@@ -20,7 +20,7 @@ Companion product backlog: [opl-opm-backlog.md](opl-opm-backlog.md). Product bou
 |-----------|------------|
 | Delivery | Web dashboard + HTTP API + orchestrator/runners (not a desktop Electron app) |
 | Project identity | **GitHub `owner/repo`** via Hub orgs + ORA connectors (not local folder paths) |
-| Execution | Ephemeral tmp clone + **builtin** in-process executor that writes plan/spec/progress/review/changelog artifacts; containerized agent spawn still follow-on (`opm-runner-task:nas` placeholder) |
+| Execution | Ephemeral tmp clone + **builtin** in-process executor that writes plan/spec/progress/review/changelog artifacts; orchestrator spawn probe reports docker + `opm-runner-task:nas` readiness (`spawnReady` still false until real agent spawn) |
 | Auth | Co-deployed Hub JWT + tenant headers |
 | Review depth | Automated review column; **deep review owned by ORA** |
 | Multi-tenancy | Org-scoped projects (`X-Organization-ID`) |
@@ -100,7 +100,7 @@ Pluggable providers; per-phase model overrides; prompt packs (`CURSOR.md` or equ
 | Route | Page | Notes |
 |-------|------|-------|
 | `/` | Projects | Link GitHub repos via Hub orgs + ORA connectors |
-| `/board` | Board | CRUD + move; require-review; Plan/Build/Approve; task detail drawer (plan/progress/spec/logs); no DnD |
+| `/board` | Board | CRUD + **DnD** + task action menu; require-review; Plan/Build/Approve/Pause/Recover; task detail drawer |
 | `/roadmap` | Roadmap | Create / edit / delete phases and features |
 | `/ideation` | Ideation | Create / edit / delete; promote to task |
 | `/changelog` | Changelog | Read + generate job + edit/save (`PUT`) |
@@ -123,11 +123,11 @@ Side rail: Projects, Board, Roadmap, Ideation, Changelog, Jobs.
 
 ### 3.3 Job actions (dashboard + store)
 
-Enqueued from UI: `run-planning`, `run-implementation`, `run-review`, `run-qa-fix`, `run-roadmap-discovery`, `run-roadmap-features`, `run-ideation`, `generate-changelog`.
+Enqueued from UI: `run-planning`, `run-implementation`, `run-review`, `run-qa-fix`, `run-followup-planning`, `recover-subtask`, `mark-stuck`, `pause-task`, `resume-task`, `run-roadmap-discovery`, `run-roadmap-features`, `run-ideation`, `generate-changelog`.
 
 Store also maps `run-followup-planning` → planning state.
 
-**Execution today:** builtin in-process runner (`execution: "builtin"`) writes real `spec.md` / `implementation_plan.json` / `progress.json` / review + QA artifacts / changelog. Containerized agent spawn via orchestrator + `opm-runner-task:nas` remains follow-on (image still a placeholder). Default runner tag env `OPM_RUNNER_TAG` (prefer `nas` on NAS — never smoke).
+**Execution today:** builtin in-process runner (`execution: "builtin"`) writes real `spec.md` / `implementation_plan.json` / `progress.json` / review + QA artifacts / changelog. Orchestrator exposes `/api/spawn-probe` (docker CLI/daemon + runner image inspect); `spawnReady` remains false until containerized agent spawn is wired. Default runner tag env `OPM_RUNNER_TAG` (prefer `nas` on NAS — never smoke).
 
 ### 3.4 Data layout (`OPM_DATA_DIR`)
 
@@ -171,7 +171,7 @@ Legend: **Done** = OPM has usable equivalent · **Missing** = gap for implemente
 |------------|--------|-------|
 | Six-column kanban | **Done** | `review` column for automated review |
 | Create / edit / delete / move tasks | **Done** | Dashboard CRUD + move |
-| Drag-and-drop board | **Missing** | Button moves only |
+| Drag-and-drop board | **Done** | HTML5 DnD + action menu |
 | Require review before coding | **Done** | Create checkbox + gate after planning |
 | Approve-for-coding action | **Done** | `POST …/approve` + board/detail UI |
 | Task detail (overview/subtasks/logs/files) | **Done** (partial) | Drawer: overview / plan / spec / logs; files thin |
@@ -186,14 +186,14 @@ Legend: **Done** = OPM has usable equivalent · **Missing** = gap for implemente
 |------------|--------|-------|
 | Job list / enqueue / cancel | **Done** | `execution` + `message` fields |
 | Optional `specId` on enqueue | **Done** | Jobs page + board/detail |
-| Real runner container + model output | **Missing** | Builtin writes artifacts; container agent still missing |
-| Orchestrator spawn/reaper loop | **Missing** | Health stub only in binary |
+| Real runner container + model output | **Missing** | Builtin writes artifacts; spawn probe only |
+| Orchestrator spawn/reaper loop | **Partial** | Health + `/api/spawn-probe`; no reaper/spawn yet |
 | `run-planning` (multi-phase) | **Done** (builtin) | Writes `spec.md` + plan; moves for require-review |
 | `run-implementation` + subtask loop | **Done** (builtin) | One subtask per enqueue |
-| Retry / stuck / recover-subtask | **Missing** | |
+| Retry / stuck / recover-subtask | **Done** (builtin) | `mark-stuck`, `recover-subtask`; cancel marks stuck |
 | `run-review` / `run-qa-fix` loop | **Done** (builtin) | PASS/FAIL + `QA_FIX_REQUEST.md` |
-| `run-followup-planning` | **Missing** (UI) | Builtin supports action; Jobs picker incomplete |
-| Pause / resume / skip-to-phase | **Missing** | |
+| `run-followup-planning` | **Done** | Jobs picker + detail action |
+| Pause / resume / skip-to-phase | **Partial** | Pause/resume done; skip-to-phase missing |
 | Parallel multi-spec / runner slots | **Missing** | Container runtime model |
 | Autonomous multi-spec build workflow | **Missing** | Orchestrator workflow later |
 | Provider / model selection | **Missing** | Runner image env only |
@@ -251,13 +251,11 @@ Legend: **Done** = OPM has usable equivalent · **Missing** = gap for implemente
 
 ## 5. Suggested implementation order (for coding agents)
 
-1. **Containerized agent spawn** — orchestrator + `opm-runner-task:nas` with real model output (builtin already writes artifacts).
-2. **Stuck/recover + follow-up planning UI** — harden implementation loop.
-3. **Roadmap/ideation agents** — replace placeholder enqueue with real generators.
-4. **Board DnD** — drag-and-drop column moves.
-5. **Pause / resume / skip-to-phase** — interruptible pipelines.
-6. **ORA deep-links** — PR/review instead of in-app merge/discard.
-7. **Insights / context** — after core automation matures.
+1. **Containerized agent spawn** — wire `docker run` of `opm-runner-task:nas` (spawn probe already reports readiness).
+2. **Roadmap/ideation agents** — replace placeholder enqueue with real generators.
+3. **Skip-to-phase** — finish interruptible pipeline controls (pause/resume done).
+4. **ORA deep-links** — PR/review instead of in-app merge/discard.
+5. **Insights / context** — after core automation matures.
 
 ---
 
@@ -265,18 +263,18 @@ Legend: **Done** = OPM has usable equivalent · **Missing** = gap for implemente
 
 Ranked for an operator using OPM on NAS today:
 
-1. **Containerized agent runners** — builtin heuristics write artifacts; model-backed containers still missing.
-2. **Stuck / recover-subtask** — implementation loop needs failure recovery.
-3. **Roadmap / ideation agent quality** — discovery/features/typed ideation beyond placeholders.
-4. **Board drag-and-drop** — button moves only today.
-5. **Follow-up planning UI + pause/resume** — long-running automation controls.
-6. **Live terminals / richer job logs UI** — Jobs list is coarse.
-7. **Create-PR helpers via ORA** — prefer Hub/ORA over in-app merge.
-8. **Provider / model settings** — runner image env only.
-9. **Pre-merge quality gates** — tests/lint before done.
-10. **Insights / context pages** — after automation matures.
+1. **Containerized agent runners** — spawn probe shipped; model-backed `docker run` still missing.
+2. **Roadmap / ideation agent quality** — discovery/features/typed ideation beyond placeholders.
+3. **Skip-to-phase** — pause/resume done; skip still open.
+4. **Live terminals / richer job logs UI** — Jobs list is coarse.
+5. **Create-PR helpers via ORA** — prefer Hub/ORA over in-app merge.
+6. **Provider / model settings** — runner image env only.
+7. **Pre-merge quality gates** — tests/lint before done.
+8. **Insights / context pages** — after automation matures.
 
-Shipped this pass (NAS-verified builtin E2E): task detail (plan/progress/spec/logs), approve + require-review, planning → implementation → review → changelog generate/save, roadmap/ideation edit/delete.
+Shipped this pass: board DnD + task action menu; stuck/mark + recover-subtask; pause/resume; orchestrator spawn probe; docs matrix update.
+
+Prior pass (NAS-verified builtin E2E): task detail, approve + require-review, planning → implementation → review → changelog, roadmap/ideation edit/delete. Health `:8096` and dashboard `:8098` remain **200** on `*:nas`.
 
 Honorable mentions: parallel job slots, durable ClickHouse job history, analytics.
 
