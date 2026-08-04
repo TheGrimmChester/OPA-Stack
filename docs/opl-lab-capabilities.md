@@ -2,20 +2,33 @@
 
 Implementation guide for **sibling** work in [OPL-API](https://github.com/TheGrimmChester/OPL-API) and [OPL-Dashboard](https://github.com/TheGrimmChester/OPL-Dashboard). Inventories what **Open Perf Lab** ships today, what is still missing for a serious self-hosted load lab, and what OPL deliberately does differently from a commercial multi-cloud load grid.
 
-**Sources (2026-08-04):** OPL-API `docs/perf-lab.md`, `docs/jmeter-perf.md`, load-lab capability routes (`jmeter.go` / `load.go` / `lab_extras.go` / `postman.go`); OPL-Dashboard `PerfLab.jsx` / `VuTree.jsx` / `LoadCurveEditor.jsx`; OPA-Stack [opl-opm-backlog.md](opl-opm-backlog.md).
+**Sources (re-verified 2026-08-04):** OPL-API `origin/main` @ `51b4e87` (`jmeter.go` / `jmeter_engine.go` /
+`load.go` / `lab_extras.go` / `postman.go` / `report_export.go` / `run_notify.go`); OPL-Dashboard `origin/main`
+@ `487e2da` (`PerfLab.jsx` / `VuTree.jsx` / `LoadCurveEditor.jsx`); OPA-Stack
+[opl-opm-backlog.md](opl-opm-backlog.md).
 
-**NAS spot-check:** `http://192.168.100.101:8092/api/health` → `status=ok`, `service=opl-api`, `auth_mode=codeployed`; `:8095/` → HTTP 200 (OPL dashboard). Production images stay `*:nas` only — never deploy `*:smoke` to NAS. Rebuild after this pass with `sync-nas-src` then `rebuild-nas-images.sh` for `opl-api` / `opl-dashboard`.
+> **Deployment verification is not part of this pass.** `opl-api` `:8092` and `opl-dashboard` `:8095` answer
+> their health/index routes, but the API reports an unversioned build id (`perf-lab-dev`) with no commit
+> identity, and the capability routes need an operator token this pass does not hold. A behaviour observed on
+> the deployed stack therefore could not be attributed to `origin/main` anyway. Nothing below claims to be
+> verified on the deployed stack; every status is a source-code statement about `origin/main`.
+> Production images stay `*:nas` only — never deploy `*:smoke` to NAS.
 
 ---
 
 ## How to read this
 
+Three status states, plus one scope label:
+
 | Bucket | Meaning |
 |--------|---------|
-| **Done** | Usable today for a lab workflow (API + typically UI; present on NAS unless noted) |
-| **Code-ready** | Implemented on OPL-API `main` (load-lab capability routes / related), but missing Dashboard and/or NAS `:nas` roll-out |
-| **Missing** | Expected load-lab capability; OPL does not ship it yet — candidate sibling PRs |
-| **Different by design** | Related capability exists, but OPL’s model / honesty boundary differs |
+| **Done** | Present on `origin/main` and re-read at the file:line cited in Notes |
+| **On a branch, not merged** | Implemented on a named unmerged feature branch; absent from `origin/main` |
+| **Missing** | No implementation on `origin/main` or on any known branch |
+| **Different by design** | Deliberate scope decision, not a status |
+
+Where a capability is real but narrower than its name suggests, the Notes column states in one sentence what
+works and what does not.
 
 OPL is a **self-hosted load lab** next to OPA, not a SaaS multi-cloud load grid. Gaps ranked for **load-test lab user impact** (design → run → analyze → gate), not for matching enterprise multi-region packaging.
 
@@ -23,7 +36,7 @@ OPL is a **self-hosted load lab** next to OPA, not a SaaS multi-cloud load grid.
 
 **Aspirational destination:** hierarchical Virtual User tree (drag-and-drop actions, containers, logic, extractors) for building JMeter-compatible journeys **without editing raw JMX**.
 
-**OPL today (Done — deepening):** Design tab is a **VU tree** (HTTP, Transaction, If / While / Loop / ForEach, Fragment + Link, extract, assert) with inspector + HTML5 DnD reorder/nest. Saves nested `steps_json` → JMX hashTrees; import round-trips controllers when parseable. Fragments emit disabled GenericControllers; Link expands by name at JMX emit. HAR/JMX/Postman import remains the on-ramp. Still not full action-tree coverage (rendezvous / JSR223 / ModuleController path fidelity).
+**OPL today (Done — deepening):** Design tab is a **VU tree** (HTTP, Transaction, If / While / Loop / ForEach, Fragment + Link, extract, assert) with inspector + HTML5 DnD reorder/nest. Saves nested `steps_json` → JMX hashTrees; import round-trips controllers when parseable. Fragments emit disabled generic controllers; Link expands by name at JMX emit. Capture and plan-file import remain the on-ramp. Two honest limits: the action tree does not cover rendezvous, scripted samplers, or module-reference path fidelity; and **the tree cannot yet bind a dataset** — a `${var}` typed into a step is not fed by the CSV in the Users & data tab (see the first row of **Missing**).
 
 ---
 
@@ -34,38 +47,45 @@ OPL is a **self-hosted load lab** next to OPA, not a SaaS multi-cloud load grid.
 | Virtual users / HTTP journeys | Scenario CRUD via upsert; Design VU tree + flat step fallback | `OPL-API` `load.go`, `jmeter_engine.go`; Dashboard Design |
 | **JMeter Visual editor (MVP+)** | Nested VU tree → JMX; DnD reorder/nest; If/While/Loop/ForEach; Fragment + Link | `VuTree.jsx`; `appendStepJMXIndexed`; import tree parse |
 | HAR → scenario | `POST /api/perf/scenarios/import-har` (+ Capture UI) | Skips private/metadata hosts (URL policy) |
-| **Postman collection import** | `POST /api/perf/scenarios/import-postman` (+ Capture UI) | Collection v2/v2.1 → HTTP steps; `{{var}}` → `${var}`; scripts ignored |
-| JMeter JMX import / export | `import-jmx`, `export-jmx`, JMX tab; nested controllers when parseable | Best-effort HTTP / timers / extractors / CSV / classic TG + If/While/Loop/ForEach/Txn/Fragment |
+| **Collection import** | `POST /api/perf/scenarios/import-postman` (+ Capture UI) | `postman.go:15`; collection v2/v2.1 → HTTP steps; `{{var}}` → `${var}`; scripts ignored |
+| JMeter JMX import / export | `import-jmx`, `export-jmx`, JMX tab; nested controllers when parseable | `jmeter.go:22`, `:53`. Best-effort HTTP / timers / extractors / classic TG + If/While/Loop/ForEach/Txn/Fragment. CSV Data Set elements are **parsed on import** (`jmeter.go:110`) into scenario metadata, not re-emitted on generation |
 | XHR capture import | `import-xhr` / `export-xhr` | Lab-oriented capture interchange |
 | Soft-archive + **restore** | API + Dashboard (Show archived + restore) | Soft-delete; `POST .../unarchive`; list `?archived=1` |
 | Load policy presets | `GET /api/perf/load-policies` + Run & scale picker | smooth / sustained / stress / custom |
 | **Custom load curve** | `schedule.curve` + `curve_mode=vus\|arrivals` | Dashboard `LoadCurveEditor`; VU peak/ramp or arrivals open-model segments |
-| **Scheduler UX** | `POST .../schedule` + in-process tick + Run & scale panel | `every_minutes` / `daily_at` UTC; not distributed campaign scheduler |
+| **Scheduler UX** | `POST .../schedule` + in-process tick + Run & scale panel | `jmeter.go:67`; tick started at `main.go:30` → `lab_extras.go:283`. `every_minutes` / `daily_at` UTC; single-process, not a distributed campaign scheduler |
 | **Multi-run history + sparklines** | Scenario-scoped run table (≤25) + p95/error sparklines on Run & scale | Complements two-run Compare |
 | **Trend report widgets** | Trends tab: latency band (p50/p95/p99), error bars, best/worst/SLA breach KPIs; `GET .../scenarios/{id}/trends` | Beyond sparklines; not a full template builder |
 | **PDF / bench pack** | `report?format=html|pdf` + `bench-pack` ZIP (JSON+CSV+HTML+PDF) | Offline shareable pack from Results |
-| CSV / datasets | `datasets_json` → CSVDataSet in generated JMX | Inline CSV in Users & data tab |
+| CSV / datasets (**storage only — does not reach the run**) | Inline CSV is stored on the scenario and materialised beside the plan, but generated plans never read it | See the dedicated row in **Missing** below; details in `jmeter_engine.go:554-587` |
 | Extractors / assertions (basic) | Nested under HTTP in VU tree | Mirrored as JMX where supported |
 | **Validate triage + auto-correlation** | `validate` returns `triage[]` + `correlation_suggestions[]`; UI Apply extract | Token/CSRF/Bearer heuristics from body_preview |
 | Load profiles | `soak` / `spike` / `ramp` + presets | Run & scale tab |
-| Multi-worker scale (same host) | `workers` / `OPA_JMETER_WORKERS` → N Docker JMeter containers | Same `load_run_id`; not geo locations |
+| Multi-worker scale (same host) | `workers` / `OPA_JMETER_WORKERS` → N containers on the lab host | `perf_container.go:348-351`; VUs split at `jmeter_engine.go:552`. Same `load_run_id`; one host, not geo locations |
 | Run lifecycle | Create, dispatch, cancel, metrics ingest, status | `created` / `running` / `failed` / `cancelled` honesty |
-| SLA / pass criteria | Scenario `sla` + `GET .../runs/{id}/gate` (fail-closed) | SLA gates tab; CI harness in OPA-Stack |
-| k6 export | `GET .../runs/{id}/export-k6` | OPL adds k6 export alongside JMeter |
+| SLA / pass criteria | Scenario `sla` + `GET .../runs/{id}/gate` (fail-closed) | `jmeter.go:59`, verdict at `jmeter.go:651`; SLA gates tab; CI harness in OPA-Stack |
+| k6 script export | `GET .../runs/{id}/export-k6` | `load.go:450` → `handlePerfExportK6` at `load.go:557` |
 | Results KPIs + samples | Results tab; `summary_json` + step samples | Prefer JMeter aggregates over client-posted pass/fail |
 | Per-step stats / report / runners | Results tab wiring | `/steps`, `/report`, `/runners` |
 | **JTL import** | `POST /api/perf/runs/import-jtl` + Results UI upload | Offline analysis path |
 | Compare two runs | Compare tab (delta on KPIs) | Simpler than full trend report builder |
 | APM correlation | `X-OPA-Load-Run-Id` / baggage → OPA Trace Explorer | First-party OPL ↔ OPA correlation |
 | Tenant + hub auth | Org/project headers; co-deployed `/hub-auth/` | Hub JWT + org/project scopes |
-| CI gate scripts | `harness/perf-gate.sh`, `jmeter-perf-gate.sh`, workflow example | Wizards for Jenkins/GitLab/Azure not ported |
+| CI gate scripts | `harness/perf-gate.sh`, `harness/jmeter-perf-gate.sh`, workflow example | Scripts only; no per-CI-vendor setup wizards |
 | On-prem execution | Docker JMeter on the Perf Lab host | Lab host workers; not public cloud regions |
 
 ---
 
-## Code-ready (ship UI + `:nas`)
+## On a branch, not merged
 
-No remaining Code-ready items for PDF/trends — ship `:nas` rebuild after merge.
+| Capability | Branch | Notes |
+|------------|--------|-------|
+| Richer notify channels + notification history | `feature/notify-channels-report-templates` | `OPL-API/run_notify.go` (+452 lines), `run_notify_history.go`, and `OPL-Dashboard/src/components/NotifyChannels.jsx` exist on that branch in both repos; `origin/main` has webhook-only notification |
+| Saved report / trend templates | `feature/notify-channels-report-templates` | `OPL-API/report_templates.go` and `OPL-Dashboard/src/components/ReportTemplateBar.jsx` exist on that branch; `origin/main` has fixed report and trend layouts only |
+
+Local checkouts of OPL-API and OPL-Dashboard commonly sit on this branch — running it locally is not evidence
+that it shipped. The PDF / bench-pack / trends work **did** merge (`OPL-API` `origin/main` @ `51b4e87` is the
+merge commit for that branch) and is listed under **Done**.
 
 ---
 
@@ -73,21 +93,22 @@ No remaining Code-ready items for PDF/trends — ship `:nas` rebuild after merge
 
 | Capability | Why labs need it | OPL gap | Suggested sibling work |
 |------------|------------------|---------|------------------------|
-| Richer **action tree** (rendezvous/queue/JSR223…) | Nested logic beyond ForEach/fragments | Controllers + fragments Done; exotic later | ModuleController path fidelity; JSR223 gated |
-| **Playwright** / real-browser VUs | Browser journeys under load | Explicitly out of scope today | New runner image or hybrid engine — large |
-| **WebDriver** / Selenium record | Recorded browser flows | Absent | Later; overlap with Playwright |
-| **Variables** (secret, counter, random, file-backed CSV UX) | Safer, richer parameterization | Headers + inline CSV | Variable store + secret refs |
+| **Bind a dataset to the executed plan** | A parameterised test is the whole point of uploading a CSV | **Datasets never reach the running test.** `jmeter_engine.go:554-563` reads only `datasets_json.csv.inline` and writes it to `data.csv` next to `plan.jmx` (`:586`), but no plan generator emits a CSV Data Set element — `CSVDataSet` appears only in the *import* parser (`jmeter.go:110`, `:137`, `:176-180`) and nowhere in `jmeter_engine.go` or `jmeter_tree.go`. Generated plans therefore run with `${var}` unbound and **nothing warns**. The `variableNames`, `delimiter`, and `recycle` fields the dashboard collects (`PerfLab.jsx:1353-1381`) are stored and round-tripped by the importer only. One narrow exception: a scenario imported from a plan file keeps its original `jmx_xml` verbatim (`jmeter_engine.go:485`, `:542`), so a CSV element already present survives — but it still points at the original author's local path, not `data.csv` | Emit a CSV Data Set element referencing `data.csv` from the plan generators, honour `variableNames` / `delimiter` / `recycle`, and fail or warn on dispatch when a plan contains unbound `${var}` with no dataset bound |
+| Richer **action tree** (rendezvous / queue / scripted samplers) | Nested logic beyond ForEach/fragments | Controllers + fragments Done; exotic later | Module-reference path fidelity; scripted samplers stay gated |
+| **Real-browser virtual users** | Browser journeys under load | Explicitly out of scope today | New runner image or hybrid engine — large |
+| **Recorded browser flows** | Capture a UI journey directly | Absent | Later; overlaps with real-browser VUs |
+| **Variables** (secret, counter, random, file-backed CSV UX) | Safer, richer parameterization | Headers only — inline CSV is stored but never bound to the run (row 1) | Variable store + secret refs, on top of dataset binding |
 | **Multi-profile** scenarios (mix VUs / locations) | Mixed traffic shapes | One scenario → one journey | Multi-scenario campaign or profiles array |
 | **Geo / cloud locations** + IP ranges | Multi-region realism | Single-host Docker | Federation peers ≠ public regions (honesty) |
 | Distributed **campaign** scheduler | Multi-host cron orchestration | In-process tick only | Orchestrator job fan-out |
 | **Live reporting** sinks (external APM/metrics) | External ops sinks | ClickHouse + OPA only | Optional exporters |
-| **Notifications** (email, Slack, Teams, Jira, webhook) | Failures noticed outside dashboard | Optional webhook Done (`OPL_RUN_WEBHOOK_URL`); richer channels later | Keep webhook; add email/Teams later |
-| **Bench report** template builder | Custom widget layouts / branded PDF templates | HTML/PDF + ZIP pack Done; no template editor | Template UX later |
-| Full **trend** template builder | Saved trend dashboards / widgets | Trends tab widgets Done; no saved templates | Persist widget layouts |
+| **Notifications** beyond webhook (email, chat, issue tracker) | Failures noticed outside the dashboard | Webhook only on `origin/main` (`OPL_RUN_WEBHOOK_URL`, `run_notify.go`); richer channels are **on a branch, not merged** — see that section | Merge `feature/notify-channels-report-templates` |
+| **Bench report** template builder | Custom widget layouts / branded templates | Fixed HTML/PDF + ZIP pack on `origin/main`; template editor is **on a branch, not merged** | Merge `feature/notify-channels-report-templates` |
+| Full **trend** template builder | Saved trend dashboards / widgets | Fixed Trends widgets on `origin/main`; saved layouts are **on a branch, not merged** | Merge `feature/notify-channels-report-templates` |
 | **Infrastructure monitoring** during test | Host/DB health while load runs | Defer to **OPA** | Deep-link OPA infra; do not fork monitors into OPL |
 | **On-premise agent** install / capacity | Remote runner capacity | Docker only on lab host | K8s / remote runner backends (Later backlog) |
-| **MCP server** for agents | Agent tooling over the lab API | No OPL MCP | Optional thin MCP over OPL REST |
-| CI/CD **wizards** (Jenkins, GH Actions, GitLab, Azure, Maven) | Faster gate adoption | Script/harness only | Copy-paste snippets in dashboard |
+| **Tool-server interface** for agents | Agent tooling over the lab API | Absent | Optional thin tool server over the OPL REST API |
+| CI/CD **setup wizards** | Faster gate adoption | Script/harness only (`harness/perf-gate.sh`, `harness/jmeter-perf-gate.sh`) | Copy-paste snippets in dashboard |
 | Workspace **collaboration** polish (tags, copy across projects, markdown descriptions) | Multi-project hygiene | Tenant headers; limited metadata UX | Tags, cross-project copy |
 | **Pass criteria** tied to monitoring SLAs | Infra + load gates together | Load SLA only | Keep infra SLOs in OPA |
 | Plugin / marketplace fidelity | Exotic JMeter plugins | Hardened JMX subset | Stay fail-closed (`OPA_PERF_ALLOW_UNSAFE_JMX`) |
@@ -101,11 +122,11 @@ No remaining Code-ready items for PDF/trends — ship `:nas` rebuild after merge
 | Deployment | SaaS + on-prem enterprise | Self-hosted Open-* family; NAS `*:nas` only |
 | Scale story | Cloud regions, millions of VUs | Lab caps (`OPA_PERF_MAX_VUS` / duration); workers on one host; federation ≠ multi-cloud |
 | APM | Third-party APM header injection | First-party **OPA** correlation via `load_run_id` |
-| Engine surface | JMeter + Playwright hybrid | JMeter-first; k6 export; Playwright explicitly later |
+| Engine surface | Protocol + real-browser hybrid | JMeter-first; k6 script export; real-browser VUs explicitly later |
 | Monitoring | Built-in server/DB monitors | Observability is **OPA**; OPL owns load control plane |
 | Auth / tenancy | Workspaces, subscriptions, OAuth | Hub JWT + org/project scopes |
 | Honesty | Commercial grid marketing | Responses document local-sample / non-cloud limits |
-| Unsafe script samplers | JSR223 / plugins in product | Blocked unless `OPA_PERF_ALLOW_UNSAFE_JMX` |
+| Unsafe script samplers | Scripted samplers / plugins enabled in product | Blocked unless `OPA_PERF_ALLOW_UNSAFE_JMX` (`OPL-API/harden.go:98-108`) |
 | Product split | Monolithic perf platform | OPL scenarios/runs; OPA traces; ORA/OSA/OPM separate |
 | Soft-delete | Hard delete in UI | Soft-archive (`archived=1`) + restore (`unarchive`) |
 
@@ -117,18 +138,19 @@ Ranked for a team that **designs HTTP/API load tests, runs them in lab, gates CI
 
 | Rank | Gap | Why it hurts a lab | Sibling hint |
 |------|-----|--------------------|--------------|
-| 1 | Distributed **scheduler** | In-process tick is single-host only | Orchestrator cron fan-out |
-| 2 | CI/CD **wizards** | Script/harness only slows adoption | Snippets in dashboard |
-| 3 | ModuleController path fidelity | Link expands inline; not JMeter ModuleController | Optional ModuleController emit |
-| 4 | **Variables** store (secret/counter/random) | Parameterization still thin | Variable store + secret refs |
-| 5 | Rendezvous / queue / JSR223 (gated) | Exotic controllers still missing | Extend VU DSL carefully |
-| 6 | Workspace collaboration polish | Multi-project hygiene | Tags, cross-project copy |
-| 7 | Richer notify channels | Webhook Done; ops often want chat/email | Email / chat adapters |
-| 8 | Trend/report **templates** | Packs/widgets exist; no saved layouts | Persist templates |
-| 9 | Geo / multi-host injectors | Single-host Docker only | Federation ≠ public regions |
-| 10 | Multi-profile campaigns | One scenario → one journey | Campaign / profiles array |
+| 1 | **Dataset binding to the executed plan** | The Users & data tab accepts a CSV, the run silently ignores it, and `${var}` stays literal — a wrong result that looks like a passing one | Emit a CSV Data Set element from the generators; warn on unbound `${var}` |
+| 2 | Distributed **scheduler** | In-process tick is single-host only | Orchestrator cron fan-out |
+| 3 | CI/CD **setup wizards** | Script/harness only slows adoption | Snippets in dashboard |
+| 4 | Module-reference path fidelity | Link expands inline rather than as a module reference | Optional module-reference emit |
+| 5 | **Variables** store (secret/counter/random) | Parameterization is blocked behind gap 1 | Variable store + secret refs |
+| 6 | Rendezvous / queue / scripted samplers (gated) | Exotic controllers still missing | Extend VU DSL carefully |
+| 7 | Workspace collaboration polish | Multi-project hygiene | Tags, cross-project copy |
+| 8 | Richer notify channels | Written but unmerged — merge the branch | `feature/notify-channels-report-templates` |
+| 9 | Trend/report **templates** | Written but unmerged — merge the branch | `feature/notify-channels-report-templates` |
+| 10 | Geo / multi-host injectors + multi-profile campaigns | Single-host containers only; one scenario → one journey | Federation ≠ public regions; campaign / profiles array |
 
-**Honorable mentions (high effort or owned elsewhere):** Playwright/WebDriver VUs; geo cloud locations; infrastructure monitors (use OPA); MCP server.
+**Honorable mentions (high effort or owned elsewhere):** real-browser and recorded-flow VUs; geo cloud
+locations; infrastructure monitors (use OPA); agent tool server.
 
 ---
 
@@ -136,27 +158,32 @@ Ranked for a team that **designs HTTP/API load tests, runs them in lab, gates CI
 
 For **OPL-API / OPL-Dashboard** implementers working load lab capabilities:
 
-1. **Near-term:** Multi-profile campaigns; report/trend templates; richer notify channels.
-2. **Flagship track:** Keep JMeter-compatible VU tree as the design destination; HAR/JMX/Postman import remains the on-ramp.
-3. Keep **honesty strings** on run/list responses when adding fan-out, locations, or “cloud-like” UX.
-4. Do **not** reimplement infrastructure monitoring inside OPL — link OPA (`load_run_id`, infra hosts).
-5. NAS / production: rebuild and tag `opl-api:nas` / `opl-dashboard:nas` only; laptop smoke is fine locally. Always `sync-nas-src` before rebuild.
-6. Cross-check [opl-opm-backlog.md](opl-opm-backlog.md) when closing Next items so backlog and this inventory stay aligned.
+1. **First:** bind datasets to the executed plan, and warn when a plan has unbound `${var}` and no dataset.
+   A silently-ignored dataset produces a confident-looking result from the wrong test.
+2. **Then merge what is already written:** `feature/notify-channels-report-templates` carries notify channels
+   and report/trend templates in both OPL repos.
+3. **Flagship track:** keep the JMeter-compatible VU tree as the design destination; capture/plan-file import
+   remains the on-ramp.
+4. Keep **honesty strings** on run/list responses when adding fan-out, locations, or "cloud-like" UX.
+5. Do **not** reimplement infrastructure monitoring inside OPL — link OPA (`load_run_id`, infra hosts).
+6. NAS / production: rebuild and tag `opl-api:nas` / `opl-dashboard:nas` only; laptop smoke stays local.
+   Always `sync-nas-src` before rebuild.
+7. Cross-check [opl-opm-backlog.md](opl-opm-backlog.md) when closing Next items so backlog and this inventory
+   stay aligned.
 
-### Recently closed
+### Verified merged on `origin/main`
 
-- Arrivals-accurate load curve (`curve_mode=arrivals` open-model segments)
+- PDF / HTML report + ZIP bench pack (`report_export.go:143`, `:209`, `:330`; route at `load.go:478`)
+- Trends API + Trends tab widgets (`report_export.go:382`; `jmeter.go:69`; `TrendBandChart.jsx`, `TrendErrorBars.jsx`)
+- Terminal-run webhook (`run_notify.go`)
+- Arrivals-mode load curve (`curve_mode=arrivals` open-model segments, `jmeter_engine.go:502-541`)
 
 ### Next (this inventory)
 
-- Report/trend template persistence; ModuleController fidelity; variables store; CI wizards
-- Richer notify channels beyond webhook
+- Dataset binding + unbound-variable warning (**highest impact**)
+- Merge notify channels and report/trend templates from `feature/notify-channels-report-templates`
+- Module-reference fidelity; variables store; CI setup wizards
 - Distributed scheduler; geo honesty (federation ≠ cloud regions)
-
-### Recently closed (this pass)
-
-- PDF / HTML report + ZIP bench pack; Trends tab widgets + `/trends` API
-- Terminal-run webhook; arrivals-mode load curve (honesty-documented)
 
 ---
 

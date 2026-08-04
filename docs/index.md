@@ -5,8 +5,8 @@
 
 - [Products](products.md) — OPA · ORA · OSA · OPL · OPM (smoke/NAS ports, Alert Test → edge)
 - [OPL + OPM backlog](opl-opm-backlog.md) — Done / Next / Later for Perf Lab and Project Manager
-- [OPL load lab capabilities](opl-lab-capabilities.md) — Done / Code-ready / Missing / Different-by-design; flagship JMeter Visual editor gap
-- [OPM project manager capabilities](opm-pm-capabilities.md) — feature inventory for Open Project Manager
+- [OPL load lab capabilities](opl-lab-capabilities.md) — Done / On a branch, not merged / Missing / Different-by-design; flagship visual editor gap
+- [OPM project manager capabilities](opm-pm-capabilities.md) — status inventory for Open Project Manager (Done / On a branch, not merged / Not implemented)
 - [Modules catalog](modules.md) — shared `Open-*` libraries and images
 - [Interop](interop.md) — peer URLs, co-deployed `/hub-auth` login, service JWT scopes
 - [Security tenant scopes](security-tenant-scopes.md) — cross-product auth/org curl matrix (NAS)
