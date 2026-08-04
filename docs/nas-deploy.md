@@ -55,7 +55,7 @@ Pre-split review/security/perf tables that still live under database `opa` are l
 
 ## Auth
 
-Co-deployed mode: shared `JWT_SECRET`, `AUTH_MODE=codeployed`, peers set `PEER_OPA_URL=http://hub:8080`. Hub issues user JWTs; product APIs validate them.
+Co-deployed mode: shared `JWT_SECRET`, `AUTH_MODE=codeployed`, and `OPA_AUTH_REQUIRED=1` on **hub, ora-api, osa-api, opl-api, and opm-api**. Peers set `PEER_OPA_URL=http://hub:8080`. Hub issues user JWTs; product APIs validate them. Product-local `/api/auth/login` returns `503` in co-deployed mode.
 
 OPM/OSA GitHub targets: `opm-api` and `osa-api` use `PEER_OPA_URL` (org directory) and `PEER_ORA_URL` (connectors / clone credentials). Configure GitHub App or PAT on **ora-api** (`OPA_GITHUB_APP_*`, `OPA_CONNECTOR_SECRET`). After image upgrades, redeploy `opa-hub`, `ora-api`, `opm-api`, `opm-dashboard`, `osa-api`, and `osa-dashboard` (`*:nas` tags only).
 
