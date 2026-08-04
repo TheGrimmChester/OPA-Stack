@@ -30,7 +30,7 @@ Ports: API `8092`, dashboard `8095`. Control plane: `opl-api` + `opl-orchestrato
 
 ### Later
 
-- **JMeter Visual test case editor** — OctoPerf’s flagship design gap; see [opl-octoperf-parity.md](opl-octoperf-parity.md) (aspirational visual editing with JMeter semantics; form+import today is not enough)
+- **JMeter Visual test case editor** — flagship design gap; see [opl-lab-capabilities.md](opl-lab-capabilities.md) (aspirational visual editing with JMeter semantics; form+import today is not enough)
 - Multi-peer fan-out beyond local samples (not a commercial multi-region load grid)
 - Kubernetes (or non-Docker) runner backends (`PerfContainerRunner` extension point)
 - Scheduled / CI-triggered suites and multi-scenario campaigns
@@ -71,6 +71,6 @@ Ports: API `8096`, dashboard `8098`. Control plane: `opm-api` + `opm-orchestrato
 - [Products](products.md) — port table and ownership
 - [Interop](interop.md) — hub-auth, tenant headers, OPM ↔ hub/ORA
 - [NAS deploy](nas-deploy.md) — `*:nas` images and verify curls
-- [OctoPerf → OPL parity](opl-octoperf-parity.md) — Done / Code-ready / Missing / Different-by-design + flagship JMeter Visual editor gap
-- [OPM ↔ AutoCursor parity](opm-autocursor-parity.md) — Done / Missing / Different-by-design inventory + top gaps
+- [OPL load lab capabilities](opl-lab-capabilities.md) — Done / Code-ready / Missing / Different-by-design + flagship JMeter Visual editor gap
+- [OPM project manager capabilities](opm-pm-capabilities.md) — Done / Missing / Different-by-design inventory + top gaps
 - Product docs: [OPL-API](https://github.com/TheGrimmChester/OPL-API/tree/main/docs), [OPL-Dashboard](https://github.com/TheGrimmChester/OPL-Dashboard/tree/main/docs), [OPM-API](https://github.com/TheGrimmChester/OPM-API/tree/main/docs), [OPM-Dashboard](https://github.com/TheGrimmChester/OPM-Dashboard/tree/main/docs)

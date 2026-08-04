@@ -1,12 +1,11 @@
-# AutoCursor → OPM parity inventory
+# OPM project manager capabilities
 
-Implementation guide for closing the gap between **[AutoCursor](https://github.com/TheGrimmChester/AutoCursor)** (local-first Electron + Python CLI, Auto-Claude-style task automation) and **Open Project Manager** (`OPM-API` + `OPM-Dashboard`).
+Implementation guide for **Open Project Manager** (`OPM-API` + `OPM-Dashboard`): what a self-hosted, Hub-linked project manager should ship for kanban, task automation, roadmap/ideation, and job orchestration — and where OPM stands today.
 
 **Sources checked (2026-08-04):**
 
 | Repo | Path / ref |
 |------|------------|
-| AutoCursor | `/Users/nicolasmeloni/Documents/repos/AutoCursor` (`main` @ origin) |
 | OPM-API | `/Users/nicolasmeloni/Documents/repos/OPM-API` |
 | OPM-Dashboard | `/Users/nicolasmeloni/Documents/repos/OPM-Dashboard` |
 | NAS | `192.168.100.101` — `opm-api:nas` `:8096`, `opm-dashboard:nas` `:8098` (no smoke tags) |
@@ -17,104 +16,94 @@ Companion product backlog: [opl-opm-backlog.md](opl-opm-backlog.md). Product bou
 
 ## 1. Product shape (different-by-design)
 
-| Dimension | AutoCursor | OPM |
-|-----------|------------|-----|
-| Delivery | Desktop Electron app + local CLI; **no HTTP server** | Web dashboard + HTTP API + orchestrator/runners |
-| Project identity | Local folder path; `.auto-cursor/` on disk | **GitHub `owner/repo`** via Hub orgs + ORA connectors |
-| Execution | Spawn `python -m auto_cursor` / Cursor CLI in worktrees | Ephemeral tmp clone + Open-Job-Go `docker run` (today: **honest stub**) |
-| Auth | Cursor CLI / API key / accounts in app settings | Co-deployed Hub JWT + tenant headers |
-| Review depth | In-app AI review + worktree merge/discard/PR | Automated review column; **deep review owned by ORA** |
-| Multi-tenancy | Multi-project tabs on one machine | Org-scoped projects (`X-Organization-ID`) |
+| Dimension | OPM stance |
+|-----------|------------|
+| Delivery | Web dashboard + HTTP API + orchestrator/runners (not a desktop Electron app) |
+| Project identity | **GitHub `owner/repo`** via Hub orgs + ORA connectors (not local folder paths) |
+| Execution | Ephemeral tmp clone + Open-Job-Go `docker run` (today: **honest stub** for most actions) |
+| Auth | Co-deployed Hub JWT + tenant headers |
+| Review depth | Automated review column; **deep review owned by ORA** |
+| Multi-tenancy | Org-scoped projects (`X-Organization-ID`) |
 
 Do **not** chase Electron, local-folder registry, or duplicating ORA Repo Watch inside OPM. Those are explicit non-goals ([OPM-API backlog](https://github.com/TheGrimmChester/OPM-API/blob/main/docs/backlog.md)).
 
 ---
 
-## 2. AutoCursor inventory
+## 2. Target project manager surface
 
-### 2.1 UI views (sidebar)
+Capabilities a mature OPM should cover (UI + jobs + storage).
 
-From `src/App.tsx` / `Sidebar.tsx`:
+### 2.1 UI views (target)
 
-| View id | Purpose |
-|---------|---------|
-| `kanban` | Six-column board + task create/edit/remove, DnD, run actions |
-| `terminals` | Live agent terminal / queue slots |
-| `insights` | Insights chat (`insights-ask`) |
-| `roadmap` | Discovery + features generation and editing |
-| `ideation` | Typed idea lists; promote to tasks |
-| `changelog` | Generate / view changelog |
-| `context` | Project index / context |
-| `agent-tools` | Agent utilities / MCP-ish tooling surface |
-| `worktrees` | Per-task worktrees; Review / Merge / Discard |
-| `settings` | Theme, providers, profiles, accounts |
-| `github-issues` / `github-prs` | GitHub issue & PR lists |
-| `gitlab-issues` / `gitlab-merge-requests` | GitLab lists |
-| `linear` | Linear import |
+| View | Purpose |
+|------|---------|
+| Projects | Multi-project registry; link GitHub repos |
+| Board (kanban) | Six-column board + task create/edit/remove, DnD, run actions |
+| Task detail | Overview / subtasks / plan / progress / logs / files |
+| Jobs | Enqueue / cancel / live status for automation actions |
+| Roadmap | Discovery + features generation and editing |
+| Ideation | Typed idea lists; promote to tasks |
+| Changelog | Generate / view / save changelog |
+| Context | Project index / context |
+| Agent tools | Agent utilities / MCP-ish tooling surface |
+| Terminals / live runs | Live agent / runner visibility |
+| Settings | Theme, providers, profiles (where Hub does not already own them) |
+| Onboarding | Welcome / first-run wizard |
 
-Plus: Welcome / onboarding, auth-failure & rate-limit modals, update banner, project tab bar, task creation wizard, **task detail modal** (tabs: overview / subtasks / logs / files).
+External issue/PR lists (GitHub/GitLab/Linear) prefer **link-out or ORA** rather than in-app clones unless later sync is justified.
 
-### 2.2 Kanban columns
+### 2.2 Kanban columns (OPM)
 
-AutoCursor board statuses (Electron `file-api.js`): `backlog` → `queue` → `in_progress` → `ai_review` → `human_review` → `done` (UI labels often say Planning / AI Review).
+`backlog` → `queue` → `in_progress` → `review` → `human_review` → `done`  
+(`review` is the automated review-runner column.)
 
-### 2.3 CLI / job-like commands (`python -m auto_cursor`)
+### 2.3 Automation job actions (target)
 
-| Command | Role |
-|---------|------|
-| `init` | Init `.auto-cursor` |
-| `create-task` | Create spec/task |
-| `generate-title` | AI title from description |
-| `run-planning` | 7-phase planning → `spec.md` + `implementation_plan.json` |
+| Action | Role |
+|--------|------|
+| `init` / project init | Seed project storage |
+| Create task / generate title | Spec/task creation helpers |
+| `run-planning` | Multi-phase planning → `spec.md` + `implementation_plan.json` |
 | `run-implementation` | One subtask per call; retry / stuck / recover |
 | `recover-subtask` | Unstick failed subtask |
-| `run-ai-review` | QA review → `QA_FIX_REQUEST.md` on fail |
+| `run-review` | QA review → fix request on fail |
 | `run-qa-fix` | Fix from failed review |
 | `run-followup-planning` | Extend plan with follow-up phases |
 | `approve-for-coding` | Human Review → Queue |
 | `pause-task` / `resume-task` / `skip-to-phase` | Interruptible pipeline checkpoints |
-| `remove-task` | Delete task + dir |
 | `run-roadmap-discovery` / `run-roadmap-features` | Roadmap agents |
-| `run-ideation --type` | Ideation agents |
+| `run-ideation` (typed) | Ideation agents |
 | `generate-changelog` | Changelog from done tasks |
-| `insights-ask` | Insights chat |
-| `refresh-project-index` | Rebuild project index |
-| `profiles` / `set-profile` | Auth profiles |
-| `github-issues` / `github-prs` / `gitlab-*` / `linear-issues` | SCM/issue list helpers |
-
-Headless Auto-Claude-style: `run.py`, `spec_runner.py` (list, autonomous build, QA, merge instructions, multi-spec parallel).
+| Insights ask | Insights chat |
+| Refresh project index | Rebuild project index |
 
 ### 2.4 Ideation types
 
-`code-improvements`, `security`, `performance`, `documentation`, `ui-ux`, `code-quality` (hyphenated in CLI; file keys underscored).
+`code_improvements`, `security`, `performance`, `documentation`, `ui_ux`, `code_quality` (underscored in store; hyphenated variants in some CLIs).
 
-### 2.5 Electron IPC surface (selected)
+### 2.5 Parallelism & workspaces
 
-Board/tasks/plan/progress; run registry + cancel; settings/projects/accounts/profiles; roadmap/ideation/changelog; review state; logs by phase; worktree create/list/info; merge / discard / create-or-open PR; diff; agent tools; memory; MCP config; screenshot.
+- Ephemeral job clone under `OPM_JOB_TMP` (not durable per-task worktrees)
+- Container runner slots / orchestrator reaper (target)
+- Multi-spec + multi-subtask coordination when real runners land
 
-### 2.6 Parallelism & worktrees
+### 2.6 Provider model
 
-- Per-spec worktrees under `.auto-cursor/worktrees/tasks/<spec_id>`
-- Global agent terminal cap (`AUTO_CURSOR_MAX_TERMINALS`, default 12)
-- Multi-spec + multi-subtask coordination (`docs/parallel-execution.md`)
-
-### 2.7 Provider model
-
-Pluggable providers (default `cursor_cli`); per-phase model overrides; composite failover; `CURSOR.md` prepended to agent prompts.
+Pluggable providers; per-phase model overrides; prompt packs (`CURSOR.md` or equivalent) prepended inside runners.
 
 ---
 
-## 3. OPM inventory
+## 3. OPM inventory (today)
 
 ### 3.1 Dashboard routes (`OPM-Dashboard` `src/App.jsx`)
 
 | Route | Page | Notes |
 |-------|------|-------|
 | `/` | Projects | Link GitHub repos via Hub orgs + ORA connectors |
-| `/board` | Board | CRUD tasks, button move (no DnD); no plan/progress modal |
-| `/roadmap` | Roadmap | Create phase/feature; limited edit/delete |
+| `/board` | Board | CRUD tasks, button move (no DnD); task detail maturity varies by release |
+| `/roadmap` | Roadmap | Create phase/feature; edit/delete improving |
 | `/ideation` | Ideation | Create ideas; promote to task |
-| `/changelog` | Changelog | Read markdown |
+| `/changelog` | Changelog | Read / generate+save depending on release |
 | `/jobs` | Jobs | Enqueue + cancel; action picker + optional `specId` |
 | `/login` | Login | Hub-auth co-deployed |
 
@@ -132,22 +121,17 @@ Side rail: Projects, Board, Roadmap, Ideation, Changelog, Jobs.
 | Roadmap / ideation / changelog | `GET|PUT …/roadmap`, `GET|PUT …/ideation`, `GET …/changelog` |
 | Status / jobs | `GET …/status`, `GET|POST …/jobs`, `GET …/jobs/{runId}`, `POST …/jobs/{runId}/cancel` |
 
-### 3.3 Board columns
-
-`backlog` → `queue` → `in_progress` → `review` → `human_review` → `done`  
-(`review` is the automated review-runner column; AutoCursor’s `ai_review` maps here.)
-
-### 3.4 Job actions (dashboard + store)
+### 3.3 Job actions (dashboard + store)
 
 Enqueued from UI: `run-planning`, `run-implementation`, `run-review`, `run-qa-fix`, `run-roadmap-discovery`, `run-roadmap-features`, `run-ideation`, `generate-changelog`.
 
-Store also maps `run-followup-planning` → planning state. Naming: AutoCursor `run-ai-review` ↔ OPM `run-review`.
+Store also maps `run-followup-planning` → planning state.
 
-**Execution today:** `stubRunJob` prepares ephemeral workspace + Open-Job-Go argv, sets `execution: "stub"`, completes with **no container exec / no model output**. Default runner tag env `OPM_RUNNER_TAG` (prefer `nas` on NAS — never smoke).
+**Execution today:** `stubRunJob` prepares ephemeral workspace + Open-Job-Go argv, sets `execution: "stub"`, completes with **no container exec / no model output** for most paths (`run-planning` may complete on NAS after clone-credentials + runtime git fixes). Default runner tag env `OPM_RUNNER_TAG` (prefer `nas` on NAS — never smoke).
 
-### 3.5 Data layout (`OPM_DATA_DIR`)
+### 3.4 Data layout (`OPM_DATA_DIR`)
 
-Mirrors AutoCursor artifact names under server storage (not local clone):
+Server-side project artifacts (not a local desktop clone):
 
 ```text
 projects/<id>/board.json, status.json, changelog.md
@@ -155,9 +139,7 @@ projects/<id>/board.json, status.json, changelog.md
   roadmap/roadmap.json, ideation/ideation.json, runs/<runId>.json
 ```
 
-Ideation type keys (underscored): `code_improvements`, `security`, `performance`, `documentation`, `ui_ux`, `code_quality`.
-
-### 3.6 NAS verify (2026-08-04)
+### 3.5 NAS verify (2026-08-04)
 
 | Check | Result |
 |-------|--------|
@@ -167,7 +149,7 @@ Ideation type keys (underscored): `code_improvements`, `security`, `performance`
 
 ---
 
-## 4. Parity matrix
+## 4. Capability matrix
 
 Legend: **Done** = OPM has usable equivalent · **Missing** = gap for implementers · **Different-by-design** = intentional OPM/family choice
 
@@ -175,27 +157,27 @@ Legend: **Done** = OPM has usable equivalent · **Missing** = gap for implemente
 
 | Capability | Status | Notes |
 |------------|--------|-------|
-| Multi-project registry | **Done** | OPM: GitHub-linked; AutoCursor: local folders |
+| Multi-project registry | **Done** | GitHub-linked via Hub + ORA |
 | Local folder / Electron app | **Different-by-design** | Web-only; API rejects path create |
-| Hub auth + tenant headers | **Done** (OPM-only) | AutoCursor has no Hub |
-| Project via ORA connectors | **Done** (OPM-only) | AutoCursor uses local git remotes optionally |
-| Onboarding / welcome wizard | **Missing** | Thin first-run UX vs AutoCursor wizard |
+| Hub auth + tenant headers | **Done** | Co-deployed `/hub-auth/` |
+| Project via ORA connectors | **Done** | Family-native path |
+| Onboarding / welcome wizard | **Missing** | Thin first-run UX |
 | Settings (theme, providers, profiles) | **Missing** / partial | OPM inherits Hub; no per-phase model UI |
 
 ### 4.2 Board & tasks
 
 | Capability | Status | Notes |
 |------------|--------|-------|
-| Six-column kanban | **Done** | `review` vs `ai_review` naming |
+| Six-column kanban | **Done** | `review` column for automated review |
 | Create / edit / delete / move tasks | **Done** | Dashboard CRUD + move |
 | Drag-and-drop board | **Missing** | Button moves only |
-| Require review before coding | **Done** (API field) | Surfacing + approve flow incomplete in UI |
-| Approve-for-coding action | **Missing** | No dedicated API/job/UI (manual move only) |
-| Task detail modal (overview/subtasks/logs/files) | **Missing** | Highest UX gap |
-| Plan + progress read APIs | **Done** (API) | Dashboard does not consume yet |
+| Require review before coding | **Done** (API field) | Surfacing + approve flow may still be thin |
+| Approve-for-coding action | **Missing** / partial | Prefer first-class API/job/UI |
+| Task detail (overview/subtasks/logs/files) | **Missing** / partial | Highest UX gap when absent |
+| Plan + progress read APIs | **Done** (API) | Dashboard must consume them |
 | Spec artifacts (`spec.md`, plan JSON) | **Done** (store shape) | Populated only when runners actually write them |
 | Generate title | **Missing** | No job/API |
-| DnD + valid transition rules | **Missing** | AutoCursor enforces column transition sets |
+| Valid column transition rules | **Missing** | Enforce allowed moves |
 
 ### 4.3 Automation jobs
 
@@ -205,26 +187,26 @@ Legend: **Done** = OPM has usable equivalent · **Missing** = gap for implemente
 | Optional `specId` on enqueue | **Done** | Jobs page picker |
 | Real runner container + model output | **Missing** | Critical path |
 | Orchestrator spawn/reaper loop | **Missing** | Health stub only in binary |
-| `run-planning` (7 phases) | **Missing** (real) | Action exists; stub only on NAS path today |
+| `run-planning` (multi-phase) | **Missing** (real) / partial on NAS | Action exists; often stub |
 | `run-implementation` + subtask loop | **Missing** (real) | |
 | Retry / stuck / recover-subtask | **Missing** | |
 | `run-review` / `run-qa-fix` loop | **Missing** (real) | |
-| `run-followup-planning` | **Missing** (UI + enqueue) | Mapped in store; not in Jobs `ACTIONS` |
+| `run-followup-planning` | **Missing** (UI + enqueue) | Mapped in store; not always in Jobs `ACTIONS` |
 | Pause / resume / skip-to-phase | **Missing** | |
-| Parallel multi-spec / terminal slots | **Missing** | Different runtime model (containers) |
-| `run.py`-style autonomous build | **Missing** | Could be orchestrator workflow later |
+| Parallel multi-spec / runner slots | **Missing** | Container runtime model |
+| Autonomous multi-spec build workflow | **Missing** | Orchestrator workflow later |
 | Provider / model selection | **Missing** | Runner image env only |
 
 ### 4.4 Roadmap / ideation / changelog
 
 | Capability | Status | Notes |
 |------------|--------|-------|
-| Roadmap GET/PUT + create phase/feature UI | **Done** (partial) | Edit/delete inline still thin |
+| Roadmap GET/PUT + create phase/feature UI | **Done** (partial) | Edit/delete inline still thin in places |
 | Roadmap discovery/features **agents** | **Missing** (real jobs) | Actions stub |
-| Ideation CRUD + promote to task | **Done** (partial) | Edit/delete incomplete |
+| Ideation CRUD + promote to task | **Done** (partial) | Edit/delete incomplete in places |
 | Ideation type agents | **Missing** (real jobs) | Types aligned |
 | Changelog read | **Done** | |
-| Changelog generate UX | **Missing** | Job action exists; page read-only |
+| Changelog generate UX | **Missing** / partial | Job action exists; wire save UX |
 
 ### 4.5 Insights, context, agent tools
 
@@ -234,9 +216,9 @@ Legend: **Done** = OPM has usable equivalent · **Missing** = gap for implemente
 | Project index / Context page | **Missing** | |
 | Agent Tools page | **Missing** | |
 | Agent terminals live view | **Missing** | Jobs list is coarse substitute |
-| Memory / Graphiti-style | **Missing** | AutoCursor optional |
+| Long-term memory store | **Missing** | Optional later |
 
-### 4.6 Worktrees, merge, PRs
+### 4.6 Workspaces, merge, PRs
 
 | Capability | Status | Notes |
 |------------|--------|-------|
@@ -257,10 +239,10 @@ Legend: **Done** = OPM has usable equivalent · **Missing** = gap for implemente
 
 | Capability | Status | Notes |
 |------------|--------|-------|
-| i18n | **Missing** | AutoCursor en/fr |
+| i18n | **Missing** | |
 | App auto-update | **Different-by-design** | Container image deploys |
-| `CURSOR.md` / prompt packs | **Missing** | Needed inside runners for quality |
-| Pre-merge quality gates (tests/lint) | **Missing** | AutoCursor roadmap idea; valuable for OPM runners |
+| Prompt packs in runners | **Missing** | Needed for runner quality |
+| Pre-merge quality gates (tests/lint) | **Missing** | Valuable for OPM runners |
 | Analytics (cycle time, pass rates) | **Missing** | Later |
 | Durable job history (ClickHouse) | **Missing** | Later; FS runs today |
 
@@ -274,7 +256,7 @@ Legend: **Done** = OPM has usable equivalent · **Missing** = gap for implemente
 4. **Implementation + review/QA loops** — subtask iteration, recover, follow-up planning.
 5. **Roadmap/ideation/changelog generators** — turn stub actions into real agent runs; changelog write UX.
 6. **Board DnD + richer edit** — roadmap/ideation inline edit/delete.
-7. **ORA deep-links** — PR/review instead of cloning AutoCursor worktree merge UI.
+7. **ORA deep-links** — PR/review instead of in-app merge/discard for durable worktrees.
 8. **Insights / context** — only after core automation works.
 
 ---
@@ -284,14 +266,14 @@ Legend: **Done** = OPM has usable equivalent · **Missing** = gap for implemente
 Ranked for an operator using OPM on NAS today:
 
 1. **Real runner execution (not stub)** — jobs must produce specs, plans, and code changes; without this the product is a board CRUD shell.
-2. **Task detail with plan / progress / logs** — AutoCursor’s primary “what is this task doing?” surface; API already half-ready.
+2. **Task detail with plan / progress / logs** — primary “what is this task doing?” surface; API already half-ready.
 3. **Working `run-implementation` loop** — subtask-by-subtask build with stuck/recover; core delivery value.
 4. **Working `run-review` + `run-qa-fix`** — closes the quality loop before human_review / done.
-5. **Working `run-planning` end-to-end** — seven phases writing `spec.md` + `implementation_plan.json` into `OPM_DATA_DIR`.
-6. **Approve-for-coding + require-review UX** — human gate after planning (parity with AutoCursor’s trust model).
+5. **Working `run-planning` end-to-end** — multi-phase writing `spec.md` + `implementation_plan.json` into `OPM_DATA_DIR`.
+6. **Approve-for-coding + require-review UX** — human gate after planning.
 7. **Changelog generate + save UX** — operators expect release notes from done work; job action exists unused.
 8. **Roadmap / ideation agent runs** — discovery/features/typed ideation that fill the boards users already edit by hand.
-9. **Board drag-and-drop + task action menu** — daily friction vs AutoCursor kanban.
+9. **Board drag-and-drop + task action menu** — daily kanban friction.
 10. **Follow-up planning + pause/resume** — keeps long-running automation usable without restarting from scratch.
 
 Honorable mentions: Insights chat, live terminals, create-PR helpers (prefer ORA), provider/model settings, parallel job slots.
@@ -300,22 +282,22 @@ Honorable mentions: Insights chat, live terminals, create-PR helpers (prefer ORA
 
 ## 7. Naming cheatsheet
 
-| AutoCursor | OPM |
-|------------|-----|
-| `ai_review` column | `review` column |
-| `run-ai-review` | `run-review` |
-| Local `.auto-cursor/specs/…` | `$OPM_DATA_DIR/projects/<id>/specs/…` |
-| Electron `runCommand` | `POST …/jobs` `{ action, specId }` |
-| Worktree merge/discard | Ephemeral clone + GitHub PR / ORA |
-| Ideation `code-improvements` | `code_improvements` |
+| Concept | OPM |
+|---------|-----|
+| Automated review column | `review` |
+| Review job action | `run-review` |
+| Spec storage | `$OPM_DATA_DIR/projects/<id>/specs/…` |
+| Enqueue automation | `POST …/jobs` `{ action, specId }` |
+| Merge path | Ephemeral clone + GitHub PR / ORA |
+| Ideation type key | `code_improvements` (underscored) |
 
 ---
 
-## 8. Out of scope for parity
+## 8. Out of scope
 
 - Replicating Electron or local-folder projects
 - Shipping smoke runner tags to NAS (`*:smoke`)
 - Embedding full ORA Repo Watch / check-runs inside OPM
-- Bit-for-bit Auto-Claude prompt pack cloning without runner design
+- Bit-for-bit third-party prompt pack cloning without runner design
 
 When in doubt: **OPM owns kanban + task automation orchestration; ORA owns SCM credentials and deep code review; Hub owns identity.**
