@@ -115,6 +115,7 @@ Side rail: Projects, Board, Roadmap, Ideation, Changelog, Jobs.
 |------|-----------|
 | Health | `GET /api/health`, `GET /api/peer/health` |
 | Hub / GitHub | `GET /api/hub/status`, `/api/hub/organizations`, `/api/github/connectors`, `…/repos` |
+| GitHub PM | `GET …/github/milestones`, `POST …/milestones/assign`, `GET …/github/projects`, `POST …/projects/bind`, `POST …/projects/sync-item`, `POST …/github/sync-task/{specId}` |
 | Projects | `GET|POST /api/projects`, `GET|DELETE /api/projects/{id}`, `POST …/init` |
 | Board | `GET|PUT …/board` |
 | Tasks | `GET|POST …/tasks`, `GET|PATCH|DELETE …/tasks/{specId}`, `POST …/move`, `POST …/approve`, `GET …/plan|progress|spec|logs|actions` |
@@ -236,6 +237,8 @@ Legend: **Done** = OPM has usable equivalent · **Missing** = gap for implemente
 |------------|--------|-------|
 | In-app GitHub Issues/PRs views | **Different-by-design** | Link out / ORA; optional later sync |
 | Non-GitHub issue import | **Different-by-design** | Later backlog |
+| GitHub Milestones bind + sync | **Done** | List/assign via ORA `scm:pm`; roadmap phases + tasks |
+| GitHub Projects v2 bind + item sync | **Done** (partial) | Bind project; draft items; Status on move best-effort; needs `organization_projects` |
 | GitHub Issues two-way sync | **Missing** (Later) | Listed in [opl-opm-backlog.md](opl-opm-backlog.md) |
 
 ### 4.8 Cross-cutting
