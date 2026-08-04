@@ -226,6 +226,7 @@ services:
       JWT_SECRET: ${JWT_SECRET}
       AUTH_MODE: ${AUTH_MODE:-codeployed}
       OPEN_SERVICE_JWT_SECRET: ${OPEN_SERVICE_JWT_SECRET:-${JWT_SECRET}}
+      OPA_AUTH_REQUIRED: ${OPA_AUTH_REQUIRED:-1}
       PEER_OPA_URL: http://hub:8080
       PEER_ORA_URL: http://ora-api:8091
       OPA_JOB_SANDBOX: ${OPA_JOB_SANDBOX:-off}
@@ -285,6 +286,7 @@ services:
       JWT_SECRET: ${JWT_SECRET}
       AUTH_MODE: ${AUTH_MODE:-codeployed}
       OPEN_SERVICE_JWT_SECRET: ${OPEN_SERVICE_JWT_SECRET:-${JWT_SECRET}}
+      OPA_AUTH_REQUIRED: ${OPA_AUTH_REQUIRED:-1}
       PEER_OPA_URL: http://hub:8080
       OPA_JOB_IMAGE_TAG: nas
       OPA_JMETER_IMAGE: ${OPA_JMETER_IMAGE:-justb4/jmeter:5.5}
@@ -339,6 +341,7 @@ services:
       JWT_SECRET: ${JWT_SECRET}
       AUTH_MODE: ${AUTH_MODE:-codeployed}
       OPEN_SERVICE_JWT_SECRET: ${OPEN_SERVICE_JWT_SECRET:-${JWT_SECRET}}
+      OPA_AUTH_REQUIRED: ${OPA_AUTH_REQUIRED:-1}
       PEER_OPA_URL: http://hub:8080
       PEER_ORA_URL: http://ora-api:8091
       PEER_OSA_URL: http://osa-api:8093
