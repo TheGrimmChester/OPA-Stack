@@ -85,6 +85,13 @@ curl -sf "http://$HOST:8093/api/security/runs?limit=50" "${NAS_T[@]}" \
 #   opl  /api/perf/scenarios       → .scenarios
 #   opl  /api/perf/runs?limit=50   → .runs
 #   opm  /api/projects             → .projects
+
+# --- OPM IDOR (wrong org must not resolve another org's UUID) ---
+PID=$(curl -sf "http://$HOST:8096/api/projects" "${DEF[@]}" | jq -r '.projects[0].id')
+for suffix in '' /board /jobs /tasks /status; do
+  curl -s -o /dev/null -w "%{http_code} projects/\$PID$suffix\n" \
+    "http://$HOST:8096/api/projects/${PID}${suffix}" "${WRONG[@]}"
+done   # expect 404 (not 200 with foreign project)
 ```
 
 Automated checklist: [`harness/security-tenant-matrix.sh`](../harness/security-tenant-matrix.sh)
@@ -101,10 +108,36 @@ HOST=192.168.100.101 ./harness/security-tenant-matrix.sh
 - Peer product local login returns **503**.
 - Wrong-org list length is **0** (or HTTP **403**); counts must not match another real tenant’s non-empty set.
 - No-header counts match explicit `default-org` / `default-project` for ClickHouse-backed lists (OSA, OPL, and WriteTenant-aligned ORA/OPM/hub surfaces).
+- OPM `GET /api/projects/{id}` (+ board/jobs/tasks/status) with a foreign org header returns **404**, not the default-org project.
+- OSA `GET /api/security/runs/{id}` returns **401** without JWT.
+- `POST /api/peer/scm/clone-credentials` rejects hub user JWTs (**401**).
 - Running containers for hub / ora-api / osa-api / opl-api / opm-api resolve to **`*:nas`** image names (never `*:smoke`).
+
+## NAS verification (2026-08-04)
+
+Executed against `192.168.100.101` with hub JWT `admin`/`admin` and `CHECK_IMAGES=1` (all `Config.Image=*:nas`, no `*:smoke`):
+
+| Surface | Hardener | Result |
+|---------|----------|--------|
+| Hub list scopes (`/api/infra/hosts`, `/api/alerts`, …) | [OPA-Hub #25](https://github.com/TheGrimmChester/OPA-Hub/pull/25), [Open-Auth-Go #5](https://github.com/TheGrimmChester/Open-Auth-Go/pull/5) | **PASS** — no-headers ≡ default-org; wrong-org empty |
+| ORA connectors / SCM jobs | [ORA-API #21](https://github.com/TheGrimmChester/ORA-API/pull/21) | **PASS** — missing/`all` → WriteTenant; wrong-org empty; no all-tenant dump |
+| ORA peer `POST /api/peer/scm/clone-credentials` | ORA-API #21 | **PASS** — user JWT → **401** (`invalid service token`) |
+| OSA security runs / secrets lists | prior Open-Tenant-Go ≥ 0.2.2 | **PASS** — wrong-org empty; nas/infra distinct |
+| OSA `GET /api/security/runs/{id}` (+ findings) | [OSA-API #13](https://github.com/TheGrimmChester/OSA-API/pull/13) | **PASS** — no JWT → **401**; +JWT → **200** |
+| OPL perf scenarios / runs | already WriteTenant-aligned | **PASS** — wrong-org empty |
+| OPM projects list | [OPM-API #12](https://github.com/TheGrimmChester/OPM-API/pull/12), [OPM-Dashboard #7](https://github.com/TheGrimmChester/OPM-Dashboard/pull/7) | **PASS** — list filtered by org; wrong-org empty |
+| OPM IDOR by UUID (board/jobs/tasks/status) | OPM-API #12 | **PASS** — wrong-org → **404** |
+| No JWT / co-deployed local login | family auth | **PASS** — 401 on protected routes; peer `/api/auth/login` → 503 |
+
+Family harness: **56 PASS / 0 FAIL**. Sibling ORA/OSA curl matrix reported **13/13 PASS** on `ora-api:nas` / `osa-api:nas`.
+
+## Documented gaps
+
+- **Org boundary only:** products enforce organization (and project) headers; there are **no per-user ACLs inside an org** yet (any org member with a valid hub JWT can read that org’s scoped lists). Optional org/project claims on user JWTs ([Open-Auth-Go #5](https://github.com/TheGrimmChester/Open-Auth-Go/pull/5)) do not replace header-based scoping today.
+- Prefer always sending concrete `X-Organization-ID` / `X-Project-ID` from dashboards and scripts.
 
 ## Notes
 
-- Some legacy ORA SCM admin honesty text may still say tenant “All” when headers are omitted; prefer always sending concrete headers. After WriteTenant alignment, wrong-org must still be empty.
-- Hub observability rows may omit an `organization_id` column in JSON; scoping is still enforced via query filters when headers are present.
+- Hub observability JSON may omit an `organization_id` field on rows; scoping is still enforced via query filters when headers are present ([OPA-Hub #25](https://github.com/TheGrimmChester/OPA-Hub/pull/25)).
+- Peer clone credentials require a **service JWT** (`OPEN_SERVICE_JWT_SECRET`, scope `scm:clone`) — never a hub user JWT.
 - Dashboard `/hub-auth/` bridges (ports `8089` / `8094` / `8095` / `8098`) are browser login only — product APIs stay on the ports above.
