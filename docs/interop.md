@@ -92,6 +92,25 @@ OPM projects are **GitHub repositories** only (no local folder registry).
 
 NAS/open-family already sets `PEER_OPA_URL` and `PEER_ORA_URL` on `opm-api` and `osa-api`. Redeploy `opm-api:nas`, `osa-api:nas`, `osa-dashboard:nas`, `opa-hub:nas`, and `ora-api:nas` after upgrading images.
 
+### OSA security-runs list cap
+
+`GET /api/security/runs` on `osa-api` applies a **server-side `limit` clamp of 200** (default `50`). Requests like `?limit=500` still return at most 200 rows; there is no offset/cursor pagination and no `total` in the JSON. This is intentional — not a ClickHouse or rewrite bug. The dashboard requests `limit=50` for the “Past runs” panel.
+
+Verify on NAS (hub JWT + tenant headers; row counts are per org/project, not global):
+
+```bash
+TOKEN=$(curl -sf -X POST http://127.0.0.1:18080/api/auth/login \
+  -H 'Content-Type: application/json' \
+  -d '{"username":"admin","password":"admin"}' | jq -r .token)
+# ClickHouse total (all tenants): curl -sf 'http://127.0.0.1:8123/?query=SELECT%20count()%20FROM%20osa.security_runs'
+curl -sf "http://127.0.0.1:8093/api/security/runs?limit=500" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "X-Organization-Id: default-org" \
+  -H "X-Project-Id: default-project" | jq '.runs | length'   # max 200
+```
+
+See [OSA-API api.md](https://github.com/TheGrimmChester/OSA-API/blob/main/docs/api.md) for param details.
+
 **Task job workspaces:** `opm-orchestrator` runs `run-planning` and other task jobs inside the **`opm-api:nas` runtime image**, which must include **`git`** for ORA-mediated clone credentials. If jobs fail with `git: executable file not found in $PATH`, rebuild `opm-api:nas` (runtime stage includes git) and recreate `opm-api` / `opm-orchestrator`. See [OPM-API github-setup](https://github.com/TheGrimmChester/OPM-API/blob/main/docs/github-setup.md).
 
 ## Allowed peer calls
