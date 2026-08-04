@@ -46,23 +46,25 @@ Ports: API `8096`, dashboard `8098`. Control plane: `opm-api` + `opm-orchestrato
 
 - GitHub-linked projects only (no local folder registry); hub orgs + ORA connectors/repos
 - Co-deployed `/hub-auth/`; `PEER_OPA_URL` / `PEER_ORA_URL`; `git` in `opm-api:nas` for ephemeral clones
-- Board + tasks CRUD/move; roadmap / ideation / changelog read APIs; jobs list + enqueue
-- `run-planning` can complete on NAS after clone-credentials + runtime git fixes
-- Filesystem project state under `OPM_DATA_DIR` (board/tasks/jobs)
+- Board + tasks CRUD/move; require-review + approve-for-coding; task detail (plan/progress/spec/logs)
+- Roadmap / ideation create + inline edit/delete; changelog generate + save
+- Builtin job executor writes real artifacts for planning / implementation / review / QA / changelog (`execution: "builtin"`)
+- Jobs list + enqueue + cancel with operator `message`; filesystem project state under `OPM_DATA_DIR`
 
 ### Next
 
-- **Edit surfaces** — roadmap / ideation / changelog are API `PUT`-capable but the dashboard is largely read-only; ship save flows operators actually use
-- **Task depth** — plan / progress / detail views (`/tasks/{specId}/plan`, `/progress`); bind job enqueue to a `specId`
-- **Job operations UX** — cancel (`POST .../jobs/{runId}/cancel`), live status, and actionable failure text (clone, egress, runner)
-- **Non-planning actions** — `run-implementation`, `run-review`, `run-qa-fix`, roadmap/ideation/changelog generators still stub-lean; harden beyond `run-planning`
+- **Containerized agent spawn** — orchestrator + `opm-runner-task:nas` with model output (beyond builtin heuristics)
+- **Stuck / recover-subtask** — harden implementation loop failure recovery
+- **Board DnD** — drag-and-drop column moves
+- **Roadmap / ideation agents** — real generators (placeholders today)
+- **Pause / resume / follow-up planning UI**
 
 ### Later
 
 - GitHub Issues / Projects sync (two-way), multi-repo portfolio views
 - Durable job/history store (ClickHouse or equivalent) instead of filesystem-only
 - Deep-link to ORA for review — do not duplicate Repo Watch inside OPM
-- Richer model-provider / runner orchestration (real container spawn maturity vs scheduler stub)
+- Insights / context / live terminals; pre-merge quality gates
 
 ---
 
