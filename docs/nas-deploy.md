@@ -78,6 +78,41 @@ ORA uses `OPA_GITHUB_APP_SLUG` as the GitHub App login when requesting reviewers
 
 On this NAS host the installed App slug is `opa-ai-orchestrator` (set in `/mnt/Apps/config-docker/open-stack/.env`). Keep that value until the GitHub App itself is renamed or replaced.
 
+## Sync source before rebuild
+
+NAS image builds read from sibling checkouts under `src/`. Those trees **must track `origin/main`** — stale rsync copies (no `.git`) have caused rebuilds that ship old code even after PR merges.
+
+### On the NAS (preferred)
+
+Git is available on the host; use the harness sync script to shallow-clone or fast-forward every family repo:
+
+```bash
+export FAMILY_ROOT=/mnt/Apps/config-docker/open-stack/src
+chmod +x "$FAMILY_ROOT/OPA-Stack/harness/sync-nas-src.sh"
+
+# Audit git vs stale and HEAD vs GitHub main
+"$FAMILY_ROOT/OPA-Stack/harness/sync-nas-src.sh" --audit
+
+# Sync everything (or pass repo names: OPA-Hub ORA-API …)
+"$FAMILY_ROOT/OPA-Stack/harness/sync-nas-src.sh"
+```
+
+First run converts stale copies into shallow git clones; later runs are `git fetch origin main` + fast-forward.
+
+### From the laptop (fallback)
+
+When the NAS cannot reach GitHub, rsync from a local sibling tree (for example `~/Documents/repos`):
+
+```bash
+export FAMILY_ROOT=~/Documents/repos
+OPA-Stack/harness/sync-nas-src.sh --rsync \
+  --nas-host root@192.168.100.101 \
+  --laptop-root "$FAMILY_ROOT" \
+  OPA-Hub ORA-API
+```
+
+Then rebuild on the NAS. Prefer converting to git clones on the NAS when network access is restored.
+
 ## Build images on the NAS
 
 From a sibling checkout tree (for example `/mnt/Apps/config-docker/open-stack/src`):
