@@ -54,7 +54,8 @@ Ports: API `8096`, dashboard `8098`. Control plane: `opm-api` + `opm-orchestrato
 - Board + tasks CRUD/move/**DnD** + task action menu; require-review + approve-for-coding; task detail (plan/progress/spec/logs)
 - Roadmap / ideation create + inline edit/delete; changelog generate + save
 - Builtin job executor writes real artifacts for planning / implementation / review / QA / changelog; **container spawn** of `opm-runner-task:nas` when `spawnReady` (`execution: "container"`, builtin fallback)
-- Stuck/recover (`mark-stuck`, `recover-subtask`); pause/resume (`pause-task`, `resume-task`)
+- Stuck/recover (`mark-stuck`, `recover-subtask`); pause/resume (`pause-task`, `resume-task`); **skip-to-phase** (`targetPhase`)
+- Roadmap/ideation agents (`run-roadmap-discovery`, `run-roadmap-features`, `run-ideation`) write real artifacts (builtin helpers)
 - Jobs list + enqueue + cancel with operator `message`; filesystem project state under `OPM_DATA_DIR`
 - Orchestrator spawn probe (`/api/spawn-probe`) — `spawnReady: true` when docker CLI + daemon + runner image work
 - NAS verify: `GET :8096/api/health` → **200** `{ status: ok, service: opm-api, auth_mode: codeployed }`; `:8098/` → **200**
@@ -62,8 +63,6 @@ Ports: API `8096`, dashboard `8098`. Control plane: `opm-api` + `opm-orchestrato
 ### Next
 
 - **Model-backed agents in runner** — prompts/agent CLI inside `opm-runner-task` (spawn already wired)
-- **Roadmap / ideation agents** — real generators (placeholders today)
-- **Skip-to-phase** — pause/resume shipped; skip still open
 
 ### Later
 
