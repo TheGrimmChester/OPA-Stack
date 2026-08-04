@@ -2,6 +2,17 @@
 
 > Generated / curated for Wave 16. Defaults are one-box friendly.
 
+## Stack environment (production compose)
+
+Read from the stack `.env` beside `compose.nas.yaml`. Template:
+[`compose.nas.env.example`](../compose.nas.env.example).
+
+| Variable | Type | Default | Scope | Description |
+|----------|------|---------|-------|-------------|
+| `COMPOSE_FILE` | string | none | compose | Set to `compose.nas.yaml` so a plain `docker compose` resolves to the single stack file. Keeps the directory free of a duplicate `docker-compose.yaml`, whose merge repeats every list-valued service key |
+| `COMPOSE_PROJECT_NAME` | string | `open-family` | compose | Project name; also builds the JMeter volume and network names passed to `opl-api` |
+| `OPA_DOCKER_GID` | int | `999` | collector | GID owning `/var/run/docker.sock`, added to the collector (which runs as uid/gid `65534`) so it can read container stats. Check with `getent group docker` |
+
 ## Agent environment
 
 | Variable | Type | Default | Scope | Description |
