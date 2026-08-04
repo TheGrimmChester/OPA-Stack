@@ -116,6 +116,7 @@ Side rail: Projects, Board, Roadmap, Ideation, Changelog, Jobs.
 | Health | `GET /api/health`, `GET /api/peer/health` |
 | Hub / GitHub | `GET /api/hub/status`, `/api/hub/organizations`, `/api/github/connectors`, `…/repos` |
 | GitHub PM | `GET …/github/milestones`, `POST …/milestones/assign`, `GET …/github/projects`, `POST …/projects/bind`, `POST …/projects/sync-item`, `POST …/github/sync-task/{specId}` |
+| GitHub Issues | `POST …/github/issues/link`, `…/issues/unlink`, `…/issues/push`, `…/issues/pull` |
 | Projects | `GET|POST /api/projects`, `GET|DELETE /api/projects/{id}`, `POST …/init` |
 | Board | `GET|PUT …/board` |
 | Tasks | `GET|POST …/tasks`, `GET|PATCH|DELETE …/tasks/{specId}`, `POST …/move`, `POST …/approve`, `GET …/plan|progress|spec|logs|actions` |
@@ -239,7 +240,30 @@ Legend: **Done** = OPM has usable equivalent · **Missing** = gap for implemente
 | Non-GitHub issue import | **Different-by-design** | Later backlog |
 | GitHub Milestones bind + sync | **Done** | List/assign via ORA `scm:pm`; roadmap phases + tasks |
 | GitHub Projects v2 bind + item sync | **Done** (partial) | Bind project; draft items; Status on move best-effort; needs `organization_projects` |
-| GitHub Issues two-way sync | **Missing** (Later) | Listed in [opl-opm-backlog.md](opl-opm-backlog.md) |
+| GitHub Issues two-way sync | **Done** | Task ↔ Issue link/unlink/push/pull via ORA `scm:pm`; needs only `issues: write`. Mapping below |
+| Issue picker / candidate list | **Missing** (Later) | Attach is by number; no `GET …/issues` list endpoint yet |
+| Issue comments ↔ task discussion | **Missing** (Later) | Not modelled in OPM |
+| Webhook-driven issue refresh | **Missing** (Later) | Poll/refresh only today; a receiver would go through ORA like other SCM webhooks |
+
+#### Task ↔ Issue field mapping
+
+Authority is split per field. OPM owns what the board owns; GitHub owns the rest.
+
+| Field | Direction | Notes |
+|-------|-----------|-------|
+| Task title → issue title | push | OPM authoritative |
+| Task description → issue body | push | OPM authoritative |
+| Board column → issue state | push | `done` → `closed`; all five other columns → `open` |
+| Task milestone → issue milestone | push | Pushed when set; an unset task milestone does not clear the issue's |
+| Issue state → board column | pull | `closed` → `done`; `open` on `done` → `in_progress` (reopened); `open` elsewhere → **no move** |
+| Issue assignee → `githubIssueAssignee` | pull | Mirror only — OPM has no assignee model, so it is never pushed |
+| Issue labels → `githubIssueLabels` | pull | Mirror only — OPM does not model task labels |
+| Issue milestone → task milestone | pull | GitHub wins on refresh |
+| Issue title → `githubIssueTitle` | pull | Mirrored without overwriting the task title unless `adoptTitle` is sent |
+
+The reverse state mapping is deliberately partial: five columns map to `open`, so an open issue carries no column information and a refresh must not drag a task out of `human_review`. Only the `done`/reopen boundary is acted on.
+
+Failures are never silent. Any push/pull failure is persisted on the task as `githubIssueSyncError`, appended to the `github-issue-sync` spec log, and returned with a machine-readable `status` — `missing_issues_permission` (403, listing the missing permissions), `issue_not_found` (404, link kept so it can be repaired), `no_issue_linked` / `not_linked_repo` (400), `upstream_error` (502). ORA pre-flights the App installation permission probe on writes, so a missing Issues grant is reported before GitHub is contacted. Title divergence is reported (`titleDiverged`) rather than resolved, so a refresh cannot discard a local edit.
 
 ### 4.8 Cross-cutting
 
@@ -275,7 +299,7 @@ Ranked for an operator using OPM on NAS today:
 5. **Pre-merge quality gates** — tests/lint before done.
 6. **Insights / context pages** — after automation matures.
 
-Shipped this pass: roadmap/ideation agent generators + skip-to-phase; prior: containerized task spawn; board DnD + stuck/recover + pause/resume. Health `:8096` and dashboard `:8098` on `*:nas`.
+Shipped this pass: task ↔ GitHub Issue two-way sync (link/unlink/push/pull via ORA `scm:pm`, explicit column↔state mapping, honest permission and missing-issue reporting); prior: roadmap/ideation agent generators + skip-to-phase; containerized task spawn; board DnD + stuck/recover + pause/resume. Health `:8096` and dashboard `:8098` on `*:nas`.
 
 Honorable mentions: parallel job slots, durable ClickHouse job history, analytics.
 
