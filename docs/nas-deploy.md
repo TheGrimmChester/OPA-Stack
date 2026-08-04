@@ -189,6 +189,19 @@ curl -sf -o /dev/null -w '%{http_code} ora\n' -X POST http://127.0.0.1:8091/api/
   -H 'Content-Type: application/json' -d '{"username":"admin","password":"admin"}'
 ```
 
+### Product list APIs need tenant headers
+
+With `OPA_AUTH_REQUIRED=1`, OSA/OPL ClickHouse list endpoints return **empty arrays** if `X-Organization-ID` / `X-Project-ID` are omitted (HTTP 200, not 401). Always pair the hub JWT with both headers. Canonical curl matrix: [interop.md — Tenant headers](interop.md#tenant-headers-required-when-auth-is-on).
+
+```bash
+TOKEN=$(curl -sf -X POST http://127.0.0.1:18080/api/auth/login \
+  -H 'Content-Type: application/json' \
+  -d '{"username":"admin","password":"admin"}' | jq -r .token)
+H=(-H "Authorization: Bearer $TOKEN" -H "X-Organization-ID: default-org" -H "X-Project-ID: default-project")
+curl -sf "http://127.0.0.1:8093/api/security/runs?limit=5" "${H[@]}" | jq '.runs | length'
+curl -sf "http://127.0.0.1:8092/api/perf/scenarios" "${H[@]}" | jq '.scenarios | length'
+```
+
 **Batch 4 deferred routes (expected 404 on hub `:18080`):** Network (`/api/network/*`), Cloud (`/api/cloud/*`), Catalog (`/api/catalog*`), mgmt (`/api/mgmt/v1*`), and call-graph compare (`/api/callgraph/compare`). These dashboard pages are scaffolds with no backend yet — do not treat 404 as a regression. Filter suggestions (`/api/filter-suggestions/*`) return **404 on hub** and **200 on edge** `:18081` (dashboard does not call them today).
 
 ## Alert email delivery
