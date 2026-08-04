@@ -114,6 +114,73 @@ curl -sf -o /dev/null -w '%{http_code}\n' http://127.0.0.1:8095/
 curl -sf -o /dev/null -w '%{http_code}\n' http://127.0.0.1:8098/
 ```
 
+## Alert email delivery
+
+Alert **evaluation and notification delivery** run on the edge agent (`opa_agent`). The hub stores rules in `opa.alerts` and queues manual tests in `opa.alert_test_requests`; the agent leader polls every ~2s and writes `opa.alert_history`.
+
+Email recipients live in each rule’s `action_config.to` (dashboard Alerts UI). **SMTP credentials stay on the agent host** — set them in `/mnt/Apps/config-docker/open-stack/.env`, not in ClickHouse or git.
+
+| Variable | Default | Effect |
+|----------|---------|--------|
+| `OPA_ALERT_NOTIFY_MODE` | `deliver` | `deliver` sends to configured channels. `log` (aliases: `log-only`, `dry-run`) records intent only — history `status=logged`. |
+| `OPA_SMTP_HOST` | *(unset)* | SMTP hostname. When unset, email actions append history with `status=logged` instead of failing silently. |
+| `OPA_SMTP_PORT` | `587` | SMTP port (STARTTLS when advertised) |
+| `OPA_SMTP_USER` | *(unset)* | Optional auth username |
+| `OPA_SMTP_PASS` | *(unset)* | Optional auth password — **host `.env` only** |
+| `OPA_SMTP_FROM` | `OPA_SMTP_USER` or `opa-agent@localhost` | Envelope From address |
+
+See [`compose.nas.env.example`](../compose.nas.env.example) for a copy-paste SMTP block. Full agent env reference: [OPA-Agent configuration](https://github.com/TheGrimmChester/OPA-Agent/blob/main/docs/configuration.md#alert-notification-channels).
+
+### Enable real email on NAS
+
+1. Add SMTP variables to `.env` on the host (example — use your provider’s values):
+
+   ```bash
+   OPA_ALERT_NOTIFY_MODE=deliver
+   OPA_SMTP_HOST=smtp.example.com
+   OPA_SMTP_PORT=587
+   OPA_SMTP_USER=your-user
+   OPA_SMTP_PASS=your-password
+   OPA_SMTP_FROM=opa-alerts@your-domain.example
+   ```
+
+2. Recreate **only** the edge agent (never smoke tags):
+
+   ```bash
+   cd /mnt/Apps/config-docker/open-stack
+   docker compose up -d opa_agent
+   ```
+
+3. Create or edit an alert with `action_type=email` and a valid `to` address in the dashboard (Alerts → Test) or via hub API.
+
+### Verify the delivery path (safe without SMTP)
+
+With SMTP unset, a manual test should still complete end-to-end with `status=logged`:
+
+```bash
+# Hub login (co-deployed default user)
+TOKEN=$(curl -sf -X POST http://127.0.0.1:18080/api/auth/login \
+  -H 'Content-Type: application/json' \
+  -d '{"username":"admin","password":"admin"}' | jq -r .token)
+
+# Create a test rule (adjust org/project if your tenancy differs)
+ALERT_ID=$(curl -sf -X POST http://127.0.0.1:18080/api/alerts \
+  -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
+  -d '{"name":"email-path-test","enabled":true,"condition_type":"custom",
+       "condition_config":{"threshold":0,"operator":"gt"},
+       "action_type":"email","action_config":{"to":"ops@example.com"}}' | jq -r .id)
+
+# Fire Test (queues opa.alert_test_requests → agent force-delivers)
+curl -sf -X POST "http://127.0.0.1:18080/api/alerts/$ALERT_ID" \
+  -H "Authorization: Bearer $TOKEN" | jq .
+
+# History: logged = no SMTP; sent = delivered; failed = SMTP/dest error
+curl -sf "http://127.0.0.1:18080/api/alerts/$ALERT_ID/history" \
+  -H "Authorization: Bearer $TOKEN" | jq .
+```
+
+After SMTP is configured, repeat the test and expect `status=sent` (or `failed` if credentials/network are wrong).
+
 ## Rollback
 
 1. `docker compose -p open-family down` (does **not** remove the external ClickHouse volume).

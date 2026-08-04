@@ -94,6 +94,14 @@ services:
       # Same ClickHouse as hub so edge ingest (PHP / collector :9090) keeps
       # writing full telemetry while the agent also registers with the hub.
       CLICKHOUSE_URL: "http://clickhouse:8123"
+      # Alert delivery — SMTP credentials stay on the agent host (.env), not in
+      # ClickHouse. Without OPA_SMTP_HOST, email actions record status=logged.
+      OPA_ALERT_NOTIFY_MODE: ${OPA_ALERT_NOTIFY_MODE:-deliver}
+      OPA_SMTP_HOST: ${OPA_SMTP_HOST:-}
+      OPA_SMTP_PORT: ${OPA_SMTP_PORT:-587}
+      OPA_SMTP_USER: ${OPA_SMTP_USER:-}
+      OPA_SMTP_PASS: ${OPA_SMTP_PASS:-}
+      OPA_SMTP_FROM: ${OPA_SMTP_FROM:-}
     ports:
       # Edge admin API (hub remains on 18080 for the public control-plane URL).
       - "18081:8080"
