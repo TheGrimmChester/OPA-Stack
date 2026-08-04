@@ -26,16 +26,14 @@ Ports: API `8092`, dashboard `8095`. Control plane: `opl-api` + `opl-orchestrato
 - **Postman import** — `POST /api/perf/scenarios/import-postman` + Capture UI
 - **Validate triage + auto-correlation** — `triage[]` + `correlation_suggestions[]`; Apply extract in Design
 - **Restore archived + JTL import UI** — `POST .../unarchive`, list `?archived=1`; Results JTL upload
+- **Terminal-run notifications** — webhook on terminal status (`OPL_RUN_WEBHOOK_URL`); health `run_notify`; optional HMAC + status filter
 
 ### Next
 
-- **Redeploy `opl-api:nas` + `opl-dashboard:nas`** — ship ForEach/fragments/Postman/triage/restore from this pass (sync-nas-src before rebuild)
-- **Notifications** webhook on terminal run status
+- **Redeploy `opl-api:nas` + `opl-dashboard:nas`** — ship ForEach/fragments/Postman/triage/restore/notify from this pass (sync-nas-src before rebuild)
 - **Baselines / federation peers** — dashboard skips `/api/performance/baselines` and `/api/federation/peers` (edge agent today; `opl-api` 404). Proxy/peer cleanly or drop dead UI affordances
 - Arrivals-accurate curve / PDF bench pack / full trend widgets (see [opl-lab-capabilities.md](opl-lab-capabilities.md))
-- **Visual editor depth** — multi-select, search/replace across tree, disable nodes, fragments / foreach
-- **JTL import UI** — API live; Results affordance missing
-- **Terminal-run notifications** — webhook on failed/gate fail
+- **Visual editor depth** — multi-select, search/replace across tree, disable nodes
 - **Trend chart builder** — multi-run history table exists; spark/trend charts still open
 
 ### Later

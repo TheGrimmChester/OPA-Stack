@@ -150,6 +150,7 @@ curl -sf http://127.0.0.1:18081/api/health   # edge agent
 curl -sf http://127.0.0.1:8091/api/health    # ora
 curl -sf http://127.0.0.1:8093/api/health    # osa
 curl -sf http://127.0.0.1:8092/api/health    # opl
+# jq .run_notify  — terminal-run webhook configured/mode (no secrets)
 curl -sf http://127.0.0.1:8096/api/health    # opm
 curl -sf -o /dev/null -w '%{http_code}\n' http://127.0.0.1:8088/
 curl -sf -o /dev/null -w '%{http_code}\n' http://127.0.0.1:8089/

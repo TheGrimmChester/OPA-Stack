@@ -84,7 +84,7 @@ Most prior Code-ready items are now Done. Remaining:
 | Arrivals-accurate **load curve** injectors | Point-accurate arrival rates | ThreadGroup peak/ramp/duration approximation | Optional plugin path — honesty first |
 | Distributed **campaign** scheduler | Multi-host cron orchestration | In-process tick only | Orchestrator job fan-out |
 | **Live reporting** sinks (external APM/metrics) | External ops sinks | ClickHouse + OPA only | Optional exporters |
-| **Notifications** (email, Slack, Teams, Jira, webhook) | Failures noticed outside dashboard | None in OPL | Hook OPA alerts or OPL webhooks on terminal status |
+| **Notifications** (email, Slack, Teams, Jira, webhook) | Failures noticed outside dashboard | Webhook on terminal status (`OPL_RUN_WEBHOOK_URL`); email/Slack/Teams later | Extend channels; optional OPA alert bridge |
 | **Bench report** builder (widgets, templates, **PDF**) | Shareable offline packs | JSON/CSV report Done | PDF/HTML pack later |
 | Full **trend** report builder (widgets, templates) | Sprint-over-sprint regressions | Sparklines + history table Done; no widget builder | CH queries + Trend tab charts |
 | **Infrastructure monitoring** during test | Host/DB health while load runs | Defer to **OPA** | Deep-link OPA infra; do not fork monitors into OPL |
@@ -121,15 +121,15 @@ Ranked for a team that **designs HTTP/API load tests, runs them in lab, gates CI
 | Rank | Gap | Why it hurts a lab | Sibling hint |
 |------|-----|--------------------|--------------|
 | 1 | Arrivals-accurate **curve** / multi-profile | ThreadGroup approximation ≠ realistic arrivals | Honesty-preserving injector path |
-| 2 | **Notifications** on terminal runs | Failures unnoticed outside the dashboard | Webhook on `failed` / gate fail |
-| 3 | Full **trend** report builder | Sparklines exist; no widget/template builder | CH + Trend tab widgets |
-| 4 | **PDF / bench pack** | Shareable offline artifacts incomplete | HTML/PDF from `/report` |
-| 5 | Distributed **scheduler** | In-process tick is single-host only | Orchestrator cron fan-out |
-| 6 | CI/CD **wizards** | Script/harness only slows adoption | Snippets in dashboard |
-| 7 | ModuleController path fidelity | Link expands inline; not JMeter ModuleController | Optional ModuleController emit |
-| 8 | **Variables** store (secret/counter/random) | Parameterization still thin | Variable store + secret refs |
-| 9 | Rendezvous / queue / JSR223 (gated) | Exotic controllers still missing | Extend VU DSL carefully |
-| 10 | Workspace collaboration polish | Multi-project hygiene | Tags, cross-project copy |
+| 2 | Full **trend** report builder | Sparklines exist; no widget/template builder | CH + Trend tab widgets |
+| 3 | **PDF / bench pack** | Shareable offline artifacts incomplete | HTML/PDF from `/report` |
+| 4 | Distributed **scheduler** | In-process tick is single-host only | Orchestrator cron fan-out |
+| 5 | CI/CD **wizards** | Script/harness only slows adoption | Snippets in dashboard |
+| 6 | ModuleController path fidelity | Link expands inline; not JMeter ModuleController | Optional ModuleController emit |
+| 7 | **Variables** store (secret/counter/random) | Parameterization still thin | Variable store + secret refs |
+| 8 | Rendezvous / throughput / JSR223 (gated) | Exotic controllers still missing | Extend VU DSL carefully |
+| 9 | Workspace collaboration polish | Multi-project hygiene | Tags, cross-project copy |
+| 10 | Multi-channel notify (email/Slack beyond webhook) | Webhook Done; ops often want chat/email | Channel adapters |
 
 **Honorable mentions (high effort or owned elsewhere):** Playwright/WebDriver VUs; geo cloud locations; infrastructure monitors (use OPA); MCP server.
 
@@ -139,7 +139,7 @@ Ranked for a team that **designs HTTP/API load tests, runs them in lab, gates CI
 
 For **OPL-API / OPL-Dashboard** implementers working load lab capabilities:
 
-1. **Near-term:** Notifications webhook on terminal runs; arrivals-curve honesty; PDF/bench pack.
+1. **Near-term:** Arrivals-curve honesty; PDF/bench pack; trend widgets.
 2. **Flagship track:** Keep JMeter-compatible VU tree as the design destination; HAR/JMX/Postman import remains the on-ramp.
 3. Keep **honesty strings** on run/list responses when adding fan-out, locations, or “cloud-like” UX.
 4. Do **not** reimplement infrastructure monitoring inside OPL — link OPA (`load_run_id`, infra hosts).
@@ -148,9 +148,8 @@ For **OPL-API / OPL-Dashboard** implementers working load lab capabilities:
 
 ### Next (this inventory)
 
-- Notifications (webhook) on terminal runs; arrivals-accurate curve (optional, honesty-first)
-- PDF / bench pack; full trend report builder widgets
-- ModuleController fidelity; variables store; CI wizards
+- Arrivals-accurate curve (optional, honesty-first); PDF / bench pack; full trend report builder widgets
+- ModuleController fidelity; variables store; CI wizards; multi-channel notify beyond webhook
 
 ---
 
