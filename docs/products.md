@@ -21,8 +21,11 @@ Recent hub batches moved dashboard query routes off the edge agent onto **opa-hu
 | 2 | `GET /api/infra/hosts`, `GET /api/transactions/compare` | Infrastructure, Compare Traces (cohort) |
 | 3 | `GET /api/version`, `GET /api/topology`, `GET /api/ops/status`, `GET /api/audit`, `GET /api/db/*` list surfaces | System, Databases |
 | 4 | *(none — docs audit only)* | Network, Cloud, Catalog, Automation, Compare Traces (call-graph tab) |
+| 5 | `GET /api/traces`, `GET /api/services/metadata` (already hub), `GET /api/explore/facets` ([OPA-Hub #20](https://github.com/TheGrimmChester/OPA-Hub/pull/20), v0.7.3) | Trace Explorer |
 
-Batch 4 audited remaining observability surfaces. **No hub routes were added.** Network, Cloud, Catalog, mgmt (`/api/mgmt/v1/*`), and call-graph compare are dashboard scaffolds with **no agent or hub backend** yet (NAS hub `:18080` → **404**). Filter suggestions exist on the edge agent only (`:18081` on NAS); the dashboard does not call them — stay edge-owned until wired.
+Batch 4 audited remaining observability surfaces and added **no** hub routes. Network, Cloud, Catalog, mgmt (`/api/mgmt/v1/*`), and call-graph compare stay **deferred** scaffolds (NAS hub `:18080` → **404**). Filter suggestions remain edge-only (`:18081`); the dashboard does not call them.
+
+Batch 5 / follow-up: Trace Explorer list + metadata were already hub-owned; **`GET /api/explore/facets` is hub-owned** (not deferred) as of opa-hub **v0.7.3**. NAS hub returns **200** with JWT; edge correctly **404**.
 
 The dashboard never calls edge hosts in production. See [OPA-Hub ownership](https://github.com/TheGrimmChester/OPA-Hub/blob/main/docs/ownership.md) for the full deferred table.
 
