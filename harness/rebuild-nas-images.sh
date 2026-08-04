@@ -92,6 +92,9 @@ if wants ora-api || wants all; then
   need Open-Auth-Go
   need Open-Client-Go
   need Open-Job-Go
+  need Open-Tenant-Go
+  need Open-ClickHouse-Go
+  need Open-HTTP-Go
   build_df ora-api.nas.Dockerfile "ora-api:$TAG" --target ora-api
   docker build -f "$DOCKER_DIR/ora-api.nas.Dockerfile" -t "ora-runner-git:$TAG" --target ora-runner-git "$FAMILY_ROOT"
 fi
@@ -101,6 +104,9 @@ if wants osa-api || wants all; then
   need Open-Auth-Go
   need Open-Client-Go
   need Open-Job-Go
+  need Open-Tenant-Go
+  need Open-ClickHouse-Go
+  need Open-HTTP-Go
   build_df osa-api.nas.Dockerfile "osa-api:$TAG" --target osa-api
   docker build -f "$DOCKER_DIR/osa-api.nas.Dockerfile" -t "osa-runner-scan:$TAG" --target osa-runner-scan "$FAMILY_ROOT"
 fi
@@ -109,6 +115,9 @@ if wants opl-api || wants all; then
   need OPL-API
   need Open-Auth-Go
   need Open-Job-Go
+  need Open-Tenant-Go
+  need Open-ClickHouse-Go
+  need Open-HTTP-Go
   build_df opl-api.nas.Dockerfile "opl-api:$TAG" --target opl-api
   docker build -f "$DOCKER_DIR/opl-api.nas.Dockerfile" -t "opl-runner-jmeter:$TAG" --target opl-runner-jmeter "$FAMILY_ROOT"
 fi
@@ -118,6 +127,8 @@ if wants opm-api || wants all; then
   need Open-Auth-Go
   need Open-Client-Go
   need Open-Job-Go
+  need Open-Tenant-Go
+  need Open-HTTP-Go
   build_df opm-api.nas.Dockerfile "opm-api:$TAG" --target opm-api
   docker build -f "$DOCKER_DIR/opm-api.nas.Dockerfile" -t "opm-runner-task:$TAG" --target opm-runner-task "$FAMILY_ROOT"
 fi
