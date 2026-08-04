@@ -57,6 +57,13 @@ Pre-split review/security/perf tables that still live under database `opa` are l
 
 Co-deployed mode: shared `JWT_SECRET`, `AUTH_MODE=codeployed`, and `OPA_AUTH_REQUIRED=1` on **hub, ora-api, osa-api, opl-api, and opm-api**. Peers set `PEER_OPA_URL=http://hub:8080`. Hub issues user JWTs; product APIs validate them. Product-local `/api/auth/login` returns `503` in co-deployed mode.
 
+**Dashboard login:** ora-dashboard (`8089`), osa-dashboard (`8094`), opl-dashboard (`8095`), and opm-dashboard (`8098`) expose a same-origin **`/hub-auth/`** proxy to `hub:8080`. Browsers sign in via `/hub-auth/api/auth/login`; product API `/api/auth/login` stays disabled. Verify with:
+
+```bash
+curl -sf http://127.0.0.1:8094/hub-auth/api/auth/status   # issuer opa-hub
+curl -sf http://127.0.0.1:8095/hub-auth/api/auth/status
+```
+
 Set **`OPEN_SERVICE_JWT_SECRET`** to a second secret (≥32 bytes), **distinct from** `JWT_SECRET`. Do not reuse the user JWT secret for service-to-service mint/validate. Compose passes it through without falling back to `JWT_SECRET`. After rotating the service secret, recreate **hub, ora-api, osa-api, opl-api, and opm-api** so all peers share the new value.
 
 OPM/OSA GitHub targets: `opm-api` and `osa-api` use `PEER_OPA_URL` (org directory) and `PEER_ORA_URL` (connectors / clone credentials). Configure GitHub App or PAT on **ora-api** (`OPA_GITHUB_APP_*`, `OPA_CONNECTOR_SECRET`). After image upgrades, redeploy `opa-hub`, `ora-api`, `opm-api`, `opm-dashboard`, `osa-api`, and `osa-dashboard` (`*:nas` tags only).
