@@ -51,7 +51,8 @@ services:
       CLICKHOUSE_DB: opa
       JWT_SECRET: ${JWT_SECRET}
       AUTH_MODE: ${AUTH_MODE:-codeployed}
-      OPEN_SERVICE_JWT_SECRET: ${OPEN_SERVICE_JWT_SECRET:-${JWT_SECRET}}
+      # Prefer a distinct service secret from JWT_SECRET (set OPEN_SERVICE_JWT_SECRET in .env).
+      OPEN_SERVICE_JWT_SECRET: ${OPEN_SERVICE_JWT_SECRET}
       OPA_HUB_ENROLL_TOKEN: ${OPA_HUB_ENROLL_TOKEN:-}
       OPA_AUTH_REQUIRED: ${OPA_AUTH_REQUIRED:-1}
       PEER_ORA_URL: http://ora-api:8091
@@ -134,7 +135,8 @@ services:
       CLICKHOUSE_DB: ora
       JWT_SECRET: ${JWT_SECRET}
       AUTH_MODE: ${AUTH_MODE:-codeployed}
-      OPEN_SERVICE_JWT_SECRET: ${OPEN_SERVICE_JWT_SECRET:-${JWT_SECRET}}
+      # Prefer a distinct service secret from JWT_SECRET (set OPEN_SERVICE_JWT_SECRET in .env).
+      OPEN_SERVICE_JWT_SECRET: ${OPEN_SERVICE_JWT_SECRET}
       OPA_AUTH_REQUIRED: ${OPA_AUTH_REQUIRED:-1}
       PEER_OPA_URL: http://hub:8080
       PEER_OSA_URL: http://osa-api:8093
@@ -225,7 +227,8 @@ services:
       CLICKHOUSE_DB: osa
       JWT_SECRET: ${JWT_SECRET}
       AUTH_MODE: ${AUTH_MODE:-codeployed}
-      OPEN_SERVICE_JWT_SECRET: ${OPEN_SERVICE_JWT_SECRET:-${JWT_SECRET}}
+      # Prefer a distinct service secret from JWT_SECRET (set OPEN_SERVICE_JWT_SECRET in .env).
+      OPEN_SERVICE_JWT_SECRET: ${OPEN_SERVICE_JWT_SECRET}
       OPA_AUTH_REQUIRED: ${OPA_AUTH_REQUIRED:-1}
       PEER_OPA_URL: http://hub:8080
       PEER_ORA_URL: http://ora-api:8091
@@ -285,7 +288,8 @@ services:
       CLICKHOUSE_DB: opl
       JWT_SECRET: ${JWT_SECRET}
       AUTH_MODE: ${AUTH_MODE:-codeployed}
-      OPEN_SERVICE_JWT_SECRET: ${OPEN_SERVICE_JWT_SECRET:-${JWT_SECRET}}
+      # Prefer a distinct service secret from JWT_SECRET (set OPEN_SERVICE_JWT_SECRET in .env).
+      OPEN_SERVICE_JWT_SECRET: ${OPEN_SERVICE_JWT_SECRET}
       OPA_AUTH_REQUIRED: ${OPA_AUTH_REQUIRED:-1}
       PEER_OPA_URL: http://hub:8080
       OPA_JOB_IMAGE_TAG: nas
@@ -340,7 +344,8 @@ services:
       LISTEN_ADDR: ":8096"
       JWT_SECRET: ${JWT_SECRET}
       AUTH_MODE: ${AUTH_MODE:-codeployed}
-      OPEN_SERVICE_JWT_SECRET: ${OPEN_SERVICE_JWT_SECRET:-${JWT_SECRET}}
+      # Prefer a distinct service secret from JWT_SECRET (set OPEN_SERVICE_JWT_SECRET in .env).
+      OPEN_SERVICE_JWT_SECRET: ${OPEN_SERVICE_JWT_SECRET}
       OPA_AUTH_REQUIRED: ${OPA_AUTH_REQUIRED:-1}
       PEER_OPA_URL: http://hub:8080
       PEER_ORA_URL: http://ora-api:8091
