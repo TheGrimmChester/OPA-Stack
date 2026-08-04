@@ -19,6 +19,14 @@ Implementation guide for **sibling** work in [OPL-API](https://github.com/TheGri
 
 OPL is a **self-hosted load lab** next to OPA, not a SaaS multi-cloud load grid. Gaps ranked for **load-test lab user impact** (design → run → analyze → gate), not for matching OctoPerf enterprise packaging.
 
+### Flagship gap: JMeter Visual test case editor
+
+OctoPerf’s **most advanced / differentiating** design feature is the **JMeter Visual test case editor** — a hierarchical Virtual User tree (drag-and-drop actions, containers, logic, extractors, search/replace) for building JMeter-compatible journeys **without editing raw JMX**. Doc anchors: [design / edit virtual user](https://api.octoperf.com/doc/design/edit-virtual-user/), [virtual user tree](https://api.octoperf.com/doc/design/edit-virtual-user/virtual-user-tree/), product framing [JMeter on steroids](https://octoperf.com/product/jmeter-on-steroids/).
+
+**OPL today:** Design tab is a **flat form step list** (`http` / `think` / `extract` / `assert` / `transaction`) that generates JMX on save, plus **HAR/XHR/JMX import** and a raw **JMX** tab. That is codeless enough for simple HTTP labs, but it is **not** a visual JMeter plan/tree editor.
+
+**Aspirational (not “different by design”):** OPL should aim for **visual scenario editing compatible with JMeter semantics** (tree or equivalent structured canvas → same JMX/engine path). Staying form-only forever would leave the flagship OctoPerf design advantage unaddressed; raw JMX-only is a fallback, not the target UX.
+
 ---
 
 ## Done (parity-ish)
@@ -29,7 +37,7 @@ OPL is a **self-hosted load lab** next to OPA, not a SaaS multi-cloud load grid.
 | HAR → VU | `POST /api/perf/scenarios/import-har` (+ Capture UI) | Skips private/metadata hosts (URL policy) |
 | JMeter JMX import / export | `import-jmx`, `export-jmx`, JMX tab | Best-effort HTTP samplers / timers / extractors / CSV / classic thread groups |
 | XHR capture import | `import-xhr` / `export-xhr` | Lab-oriented; not an OctoPerf product name |
-| Codeless / form designer → JMX | Dashboard builds steps; API stores `jmx_xml` | Users need not author JMeter XML |
+| Codeless / form designer → JMX | Dashboard builds **flat** steps; API stores `jmx_xml` | Not OctoPerf’s visual JMeter tree editor (see Flagship gap) |
 | CSV / datasets | `datasets_json` → CSVDataSet in generated JMX | Inline CSV in Users & data tab |
 | Extractors / assertions (basic) | Step types `extract`, `assert`; selector metadata (css/xpath/correlate) | Mirrored as JMX where supported; not full OctoPerf action tree |
 | Load profiles | `soak` / `spike` / `ramp` + presets (smoke, stress) | Run & scale tab |
@@ -65,11 +73,12 @@ Present on **OPL-API `main`** (`octoperf_parity.go`, `jmeter.go` / `load.go` wir
 
 | OctoPerf capability | Doc anchor | OPL gap | Suggested sibling work |
 |---------------------|------------|---------|------------------------|
+| **JMeter Visual test case editor** (flagship) | `design/edit-virtual-user/` + `virtual-user-tree/` | Flat form steps + JMX/HAR import only — no hierarchical visual JMeter plan editor | Visual tree/canvas UX → JMeter-semantic model → existing JMX engine; keep import as on-ramp |
 | **Postman** collection import | `design/create-virtual-user/import-postman-collection` | Absent | `import-postman` → HTTP steps / JMX |
 | **Playwright** / real-browser VUs | Playwright import + actions | Explicitly out of scope today | New runner image or hybrid engine — large |
 | **WebDriver** / Selenium record | `record-selenium-web-driver` | Absent | Later; overlap with Playwright |
 | **VU fragments** + Link actions | Fragments VU type | No shared fragments | Reusable scenario fragments / includes |
-| Rich **action tree** (if/while/foreach/rendezvous/queue/JSR223…) | `design/edit-virtual-user/action-types/*` | Flat step list + limited JMX | Extend step DSL or trust raw JMX only |
+| Rich **action tree** (if/while/foreach/rendezvous/queue/JSR223…) | `design/edit-virtual-user/action-types/*` | Flat step list + limited JMX | Extend visual/step DSL toward JMeter containers & logic (pairs with flagship editor) |
 | **Auto-correlation** studio | `configuration/auto-correlation` | Selector metadata only | Detect dynamic tokens; suggest extractors |
 | **Validate VU** triage (functional check before load) | `edit-virtual-user/validation` | `validate` thinner than OctoPerf | Per-step request/response triage UI |
 | **Variables** (secret, counter, random, file-backed CSV UX) | `configuration/variables/*` | Headers + inline CSV | Variable store + secret refs |
@@ -111,33 +120,36 @@ Present on **OPL-API `main`** (`octoperf_parity.go`, `jmeter.go` / `load.go` wir
 
 ## Top 10 missing (load-test lab impact)
 
-Ranked for a team that **designs HTTP/API load tests, runs them in lab, gates CI, and correlates to APM** — not for matching SaaS geo scale. Items already **code-ready** still count until Dashboard + NAS `:nas` make them usable.
+Ranked for a team that **designs HTTP/API load tests, runs them in lab, gates CI, and correlates to APM** — not for matching SaaS geo scale. Items already **code-ready** still count until Dashboard + NAS `:nas` make them usable. **#1 is the flagship product gap** (see above); near-term ship work still prefers Code-ready → Done first (Implementation priority).
 
 | Rank | Gap | Why it hurts a lab | Sibling hint |
 |------|-----|--------------------|--------------|
-| 1 | **Archive/delete end-to-end** | Lab clutter; API soft-archive on `main` but no UI / may lag NAS | Dashboard + `opl-api:nas` roll-out |
-| 2 | **Scheduler / cron runs** | Manual click-to-run blocks nightly soak & regression | Orchestrator job + `schedule_json` consumer |
-| 3 | **Custom / visual load policy** | Presets ≠ realistic arrival curves; point editor absent | Timeline JSON → JMeter; expose `load-policies` in UI |
-| 4 | **VU validation triage (pre-load)** | Broken correlation burns engine minutes | Expand validate + per-step RR UI |
-| 5 | **Auto-correlation assistance** | Dynamic tokens are the #1 replay failure mode | Suggest extractors from HAR/validate |
-| 6 | **Postman import** | Common API collections never enter the lab | Map Postman → steps/JMX |
-| 7 | **Trend / multi-run history** | Two-run compare hides regressions over a sprint | CH queries + Compare/Trend tab |
-| 8 | **Terminal-run notifications** | Failures unnoticed outside the dashboard | Webhook/Slack on `failed` / gate fail |
-| 9 | **Runner live status in UI** | API `/runners` on `main`; operators still stare at “running” | Results workers panel + `:nas` |
-| 10 | **Report export + JTL import** | Shareable artifacts / offline JMeter; PDF still out | Wire `/report` download; add `import-jtl` |
+| 1 | **JMeter Visual test case editor** | OctoPerf’s differentiating design surface; OPL form+import cannot compose nested JMeter journeys | Visual tree/canvas ↔ JMeter-semantic steps → existing JMX path |
+| 2 | **Archive/delete end-to-end** | Lab clutter; API soft-archive on `main` but no UI / may lag NAS | Dashboard + `opl-api:nas` roll-out |
+| 3 | **Scheduler / cron runs** | Manual click-to-run blocks nightly soak & regression | Orchestrator job + `schedule_json` consumer |
+| 4 | **Custom / visual load policy** | Presets ≠ realistic arrival curves; point editor absent | Timeline JSON → JMeter; expose `load-policies` in UI |
+| 5 | **VU validation triage (pre-load)** | Broken correlation burns engine minutes | Expand validate + per-step RR UI |
+| 6 | **Auto-correlation assistance** | Dynamic tokens are the #1 replay failure mode | Suggest extractors from HAR/validate |
+| 7 | **Postman import** | Common API collections never enter the lab | Map Postman → steps/JMX |
+| 8 | **Trend / multi-run history** | Two-run compare hides regressions over a sprint | CH queries + Compare/Trend tab |
+| 9 | **Terminal-run notifications** | Failures unnoticed outside the dashboard | Webhook/Slack on `failed` / gate fail |
+| 10 | **Runner live status + report/JTL** | Operators lack injector visibility / shareable offline artifacts | Wire `/runners` + `/report`; add `import-jtl` |
 
-**Honorable mentions (high effort or owned elsewhere):** Playwright/WebDriver VUs; geo cloud locations; full action-tree parity; OctoPerf-style infrastructure monitors (use OPA); MCP server; multi-profile geo campaigns.
+**Honorable mentions (high effort or owned elsewhere):** Playwright/WebDriver VUs; geo cloud locations; full action-tree parity beyond the visual editor MVP; OctoPerf-style infrastructure monitors (use OPA); MCP server; multi-profile geo campaigns.
 
 ---
 
-## Implementation guidance (siblings)
+## Implementation priority (siblings)
 
-1. Prefer **closing Code-ready → Done** (archive, duplicate, policies, steps, report, runners) before large Missing items — smallest path to OctoPerf-familiar lab UX.
-2. Then Top 10 **#2–#5** (scheduler, custom curve, validate triage, auto-correlation).
-3. Keep **honesty strings** on run/list responses when adding fan-out, locations, or “cloud-like” UX.
-4. Do **not** reimplement OctoPerf monitoring inside OPL — link OPA (`load_run_id`, infra hosts).
-5. NAS / production: rebuild and tag `opl-api:nas` / `opl-dashboard:nas` only; laptop smoke is fine locally.
-6. Cross-check [opl-opm-backlog.md](opl-opm-backlog.md) when closing Next items so backlog and this inventory stay aligned (backlog “upsert-only delete” / “runner live status” should flip once Code-ready ships to NAS + UI).
+For **OPL-API / OPL-Dashboard** implementers working OctoPerf parity:
+
+1. **Near-term:** Prefer **closing Code-ready → Done** (archive, duplicate, policies, steps, report, runners) — smallest path to a cleaner lab UX on NAS `:nas`.
+2. **Flagship track (parallel / next major design investment):** **JMeter Visual test case editor** — visual scenario editing with **JMeter-compatible semantics**, not a permanent “form-only” stance. HAR/JMX import remains the on-ramp; the editor is the destination for complex journeys. Grow action coverage (containers, logic, fragments) on that model rather than only extending the flat step list.
+3. Then Top 10 **#3–#6** (scheduler, custom curve, validate triage, auto-correlation).
+4. Keep **honesty strings** on run/list responses when adding fan-out, locations, or “cloud-like” UX.
+5. Do **not** reimplement OctoPerf monitoring inside OPL — link OPA (`load_run_id`, infra hosts).
+6. NAS / production: rebuild and tag `opl-api:nas` / `opl-dashboard:nas` only; laptop smoke is fine locally.
+7. Cross-check [opl-opm-backlog.md](opl-opm-backlog.md) when closing Next items so backlog and this inventory stay aligned (backlog “upsert-only delete” / “runner live status” should flip once Code-ready ships to NAS + UI).
 
 ---
 
