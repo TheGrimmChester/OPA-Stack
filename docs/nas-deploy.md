@@ -8,9 +8,47 @@ This document describes the production Open-* stack on the TrueNAS host.
 |------|--------|
 | Compose project | `open-family` |
 | Directory | `/mnt/Apps/config-docker/open-stack` |
-| Legacy path | `/mnt/Apps/config-docker/opa` — kept as a **symlink** to `open-stack` so existing overlays and bind mounts keep working |
-| Compose file | `compose.nas.yaml` (copied or linked as `docker-compose.yaml` on the host) |
+| Legacy path | `/mnt/Apps/config-docker/opa` — kept as a **symlink** to `open-stack` so existing overlays and bind mounts keep working. Run compose from the real path: Compose keys files by the path given, so the symlink and the real path count as two files |
+| Compose file | `compose.nas.yaml` — the **only** stack file in the directory, selected by `COMPOSE_FILE=compose.nas.yaml` in `.env` (see [Compose file set](#compose-file-set)) |
 | Image tags | `*:nas` only — never deploy `*:smoke` on this host |
+
+## Compose file set
+
+The stack directory holds exactly one compose file: `compose.nas.yaml`, kept in
+step with this repository. `COMPOSE_FILE=compose.nas.yaml` in the stack `.env`
+makes a plain `docker compose` resolve to it, so no copy named
+`docker-compose.yaml` is needed and no `-f` flag has to be remembered.
+
+Do not add a second stack file to the directory, and do not name the same file
+twice on one command line. Compose merges every file it is given into one model:
+where a service key holds a list, the lists are concatenated, so a service
+defined twice ends up with its list values repeated. The collector's
+`group_add` is validated as a set, and the merged model is rejected:
+
+```
+validating compose.nas.yaml: services.collector.group_add items at 0 and 1 are equal
+```
+
+The collector is only where it surfaces: `group_add` is compared as a set, while
+`ports`, `volumes`, and `networks` merge by key and absorb their duplicates
+silently. The duplication is stack-wide either way. Two full definitions also
+drift apart, and containers then carry whichever file happened to create them —
+something `docker compose ps` does not show. Check for a split project with:
+
+```bash
+cd /mnt/Apps/config-docker/open-stack
+docker compose config -q && echo "compose model OK"
+
+# every container must report the same file
+docker ps -a --filter label=com.docker.compose.project=open-family --format '{{.Names}}' |
+  while read -r c; do
+    docker inspect "$c" \
+      --format '{{.Name}} {{index .Config.Labels "com.docker.compose.project.config_files"}}'
+  done | sort -k2
+```
+
+Services listing anything other than `compose.nas.yaml` were created from a
+stale definition — recreate them (`docker compose up -d --no-deps <service>`).
 
 ## Services and ports
 
@@ -136,10 +174,17 @@ This script tags **only** `*:nas`. Do not run `harness/rebuild-smoke-images.sh` 
 
 ```bash
 cd /mnt/Apps/config-docker/open-stack
-# ensure docker-compose.yaml is the NAS file (compose.nas.yaml)
+grep -q '^COMPOSE_FILE=compose.nas.yaml$' .env   # single stack file (see above)
+docker compose config -q                          # validate before touching the stack
 docker compose pull clickhouse   # or rely on local *:nas images
 docker compose up -d
 docker compose ps
+```
+
+Recreate one service without disturbing its dependencies:
+
+```bash
+docker compose up -d --no-deps --force-recreate collector
 ```
 
 ## Health checks
@@ -176,6 +221,13 @@ TOKEN=$(curl -sf -X POST http://127.0.0.1:18080/api/auth/login \
 curl -sf -H "Authorization: Bearer $TOKEN" http://127.0.0.1:18080/api/infra/hosts | jq .
 # expect host truenas2012 with reporting=true and recent last_seen
 ```
+
+Container metrics need the host docker group on the collector, which runs as
+uid/gid `65534` from a scratch image. `compose.nas.yaml` adds
+`${OPA_DOCKER_GID:-999}` to it; set `OPA_DOCKER_GID` in `.env` if
+`getent group docker` reports a different GID. Without the group the process
+still ships host CPU, memory, and disk points but logs docker socket permission
+errors and reports no containers.
 
 ### Hub dashboard routes (authenticated)
 
@@ -333,9 +385,15 @@ cd /mnt/Apps/config-docker/open-stack && docker compose -p open-family ps
 
 ## Rollback
 
+Roll back the compose file through git, not through a second copy in the stack
+directory — that is what produced the split project this layout removes.
+
 1. `docker compose -p open-family down` (does **not** remove the external ClickHouse volume).
-2. Restore the previous `docker-compose.yaml` under the stack directory (backups are timestamped beside the file).
-3. `docker compose -p opa-stack up -d` with the legacy file if needed.
+2. In `src/OPA-Stack`, check out the previous revision of `compose.nas.yaml`
+   (`git log --oneline -- compose.nas.yaml`) and copy that one file into the
+   stack directory. The directory keeps exactly one stack file.
+3. `docker compose config -q`, then `docker compose up -d`. The project name
+   stays `open-family`; there is no separate legacy project to bring up.
 4. Confirm volume `opa-stack_opa_clickhouse_data` is still present: `docker volume ls | grep opa_clickhouse`.
 
 ## Related

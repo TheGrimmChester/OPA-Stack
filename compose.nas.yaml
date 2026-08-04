@@ -5,6 +5,11 @@
 # Typical path on NAS: /mnt/Apps/config-docker/open-stack
 #   (legacy path /mnt/Apps/config-docker/opa may remain as a symlink)
 #
+# This is the only compose file for the production stack. Select it with
+# COMPOSE_FILE=compose.nas.yaml in the stack .env and keep no second copy
+# beside it — a directory holding two full stack definitions merges every
+# service twice and drifts silently. See docs/nas-deploy.md, "Compose file set".
+#
 # ClickHouse data: reuses the pre-split volume by name (external) so production
 # telemetry is not wiped when the compose project renames from opa-stack.
 #
@@ -428,6 +433,11 @@ services:
       - open_internal
       - opa_network
 
+  # Host metrics collector — the single definition of this service. It runs as
+  # uid/gid 65534 (scratch image, no shell), so container collection needs the
+  # host docker group added explicitly to read /var/run/docker.sock. Set
+  # OPA_DOCKER_GID in the stack .env when the host docker group is not 999
+  # (`getent group docker`) instead of editing this file.
   collector:
     image: opa-collector:nas
     container_name: open_collector
@@ -435,7 +445,7 @@ services:
     network_mode: host
     pid: host
     group_add:
-      - "999"
+      - "${OPA_DOCKER_GID:-999}"
     depends_on:
       opa_agent:
         condition: service_healthy
