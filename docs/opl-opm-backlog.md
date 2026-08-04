@@ -20,15 +20,17 @@ Ports: API `8092`, dashboard `8095`. Control plane: `opl-api` + `opl-orchestrato
 - Run lifecycle: undispatched → `created`, failed dispatch → `failed`, `POST .../runs/{id}/cancel`; gate JSON includes `pass`
 - Results KPIs prefer `summary_json` (JMeter aggregates); sample table uses `step_name`
 - OPA Trace Explorer deep-links default to same-host `:8088` (`?load_run_id=`)
-- **JMeter visual test case editor (first slice)** — hierarchical VU tree + inspector; nested `children` → JMX hashTrees (PRs pending NAS `:nas` roll-out)
-- Scenario soft-archive + duplicate; load-policies; runners inspect; steps/report export; JTL import; validate triage (API+UI; needs `:nas`)
+- **Lab ops API on NAS `opl-api:nas`** (Hub JWT): `GET /api/perf/load-policies` → **200** (not 404); soft-archive / duplicate / validate; `GET .../runs/{id}/steps|report|runners`; `POST .../import-jtl`
+- **JMeter visual test case editor (first slice) + lab ops UI** on OPL-Dashboard / OPL-API `main` (`VuTree`, archive/duplicate/validate/runners/steps/report) — **pending `opl-dashboard:nas` rebuild** (served NAS bundle still lacks VuTree / archive strings)
 
 ### Next
 
+- **Redeploy `opl-dashboard:nas`** — surface VuTree + archive/duplicate/validate/runners/report from `main` (API already live)
 - **Baselines / federation peers** — dashboard skips `/api/performance/baselines` and `/api/federation/peers` (edge agent today; `opl-api` 404). Proxy/peer cleanly or drop dead UI affordances
 - **Visual editor depth** — drag-and-drop multi-select, logic containers (If/While/Loop), search/replace across tree, disable nodes
 - **Custom load curve editor** — point timeline → ThreadGroup / schedule_json
 - **Scheduler UX** — wire `schedule_json` enable/every_minutes/daily_at in Run & scale
+- **JTL import UI** — API live; Results affordance missing
 - **Terminal-run notifications** — webhook on failed/gate fail
 - **Trend / multi-run history** — beyond two-run compare
 
@@ -54,6 +56,7 @@ Ports: API `8096`, dashboard `8098`. Control plane: `opm-api` + `opm-orchestrato
 - Roadmap / ideation create + inline edit/delete; changelog generate + save
 - Builtin job executor writes real artifacts for planning / implementation / review / QA / changelog (`execution: "builtin"`)
 - Jobs list + enqueue + cancel with operator `message`; filesystem project state under `OPM_DATA_DIR`
+- NAS verify: `GET :8096/api/health` → **200** `{ status: ok, service: opm-api, auth_mode: codeployed }`; `:8098/` → **200**
 
 ### Next
 
