@@ -14,18 +14,18 @@ Headers: `Authorization: Bearer <user-jwt>`, **`X-Organization-ID`**, **`X-Proje
 
 ### Tenant headers (required when auth is on)
 
-When `OPA_AUTH_REQUIRED=1` (NAS default on hub + ORA/OSA/OPL/OPM), Open-Tenant scopes ClickHouse list queries to the org/project in those headers. **Omit either header and many list endpoints still return HTTP 200 with an empty array** — not `401`/`403`. That looks like “no data” even when ClickHouse has rows for `default-org` / `default-project`.
+When `OPA_AUTH_REQUIRED=1` (NAS default on hub + ORA/OSA/OPL/OPM), Open-Tenant scopes ClickHouse list queries to the org/project in those headers. **Omit either header** (or send the picker marker `"all"`, which is stripped) and list endpoints scope to **`default-org` / `default-project`** — the same write tenant used for INSERT — not an empty array. They still return HTTP 200 (not `401`/`403`). Rows written under another tenant (e.g. `nas` / `infra`) stay invisible until you send those headers.
 
-Always send both headers with the hub JWT. Canonical names (case-insensitive): `X-Organization-ID`, `X-Project-ID`. Query fallbacks `organization_id` / `project_id` work the same. The `"all"` picker marker is stripped under auth and does not widen scope.
+Always prefer sending both headers with the hub JWT. Canonical names (case-insensitive): `X-Organization-ID`, `X-Project-ID`. Query fallbacks `organization_id` / `project_id` work the same. The `"all"` picker marker is stripped under auth and does not widen scope to every tenant (Open-Tenant-Go ≥ 0.2.2 aligns missing/`all` with `WriteTenant` defaults).
 
-Verified empty-without / populated-with on NAS (`192.168.100.101`; use `127.0.0.1` when curling on the host):
+Verified on NAS (`192.168.100.101`; use `127.0.0.1` when curling on the host) after Open-Tenant-Go 0.2.2:
 
-| Product | Port | List path | Without headers | With `default-org` / `default-project` |
-|---------|------|-----------|-----------------|----------------------------------------|
-| OSA | `8093` | `GET /api/security/runs` | `{"runs":[]}` | runs present |
-| OSA | `8093` | `GET /api/security/secrets` | `{"findings":[]}` | findings present |
-| OPL | `8092` | `GET /api/perf/scenarios` | `{"scenarios":[]}` | scenarios present |
-| OPL | `8092` | `GET /api/perf/runs` | `{"runs":[]}` | runs present |
+| Product | Port | List path | Without headers | With `default-org` / `default-project` | With `nas` / `infra` |
+|---------|------|-----------|-----------------|----------------------------------------|----------------------|
+| OSA | `8093` | `GET /api/security/runs` | default-org rows | same | nas/infra rows |
+| OSA | `8093` | `GET /api/security/secrets` | default-org findings | same | nas/infra findings |
+| OPL | `8092` | `GET /api/perf/scenarios` | default-org scenarios | same | nas/infra scenarios |
+| OPL | `8092` | `GET /api/perf/runs` | default-org runs | same | nas/infra runs |
 
 Some ORA admin/SCM surfaces still return broader lists when headers are missing (honesty text may say tenant All). Prefer sending headers anyway so dashboards and scripts match the scoped tenant.
 
@@ -35,25 +35,21 @@ TOKEN=$(curl -sf -X POST http://127.0.0.1:18080/api/auth/login \
   -H 'Content-Type: application/json' \
   -d '{"username":"admin","password":"admin"}' | jq -r .token)
 
-# Empty without tenant headers (auth on)
-curl -sf "http://127.0.0.1:8093/api/security/runs?limit=5" \
-  -H "Authorization: Bearer $TOKEN" | jq '.runs | length'   # → 0
+# Default write tenant (no headers → default-org / default-project)
+curl -sf "http://127.0.0.1:8092/api/perf/runs?limit=5" \
+  -H "Authorization: Bearer $TOKEN" | jq '.runs | length'
 
-# Populated with tenant headers
-curl -sf "http://127.0.0.1:8093/api/security/runs?limit=5" \
-  -H "Authorization: Bearer $TOKEN" \
-  -H "X-Organization-ID: default-org" \
-  -H "X-Project-ID: default-project" | jq '.runs | length'   # → >0 when CH has rows
-
+# Explicit default tenant
 curl -sf "http://127.0.0.1:8092/api/perf/scenarios" \
   -H "Authorization: Bearer $TOKEN" \
   -H "X-Organization-ID: default-org" \
   -H "X-Project-ID: default-project" | jq '.scenarios | length'
 
+# Other tenant
 curl -sf "http://127.0.0.1:8092/api/perf/runs?limit=5" \
   -H "Authorization: Bearer $TOKEN" \
-  -H "X-Organization-ID: default-org" \
-  -H "X-Project-ID: default-project" | jq '.runs | length'
+  -H "X-Organization-ID: nas" \
+  -H "X-Project-ID: infra" | jq '.runs | length'
 ```
 
 Product docs: [OSA api](https://github.com/TheGrimmChester/OSA-API/blob/main/docs/api.md), [OPL interop](https://github.com/TheGrimmChester/OPL-API/blob/main/docs/interop.md), [ORA interop](https://github.com/TheGrimmChester/ORA-API/blob/main/docs/interop.md), [OPM security](https://github.com/TheGrimmChester/OPM-API/blob/main/docs/security.md).
