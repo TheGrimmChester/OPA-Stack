@@ -20,17 +20,21 @@ Ports: API `8092`, dashboard `8095`. Control plane: `opl-api` + `opl-orchestrato
 - Run lifecycle: undispatched → `created`, failed dispatch → `failed`, `POST .../runs/{id}/cancel`; gate JSON includes `pass`
 - Results KPIs prefer `summary_json` (JMeter aggregates); sample table uses `step_name`
 - OPA Trace Explorer deep-links default to same-host `:8088` (`?load_run_id=`)
+- **JMeter visual test case editor (first slice)** — hierarchical VU tree + inspector; nested `children` → JMX hashTrees (PRs pending NAS `:nas` roll-out)
+- Scenario soft-archive + duplicate; load-policies; runners inspect; steps/report export; JTL import; validate triage (API+UI; needs `:nas`)
 
 ### Next
 
 - **Baselines / federation peers** — dashboard skips `/api/performance/baselines` and `/api/federation/peers` (edge agent today; `opl-api` 404). Proxy/peer cleanly or drop dead UI affordances
-- **Scenario delete/archive** — API+UI still upsert-only
-- **Runner live status** — container inspect / orchestrator visibility beyond run status + samples
-- **Instrumented target honesty** — document when apps are not OPA-instrumented (example.com never yields traces)
+- **Visual editor depth** — drag-and-drop multi-select, logic containers (If/While/Loop), search/replace across tree, disable nodes
+- **Custom load curve editor** — point timeline → ThreadGroup / schedule_json
+- **Scheduler UX** — wire `schedule_json` enable/every_minutes/daily_at in Run & scale
+- **Terminal-run notifications** — webhook on failed/gate fail
+- **Trend / multi-run history** — beyond two-run compare
 
 ### Later
 
-- **JMeter Visual test case editor** — flagship design gap; see [opl-lab-capabilities.md](opl-lab-capabilities.md) (aspirational visual editing with JMeter semantics; form+import today is not enough)
+- Full visual editor fidelity (logic actions, fragments, processors beyond extract/assert)
 - Multi-peer fan-out beyond local samples (not a commercial multi-region load grid)
 - Kubernetes (or non-Docker) runner backends (`PerfContainerRunner` extension point)
 - Scheduled / CI-triggered suites and multi-scenario campaigns
