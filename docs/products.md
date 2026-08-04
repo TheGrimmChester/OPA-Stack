@@ -67,6 +67,7 @@ Removed endpoints are absent (normal HTTP 404). Do not ship redirects, dual path
 
 ## Related docs
 
+- [OPL + OPM remaining backlog](opl-opm-backlog.md) — Done / Next / Later for Perf Lab and Project Manager
 - [Modules catalog](modules.md)
 - [Interop, auth modes, and ClickHouse databases](interop.md)
 - [NAS production deploy](nas-deploy.md) — compose project `open-family`, path `/mnt/Apps/config-docker/open-stack`, images `*:nas` only
