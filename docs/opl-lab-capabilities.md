@@ -42,6 +42,8 @@ OPL is a **self-hosted load lab** next to OPA, not a SaaS multi-cloud load grid.
 | **Custom load curve** | `schedule.curve` + `curve_mode=vus\|arrivals` | Dashboard `LoadCurveEditor`; VU peak/ramp or arrivals open-model segments |
 | **Scheduler UX** | `POST .../schedule` + in-process tick + Run & scale panel | `every_minutes` / `daily_at` UTC; not distributed campaign scheduler |
 | **Multi-run history + sparklines** | Scenario-scoped run table (≤25) + p95/error sparklines on Run & scale | Complements two-run Compare |
+| **Trend report widgets** | Trends tab: latency band (p50/p95/p99), error bars, best/worst/SLA breach KPIs; `GET .../scenarios/{id}/trends` | Beyond sparklines; not a full template builder |
+| **PDF / bench pack** | `report?format=html|pdf` + `bench-pack` ZIP (JSON+CSV+HTML+PDF) | Offline shareable pack from Results |
 | CSV / datasets | `datasets_json` → CSVDataSet in generated JMX | Inline CSV in Users & data tab |
 | Extractors / assertions (basic) | Nested under HTTP in VU tree | Mirrored as JMX where supported |
 | **Validate triage + auto-correlation** | `validate` returns `triage[]` + `correlation_suggestions[]`; UI Apply extract | Token/CSRF/Bearer heuristics from body_preview |
@@ -63,11 +65,7 @@ OPL is a **self-hosted load lab** next to OPA, not a SaaS multi-cloud load grid.
 
 ## Code-ready (ship UI + `:nas`)
 
-Most prior Code-ready items are now Done. Remaining:
-
-| Capability | API | Lab analogue | Sibling follow-up |
-|------------|-----|--------------|-------------------|
-| PDF bench pack | JSON/CSV report only | Shareable PDF | Report builder later |
+No remaining Code-ready items for PDF/trends — ship `:nas` rebuild after merge.
 
 ---
 
@@ -83,9 +81,9 @@ Most prior Code-ready items are now Done. Remaining:
 | **Geo / cloud locations** + IP ranges | Multi-region realism | Single-host Docker | Federation peers ≠ public regions (honesty) |
 | Distributed **campaign** scheduler | Multi-host cron orchestration | In-process tick only | Orchestrator job fan-out |
 | **Live reporting** sinks (external APM/metrics) | External ops sinks | ClickHouse + OPA only | Optional exporters |
-| **Notifications** (email, Slack, Teams, Jira, webhook) | Failures noticed outside dashboard | Webhook on terminal status (`OPL_RUN_WEBHOOK_URL`); email/Slack/Teams later | Extend channels; optional OPA alert bridge |
-| **Bench report** builder (widgets, templates, **PDF**) | Shareable offline packs | JSON/CSV report Done | PDF/HTML pack later |
-| Full **trend** report builder (widgets, templates) | Sprint-over-sprint regressions | Sparklines + history table Done; no widget builder | CH queries + Trend tab charts |
+| **Notifications** (email, Slack, Teams, Jira, webhook) | Failures noticed outside dashboard | Optional webhook Done (`OPL_RUN_WEBHOOK_URL`); richer channels later | Keep webhook; add email/Teams later |
+| **Bench report** template builder | Custom widget layouts / branded PDF templates | HTML/PDF + ZIP pack Done; no template editor | Template UX later |
+| Full **trend** template builder | Saved trend dashboards / widgets | Trends tab widgets Done; no saved templates | Persist widget layouts |
 | **Infrastructure monitoring** during test | Host/DB health while load runs | Defer to **OPA** | Deep-link OPA infra; do not fork monitors into OPL |
 | **On-premise agent** install / capacity | Remote runner capacity | Docker only on lab host | K8s / remote runner backends (Later backlog) |
 | **MCP server** for agents | Agent tooling over the lab API | No OPL MCP | Optional thin MCP over OPL REST |
@@ -126,7 +124,7 @@ Ranked for a team that **designs HTTP/API load tests, runs them in lab, gates CI
 | 5 | Rendezvous / queue / JSR223 (gated) | Exotic controllers still missing | Extend VU DSL carefully |
 | 6 | Workspace collaboration polish | Multi-project hygiene | Tags, cross-project copy |
 | 7 | Richer notify channels | Webhook Done; ops often want chat/email | Email / chat adapters |
-| 8 | Trend/report **templates** | Packs/widgets may exist; no saved layouts | Persist templates |
+| 8 | Trend/report **templates** | Packs/widgets exist; no saved layouts | Persist templates |
 | 9 | Geo / multi-host injectors | Single-host Docker only | Federation ≠ public regions |
 | 10 | Multi-profile campaigns | One scenario → one journey | Campaign / profiles array |
 
@@ -151,9 +149,14 @@ For **OPL-API / OPL-Dashboard** implementers working load lab capabilities:
 
 ### Next (this inventory)
 
-- Multi-profile campaigns; ModuleController fidelity; variables store; CI wizards
-- Report/trend templates; richer notify channels (webhook Done)
+- Report/trend template persistence; ModuleController fidelity; variables store; CI wizards
+- Richer notify channels beyond webhook
 - Distributed scheduler; geo honesty (federation ≠ cloud regions)
+
+### Recently closed (this pass)
+
+- PDF / HTML report + ZIP bench pack; Trends tab widgets + `/trends` API
+- Terminal-run webhook; arrivals-mode load curve (honesty-documented)
 
 ---
 
