@@ -27,19 +27,20 @@ Ports: API `8092`, dashboard `8095`. Control plane: `opl-api` + `opl-orchestrato
 - **Postman import** — `POST /api/perf/scenarios/import-postman` + Capture UI
 - **Validate triage + auto-correlation** — `triage[]` + `correlation_suggestions[]`; Apply extract in Design
 - **Restore archived + JTL import UI** — `POST .../unarchive`, list `?archived=1`; Results JTL upload
+- **PDF / HTML report + bench pack ZIP** — `report?format=html|pdf`, `GET .../bench-pack`
+- **Trends tab widgets** — latency band, error bars, best/worst/SLA KPIs; `GET .../scenarios/{id}/trends`
 - **Terminal-run notifications** — webhook on terminal status (`OPL_RUN_WEBHOOK_URL`); health `run_notify`; optional HMAC + status filter
 
 ### Next
 
-- **Redeploy `opl-api:nas` + `opl-dashboard:nas`** — ship ForEach/fragments/Postman/triage/restore/notify from this pass (sync-nas-src before rebuild)
+- **Redeploy `opl-api:nas` + `opl-dashboard:nas`** after PDF/trends + arrivals/notify (sync-nas-src before rebuild)
 - **Baselines / federation peers** — dashboard skips `/api/performance/baselines` and `/api/federation/peers` (edge agent today; `opl-api` 404). Proxy/peer cleanly or drop dead UI affordances
-- PDF bench pack / full trend widgets (see [opl-lab-capabilities.md](opl-lab-capabilities.md))
 - **Visual editor depth** — multi-select, search/replace across tree, disable nodes
-- **Trend chart builder** — multi-run history table exists; spark/trend charts still open
+- Richer notify channels; report/trend templates
 
 ### Later
 
-- Full visual editor fidelity (fragments, processors beyond extract/assert)
+- Full visual editor fidelity (processors beyond extract/assert; ModuleController path)
 - Multi-peer fan-out beyond local samples (not a commercial multi-region load grid)
 - Kubernetes (or non-Docker) runner backends (`PerfContainerRunner` extension point)
 - Distributed campaign scheduler (beyond in-process tick) and multi-scenario campaigns
