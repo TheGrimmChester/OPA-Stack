@@ -14,6 +14,8 @@ Headers: `Authorization: Bearer <user-jwt>`, **`X-Organization-ID`**, **`X-Proje
 
 ### Tenant headers (required when auth is on)
 
+Full curl matrix (no JWT → 401, wrong org → empty/403, co-deployed local login → 503): [security-tenant-scopes.md](security-tenant-scopes.md). Harness: `HOST=192.168.100.101 ./harness/security-tenant-matrix.sh`.
+
 When `OPA_AUTH_REQUIRED=1` (NAS default on hub + ORA/OSA/OPL/OPM), Open-Tenant scopes ClickHouse list queries to the org/project in those headers. **Omit either header** (or send the picker marker `"all"`, which is stripped) and list endpoints scope to **`default-org` / `default-project`** — the same write tenant used for INSERT — not an empty array. They still return HTTP 200 (not `401`/`403`). Rows written under another tenant (e.g. `nas` / `infra`) stay invisible until you send those headers.
 
 Always prefer sending both headers with the hub JWT. Canonical names (case-insensitive): `X-Organization-ID`, `X-Project-ID`. Query fallbacks `organization_id` / `project_id` work the same. The `"all"` picker marker is stripped under auth and does not widen scope to every tenant (Open-Tenant-Go ≥ 0.2.2 aligns missing/`all` with `WriteTenant` defaults).
