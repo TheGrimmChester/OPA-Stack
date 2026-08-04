@@ -21,25 +21,24 @@ Ports: API `8092`, dashboard `8095`. Control plane: `opl-api` + `opl-orchestrato
 - Results KPIs prefer `summary_json` (JMeter aggregates); sample table uses `step_name`
 - OPA Trace Explorer deep-links default to same-host `:8088` (`?load_run_id=`)
 - **Lab ops API on NAS `opl-api:nas`** (Hub JWT): `GET /api/perf/load-policies` → **200** (not 404); soft-archive / duplicate / validate; `GET .../runs/{id}/steps|report|runners`; `POST .../import-jtl`
-- **JMeter visual test case editor (first slice) + lab ops UI** on OPL-Dashboard / OPL-API `main` (`VuTree`, archive/duplicate/validate/runners/steps/report) — **pending `opl-dashboard:nas` rebuild** (served NAS bundle still lacks VuTree / archive strings)
+- **JMeter visual test case editor** — VU tree (HTTP / Txn / If / While / Loop) + DnD reorder/nest; JMX round-trip for controllers; archive/duplicate/validate/runners/steps/report in Dashboard
+- **Custom load curve + scheduler UX** — point-curve editor → `schedule.curve` / load-policies custom; Run & scale schedule panel (`enabled` / `every_minutes` / `daily_at`); scenario multi-run history (≤25)
 
 ### Next
 
-- **Redeploy `opl-dashboard:nas`** — surface VuTree + archive/duplicate/validate/runners/report from `main` (API already live)
+- **Redeploy `opl-api:nas` + `opl-dashboard:nas`** — ship controllers / curve / scheduler from this pass (sync-nas-src before rebuild)
 - **Baselines / federation peers** — dashboard skips `/api/performance/baselines` and `/api/federation/peers` (edge agent today; `opl-api` 404). Proxy/peer cleanly or drop dead UI affordances
-- **Visual editor depth** — drag-and-drop multi-select, logic containers (If/While/Loop), search/replace across tree, disable nodes
-- **Custom load curve editor** — point timeline → ThreadGroup / schedule_json
-- **Scheduler UX** — wire `schedule_json` enable/every_minutes/daily_at in Run & scale
+- **Visual editor depth** — multi-select, search/replace across tree, disable nodes, fragments / foreach
 - **JTL import UI** — API live; Results affordance missing
 - **Terminal-run notifications** — webhook on failed/gate fail
-- **Trend / multi-run history** — beyond two-run compare
+- **Trend chart builder** — multi-run history table exists; spark/trend charts still open
 
 ### Later
 
-- Full visual editor fidelity (logic actions, fragments, processors beyond extract/assert)
+- Full visual editor fidelity (fragments, processors beyond extract/assert, arrivals-accurate injectors)
 - Multi-peer fan-out beyond local samples (not a commercial multi-region load grid)
 - Kubernetes (or non-Docker) runner backends (`PerfContainerRunner` extension point)
-- Scheduled / CI-triggered suites and multi-scenario campaigns
+- Distributed campaign scheduler (beyond in-process tick) and multi-scenario campaigns
 - Optional `opl-gateway` peel; keep Node/host JMeter fallbacks lab-only
 
 ---
