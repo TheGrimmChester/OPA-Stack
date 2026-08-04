@@ -48,6 +48,8 @@ CREATE DATABASE IF NOT EXISTS opl;
 
 Pre-split review/security/perf tables that still live under database `opa` are left in place. New ORA/OSA/OPL writes go to their own databases. No destructive table moves are performed by this stack rename.
 
+**ORA GitHub connectors:** legacy rows may exist only in `opa.connectors`. On boot, `ora-api:nas` backfills missing connector rows into `ora.connectors` so OPM peer clone-credentials survive restart. Check `ora-api` logs for `legacy backfill` after recreate; no manual SQL is required.
+
 ## Networks
 
 - `open_internal` — stack-private bridge
@@ -57,16 +59,20 @@ Pre-split review/security/perf tables that still live under database `opa` are l
 
 Co-deployed mode: shared `JWT_SECRET`, `AUTH_MODE=codeployed`, and `OPA_AUTH_REQUIRED=1` on **hub, ora-api, osa-api, opl-api, and opm-api**. Peers set `PEER_OPA_URL=http://hub:8080`. Hub issues user JWTs; product APIs validate them. Product-local `/api/auth/login` returns `503` in co-deployed mode.
 
-**Dashboard login:** ora-dashboard (`8089`), osa-dashboard (`8094`), opl-dashboard (`8095`), and opm-dashboard (`8098`) expose a same-origin **`/hub-auth/`** proxy to `hub:8080`. Browsers sign in via `/hub-auth/api/auth/login`; product API `/api/auth/login` stays disabled. Verify with:
+**Dashboard login:** ora-dashboard (`8089`), osa-dashboard (`8094`), opl-dashboard (`8095`), and opm-dashboard (`8098`) expose a same-origin **`/hub-auth/`** proxy to `hub:8080`. Browsers sign in via `/hub-auth/api/auth/login`; product API `/api/auth/login` stays disabled (`503`). Verify with:
 
 ```bash
-curl -sf http://127.0.0.1:8094/hub-auth/api/auth/status   # issuer opa-hub
-curl -sf http://127.0.0.1:8095/hub-auth/api/auth/status
+for port in 8089 8094 8095 8098; do
+  curl -sf "http://127.0.0.1:$port/hub-auth/api/auth/status" | jq -r .issuer   # opa-hub
+done
+curl -sf -X POST http://127.0.0.1:8098/hub-auth/api/auth/login \
+  -H 'Content-Type: application/json' \
+  -d '{"username":"admin","password":"admin"}' | jq -r .token
 ```
 
 Set **`OPEN_SERVICE_JWT_SECRET`** to a second secret (≥32 bytes), **distinct from** `JWT_SECRET`. Do not reuse the user JWT secret for service-to-service mint/validate. Compose passes it through without falling back to `JWT_SECRET`. After rotating the service secret, recreate **hub, ora-api, osa-api, opl-api, and opm-api** so all peers share the new value.
 
-OPM/OSA GitHub targets: `opm-api` and `osa-api` use `PEER_OPA_URL` (org directory) and `PEER_ORA_URL` (connectors / clone credentials). Configure GitHub App or PAT on **ora-api** (`OPA_GITHUB_APP_*`, `OPA_CONNECTOR_SECRET`). After image upgrades, redeploy `opa-hub`, `ora-api`, `opm-api`, `opm-dashboard`, `osa-api`, and `osa-dashboard` (`*:nas` tags only).
+OPM/OSA GitHub targets: `opm-api` and `osa-api` use `PEER_OPA_URL` (org directory) and `PEER_ORA_URL` (connectors / clone credentials). Configure GitHub App or PAT on **ora-api** (`OPA_GITHUB_APP_*`, `OPA_CONNECTOR_SECRET`). **`opm-api:nas` runtime must include `git`** — task jobs clone via ORA credentials inside the API image. After image upgrades, redeploy `opa-hub`, `ora-api`, `opm-api`, `opm-orchestrator`, `opm-dashboard`, `osa-api`, and `osa-dashboard` (`*:nas` tags only).
 
 ### Public URLs (`ORA_PUBLIC_URL` / `OPA_PUBLIC_URL`)
 
@@ -98,6 +104,8 @@ chmod +x "$FAMILY_ROOT/OPA-Stack/harness/sync-nas-src.sh"
 ```
 
 First run converts stale copies into shallow git clones; later runs are `git fetch origin main` + fast-forward.
+
+**Before every NAS rebuild:** run sync, then `rebuild-nas-images.sh`. Skipping sync ships stale source even when GitHub main has merged fixes.
 
 ### From the laptop (fallback)
 
@@ -147,6 +155,38 @@ curl -sf -o /dev/null -w '%{http_code}\n' http://127.0.0.1:8089/
 curl -sf -o /dev/null -w '%{http_code}\n' http://127.0.0.1:8094/
 curl -sf -o /dev/null -w '%{http_code}\n' http://127.0.0.1:8095/
 curl -sf -o /dev/null -w '%{http_code}\n' http://127.0.0.1:8098/
+```
+
+### Hub dashboard routes (authenticated)
+
+Recent hub batches moved Infrastructure, Compare Traces, System, and Databases reads to **opa-hub** (`18080`). Smoke with hub login:
+
+```bash
+TOKEN=$(curl -sf -X POST http://127.0.0.1:18080/api/auth/login \
+  -H 'Content-Type: application/json' \
+  -d '{"username":"admin","password":"admin"}' | jq -r .token)
+
+for path in \
+  /api/infra/hosts \
+  '/api/transactions/compare?dimension=name' \
+  /api/version \
+  /api/topology \
+  /api/ops/status \
+  /api/audit \
+  /api/db/instances \
+  /api/db/statements \
+  /api/db/fingerprint-match \
+  /api/db/unused-indexes; do
+  curl -sf -o /dev/null -w '%{http_code} %s\n' -H "Authorization: Bearer $TOKEN" \
+    "http://127.0.0.1:18080$path" "$path"
+done
+```
+
+Expect `200` on each path. Product APIs should return `503` on local login in co-deployed mode:
+
+```bash
+curl -sf -o /dev/null -w '%{http_code} ora\n' -X POST http://127.0.0.1:8091/api/auth/login \
+  -H 'Content-Type: application/json' -d '{"username":"admin","password":"admin"}'
 ```
 
 ## Alert email delivery
