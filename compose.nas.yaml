@@ -362,6 +362,14 @@ services:
       OPM_RUNNER_TAG: nas
       OPM_DATA_DIR: /data
       OPM_JOB_TMP: /tmp/opm-jobs
+      # Model-backed runner (optional — set in .env; never commit secrets)
+      OPM_MODEL_API_KEY: ${OPM_MODEL_API_KEY:-}
+      OPM_MODEL_BASE_URL: ${OPM_MODEL_BASE_URL:-}
+      OPM_MODEL: ${OPM_MODEL:-}
+      OPM_MODEL_PLANNING: ${OPM_MODEL_PLANNING:-}
+      OPM_MODEL_CODING: ${OPM_MODEL_CODING:-}
+      OPM_MODEL_REVIEW: ${OPM_MODEL_REVIEW:-}
+      OPM_RUNNER_NETWORK: ${OPM_RUNNER_NETWORK:-bridge}
       # GitHub App/PAT live on ora-api — OPM discovers via PEER_ORA_URL + hub orgs via PEER_OPA_URL
     volumes:
       - opm_data:/data
@@ -386,6 +394,9 @@ services:
       ORCHESTRATOR_LISTEN_ADDR: ":8099"
       OPM_RUNNER_TAG: nas
       OPM_DATA_DIR: /data
+      OPM_MODEL_API_KEY: ${OPM_MODEL_API_KEY:-}
+      OPM_MODEL_BASE_URL: ${OPM_MODEL_BASE_URL:-}
+      OPM_MODEL: ${OPM_MODEL:-}
     volumes:
       - opm_data:/data
       - /var/run/docker.sock:/var/run/docker.sock
