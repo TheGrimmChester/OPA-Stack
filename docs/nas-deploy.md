@@ -189,6 +189,8 @@ curl -sf -o /dev/null -w '%{http_code} ora\n' -X POST http://127.0.0.1:8091/api/
   -H 'Content-Type: application/json' -d '{"username":"admin","password":"admin"}'
 ```
 
+**Batch 4 deferred routes (expected 404 on hub `:18080`):** Network (`/api/network/*`), Cloud (`/api/cloud/*`), Catalog (`/api/catalog*`), mgmt (`/api/mgmt/v1*`), and call-graph compare (`/api/callgraph/compare`). These dashboard pages are scaffolds with no backend yet — do not treat 404 as a regression. Filter suggestions (`/api/filter-suggestions/*`) return **404 on hub** and **200 on edge** `:18081` (dashboard does not call them today).
+
 ## Alert email delivery
 
 Alert **evaluation and notification delivery** run on the edge agent (`opa_agent`). The hub stores rules in `opa.alerts` and queues manual tests in `opa.alert_test_requests`; the agent leader polls every ~2s and writes `opa.alert_history`.
