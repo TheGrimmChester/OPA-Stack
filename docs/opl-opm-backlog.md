@@ -20,24 +20,25 @@ Ports: API `8092`, dashboard `8095`. Control plane: `opl-api` + `opl-orchestrato
 - Run lifecycle: undispatched → `created`, failed dispatch → `failed`, `POST .../runs/{id}/cancel`; gate JSON includes `pass`
 - Results KPIs prefer `summary_json` (JMeter aggregates); sample table uses `step_name`
 - OPA Trace Explorer deep-links default to same-host `:8088` (`?load_run_id=`)
-- **JMeter visual test case editor (first slice)** — hierarchical VU tree + inspector; nested `children` → JMX hashTrees (PRs pending NAS `:nas` roll-out)
-- Scenario soft-archive + duplicate; load-policies; runners inspect; steps/report export; JTL import; validate triage (API+UI; needs `:nas`)
+- **Lab ops API on NAS `opl-api:nas`** (Hub JWT): `GET /api/perf/load-policies` → **200** (not 404); soft-archive / duplicate / validate; `GET .../runs/{id}/steps|report|runners`; `POST .../import-jtl`
+- **JMeter visual test case editor** — VU tree (HTTP / Txn / If / While / Loop) + DnD reorder/nest; JMX round-trip for controllers; archive/duplicate/validate/runners/steps/report in Dashboard
+- **Custom load curve + scheduler UX** — point-curve editor → `schedule.curve` / load-policies custom; Run & scale schedule panel (`enabled` / `every_minutes` / `daily_at`); scenario multi-run history (≤25)
 
 ### Next
 
+- **Redeploy `opl-api:nas` + `opl-dashboard:nas`** — ship controllers / curve / scheduler from this pass (sync-nas-src before rebuild)
 - **Baselines / federation peers** — dashboard skips `/api/performance/baselines` and `/api/federation/peers` (edge agent today; `opl-api` 404). Proxy/peer cleanly or drop dead UI affordances
-- **Visual editor depth** — drag-and-drop multi-select, logic containers (If/While/Loop), search/replace across tree, disable nodes
-- **Custom load curve editor** — point timeline → ThreadGroup / schedule_json
-- **Scheduler UX** — wire `schedule_json` enable/every_minutes/daily_at in Run & scale
+- **Visual editor depth** — multi-select, search/replace across tree, disable nodes, fragments / foreach
+- **JTL import UI** — API live; Results affordance missing
 - **Terminal-run notifications** — webhook on failed/gate fail
-- **Trend / multi-run history** — beyond two-run compare
+- **Trend chart builder** — multi-run history table exists; spark/trend charts still open
 
 ### Later
 
-- Full visual editor fidelity (logic actions, fragments, processors beyond extract/assert)
+- Full visual editor fidelity (fragments, processors beyond extract/assert, arrivals-accurate injectors)
 - Multi-peer fan-out beyond local samples (not a commercial multi-region load grid)
 - Kubernetes (or non-Docker) runner backends (`PerfContainerRunner` extension point)
-- Scheduled / CI-triggered suites and multi-scenario campaigns
+- Distributed campaign scheduler (beyond in-process tick) and multi-scenario campaigns
 - Optional `opl-gateway` peel; keep Node/host JMeter fallbacks lab-only
 
 ---
@@ -56,7 +57,7 @@ Ports: API `8096`, dashboard `8098`. Control plane: `opm-api` + `opm-orchestrato
 - Stuck/recover (`mark-stuck`, `recover-subtask`); pause/resume (`pause-task`, `resume-task`)
 - Jobs list + enqueue + cancel with operator `message`; filesystem project state under `OPM_DATA_DIR`
 - Orchestrator spawn probe (`/api/spawn-probe`) — docker + runner image honesty (`spawnReady` still false)
-- NAS verify: `GET :8096/api/health` → **200**; `:8098/` → **200**
+- NAS verify: `GET :8096/api/health` → **200** `{ status: ok, service: opm-api, auth_mode: codeployed }`; `:8098/` → **200**
 
 ### Next
 
