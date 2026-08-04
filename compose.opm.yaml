@@ -18,6 +18,8 @@ services:
       OPM_DATA_DIR: ${OPM_DATA_DIR:-/data}
       OPM_JOB_TMP: ${OPM_JOB_TMP:-/tmp/opm-jobs}
       # GitHub credentials stay on ora-api (OPA_GITHUB_APP_* / PAT connectors).
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
 
   opm-orchestrator:
     image: opm-api:smoke
@@ -26,6 +28,8 @@ services:
     environment:
       ORCHESTRATOR_LISTEN_ADDR: ":8099"
       OPM_RUNNER_TAG: ${OPM_RUNNER_TAG:-smoke}
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
 
   opm-dashboard:
     image: opm-dashboard:smoke
