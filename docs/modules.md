@@ -6,7 +6,7 @@ Reusable code and images used by **two or more** products live in dedicated `Ope
 |------|----------|--------------------|-------------|
 | `Open-Client-JS` | Typed control-plane HTTP clients + user-auth header helpers | `*-Dashboard` (incl. OPM) | npm `@open-family/client` |
 | `Open-Client-Go` | Typed peer/product HTTP clients | Go APIs, hub, orchestrators | `github.com/TheGrimmChester/open-client-go` |
-| `Open-Auth-Go` | User JWT validate + service JWT mint/validate | All Go APIs | `github.com/TheGrimmChester/open-auth-go` |
+| `Open-Auth-Go` | User JWT mint/validate, HTTP middleware (`Gate`), standalone handlers, service JWT mint/validate | All Go APIs | `github.com/TheGrimmChester/open-auth-go` |
 | `Open-Tenant-Go` | `X-Organization-ID` / `X-Project-ID` helpers | All Go APIs | `github.com/TheGrimmChester/open-tenant-go` |
 | `Open-ClickHouse-Go` | ClickHouse HTTP client, dial/config, migrate helpers | Go APIs using ClickHouse | `github.com/TheGrimmChester/open-clickhouse-go` |
 | `Open-Job-Go` | Sandboxed job lifecycle, hardened `docker run`, labels, env scrub | Product orchestrators (incl. OPM) | `github.com/TheGrimmChester/open-job-go` |
