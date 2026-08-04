@@ -218,16 +218,21 @@ docker logs open_collector --tail 5
 TOKEN=$(curl -sf -X POST http://127.0.0.1:18080/api/auth/login \
   -H 'Content-Type: application/json' \
   -d '{"username":"admin","password":"admin"}' | jq -r .token)
-curl -sf -H "Authorization: Bearer $TOKEN" http://127.0.0.1:18080/api/infra/hosts | jq .
+# Scope the query to the tenant the collector writes under (OPA_ORGANIZATION_ID /
+# OPA_PROJECT_ID in compose.nas.yaml) — the inventory is tenant-filtered, so an
+# unscoped call omits this host and looks like a dead collector.
+curl -sf -H "Authorization: Bearer $TOKEN" \
+  'http://127.0.0.1:18080/api/infra/hosts?organization_id=nas&project_id=infra' | jq .
 # expect host truenas2012 with reporting=true and recent last_seen
 ```
 
 Container metrics need the host docker group on the collector, which runs as
 uid/gid `65534` from a scratch image. `compose.nas.yaml` adds
 `${OPA_DOCKER_GID:-999}` to it; set `OPA_DOCKER_GID` in `.env` if
-`getent group docker` reports a different GID. Without the group the process
-still ships host CPU, memory, and disk points but logs docker socket permission
-errors and reports no containers.
+`getent group docker` reports a different GID. Startup logs
+`container name enrichment via docker socket /var/run/docker.sock` when the group
+is right. Without it the process still ships host CPU, memory, and disk points but
+reports no containers.
 
 ### Hub dashboard routes (authenticated)
 
