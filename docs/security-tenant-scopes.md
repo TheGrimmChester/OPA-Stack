@@ -12,7 +12,7 @@ Related: [interop.md](interop.md) (tenant headers), [nas-deploy.md](nas-deploy.m
 | JWT, no `X-Organization-ID` / `X-Project-ID` | Scope to **`default-org` / `default-project`** (same as write tenant; Open-Tenant-Go ≥ 0.2.2). HTTP **200**, not an unscoped dump. |
 | JWT + wrong / unknown org | **Empty list** or **403** — never rows belonging to another org |
 | JWT + correct org | Tenant’s data (HTTP **200**) |
-| JWT with `project_ids` + non-member project | Hub → **403** (`project access denied`); admins exempt |
+| JWT with `project_ids` + non-member project | Hub + ORA/OSA/OPL/OPM → **403** (`project access denied`); admins exempt |
 | Product-local `POST /api/auth/login` (ORA/OSA/OPL/OPM) | **503** when `AUTH_MODE=codeployed` |
 | Hub `POST /api/auth/login` | **200** (hub is the JWT issuer) |
 
@@ -134,15 +134,15 @@ Family harness: **56 PASS / 0 FAIL**. Sibling ORA/OSA curl matrix reported **13/
 
 ## Documented gaps
 
-- **Per-user project ACLs (hub + Open-Auth-Go):** JWT `project_ids` allowlist + hub middleware enforcement on tenancy / query routes (including `/api/key-transactions`). Role `admin` sees all org projects; lab seed `admin`/`admin` stays unbound. Peer products (ORA/OSA/OPL/OPM) should call `openauth.EnforceProjectACL` after `ApplyUserTenantHeaders` on their `SetAuthEnforced` routes — same pattern as hub — once they bump Open-Auth-Go. Until then, a restricted hub JWT is only enforced on hub surfaces; peers still trust header org/project alone.
+- **Per-user project ACLs (hub + peers + Open-Auth-Go):** JWT `project_ids` allowlist. Hub middleware and product `Gate.Middleware` (`AuthMiddleware`) call `EnforceProjectACL` after `ApplyUserTenantHeaders`. Role `admin` sees all org projects; lab seed `admin`/`admin` stays unbound. No second membership store — hub-minted claims only.
 - Prefer always sending concrete `X-Organization-ID` / `X-Project-ID` from dashboards and scripts.
 
-### Adoption notes (ORA / OSA / OPL / OPM)
+### Adoption notes (ORA / OSA / OPL / OPM) — done
 
-1. Bump `open-auth-go` (replace path or tagged release) that includes `project_ids` / `EnforceProjectACL`.
-2. After user JWT parse + `ApplyUserTenantHeaders`, call `EnforceProjectACL(r, claims)` and map errors to HTTP **403**.
-3. Do not invent a second membership store — trust hub-minted claims (`org_id`, `project_ids`). Hub remains the issuer for co-deployed stacks.
-4. Keep role `admin` unrestricted so NAS lab login is never locked out.
+1. ~~Bump `open-auth-go`~~ — peers replace `../Open-Auth-Go` (Open-Auth-Go #6); NAS Docker COPY picks it up via `sync-nas-src`.
+2. ~~`EnforceProjectACL` after `ApplyUserTenantHeaders`~~ — via Open-Auth-Go `Gate.RequireUser` / `RequireUserOrService` (product `AuthMiddleware`).
+3. ~~No second membership store~~ — trust hub-minted `org_id` / `project_ids`.
+4. ~~Admin unrestricted~~ — role `admin` bypasses allowlist (lab login stays unlocked).
 5. Optional: surface `user.project_ids` from hub login/status in each dashboard project picker.
 
 ## Notes
