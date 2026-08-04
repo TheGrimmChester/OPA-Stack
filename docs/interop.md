@@ -83,12 +83,14 @@ PEER_ORA_URL=
 PEER_OSA_URL=
 PEER_OPL_URL=
 PEER_OPM_URL=
-OPA_PUBLIC_URL=
-ORA_PUBLIC_URL=
+OPA_PUBLIC_URL=            # legacy alias; prefer ORA_PUBLIC_URL for ora-api webhooks
+ORA_PUBLIC_URL=            # public base for ora-api (GitHub webhooks / review callbacks)
 OSA_PUBLIC_URL=
 OPL_PUBLIC_URL=
 OPM_PUBLIC_URL=
 ```
+
+On NAS (`open-family`), `ORA_PUBLIC_URL` / `OPA_PUBLIC_URL` currently share the legacy hostname `https://ai-orchestrator.clouded.fr`, which fronts **ora-api**. See [nas-deploy.md](nas-deploy.md).
 
 ## All-in-one compose
 
