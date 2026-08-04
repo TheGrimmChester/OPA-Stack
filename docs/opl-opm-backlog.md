@@ -23,6 +23,7 @@ Ports: API `8092`, dashboard `8095`. Control plane: `opl-api` + `opl-orchestrato
 - **Lab ops API on NAS `opl-api:nas`** (Hub JWT): `GET /api/perf/load-policies` → **200** (not 404); soft-archive / duplicate / validate; `GET .../runs/{id}/steps|report|runners`; `POST .../import-jtl`
 - **JMeter visual test case editor** — VU tree (HTTP / Txn / If / While / Loop / ForEach / Fragment+Link) + DnD reorder/nest; JMX round-trip for controllers; archive/duplicate/validate/runners/steps/report in Dashboard
 - **Custom load curve + scheduler UX** — point-curve editor → `schedule.curve` / load-policies custom; Run & scale schedule panel (`enabled` / `every_minutes` / `daily_at`); scenario multi-run history (≤25) + sparklines
+- **Arrivals-accurate load curve** — `curve_mode=arrivals` rate points → open-model ThreadGroup segments (one journey per arrival); honesty vs concurrent VU mode
 - **Postman import** — `POST /api/perf/scenarios/import-postman` + Capture UI
 - **Validate triage + auto-correlation** — `triage[]` + `correlation_suggestions[]`; Apply extract in Design
 - **Restore archived + JTL import UI** — `POST .../unarchive`, list `?archived=1`; Results JTL upload
@@ -32,13 +33,13 @@ Ports: API `8092`, dashboard `8095`. Control plane: `opl-api` + `opl-orchestrato
 
 - **Redeploy `opl-api:nas` + `opl-dashboard:nas`** — ship ForEach/fragments/Postman/triage/restore/notify from this pass (sync-nas-src before rebuild)
 - **Baselines / federation peers** — dashboard skips `/api/performance/baselines` and `/api/federation/peers` (edge agent today; `opl-api` 404). Proxy/peer cleanly or drop dead UI affordances
-- Arrivals-accurate curve / PDF bench pack / full trend widgets (see [opl-lab-capabilities.md](opl-lab-capabilities.md))
+- PDF bench pack / full trend widgets (see [opl-lab-capabilities.md](opl-lab-capabilities.md))
 - **Visual editor depth** — multi-select, search/replace across tree, disable nodes
 - **Trend chart builder** — multi-run history table exists; spark/trend charts still open
 
 ### Later
 
-- Full visual editor fidelity (fragments, processors beyond extract/assert, arrivals-accurate injectors)
+- Full visual editor fidelity (fragments, processors beyond extract/assert)
 - Multi-peer fan-out beyond local samples (not a commercial multi-region load grid)
 - Kubernetes (or non-Docker) runner backends (`PerfContainerRunner` extension point)
 - Distributed campaign scheduler (beyond in-process tick) and multi-scenario campaigns
@@ -62,6 +63,7 @@ Ports: API `8096`, dashboard `8098`. Control plane: `opm-api` + `opm-orchestrato
 - Jobs list + enqueue + cancel with operator `message`; filesystem project state under `OPM_DATA_DIR`
 - Orchestrator spawn probe (`/api/spawn-probe`) — `spawnReady: true` when docker CLI + daemon + runner image work
 - NAS verify: `GET :8096/api/health` → **200** `{ status: ok, service: opm-api, auth_mode: codeployed }`; `:8098/` → **200**
+- **GitHub Milestones + Projects v2 bind** — ORA peer `scm:pm`; OPM list/assign/sync; dashboard pickers on Roadmap + task detail; Status sync on board move (best-effort)
 
 ### Next
 
@@ -69,7 +71,7 @@ Ports: API `8096`, dashboard `8098`. Control plane: `opm-api` + `opm-orchestrato
 
 ### Later
 
-- GitHub Issues / Projects sync (two-way), multi-repo portfolio views
+- GitHub Issues two-way sync, multi-repo portfolio views
 - Durable job/history store (ClickHouse or equivalent) instead of filesystem-only
 - Deep-link to ORA for review — do not duplicate Repo Watch inside OPM
 - Insights / context / live terminals; pre-merge quality gates

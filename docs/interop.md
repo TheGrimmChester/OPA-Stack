@@ -122,6 +122,7 @@ Caller sets `PEER_{OPA|ORA|OSA|OPL|OPM}_URL` and mints a **service JWT** with `O
 | `health:read` | Peer probe |
 | `connectors:read` | List ORA GitHub connectors / repos (OPM → ORA) |
 | `scm:clone` | Short-lived clone credentials for ephemeral job workspaces (OPM → ORA) |
+| `scm:pm` | Milestones + Projects v2 list/bind/sync (OPM → ORA peer `/api/peer/scm/milestones/*`, `/api/peer/scm/projects/*`) |
 
 ## OPM + Hub + GitHub
 
