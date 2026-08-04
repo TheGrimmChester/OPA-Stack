@@ -3,9 +3,10 @@
 
 ## Open-* family
 
-- [Products](products.md) — OPA · ORA · OSA · OPL
+- [Products](products.md) — OPA · ORA · OSA · OPL · OPM (smoke/NAS ports, Alert Test → edge)
 - [Modules catalog](modules.md) — shared `Open-*` libraries and images
-- [Interop](interop.md) — peer URLs, user JWT, service JWT scopes
+- [Interop](interop.md) — peer URLs, co-deployed `/hub-auth` login, service JWT scopes
+- [NAS deploy](nas-deploy.md) — `open-family`, `*:nas` images, host ports
 
 Single entry point for the self-hosted observability stack.
 

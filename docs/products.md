@@ -16,13 +16,24 @@ Hub-and-spoke, push-primary: edge `opa-agent` registers and pushes telemetry out
 
 ## Smoke ports (laptop)
 
-| Product | Port |
+API and dashboard host ports from `compose.all.yaml` (and the solo `compose.*.yaml` profiles). NAS production uses the same dashboard ports for OSA/OPL; see [nas-deploy.md](nas-deploy.md).
+
+| Service | Port |
 |---------|------|
 | OPA hub | `8080` |
-| ORA | `8091` |
-| OPL | `8092` |
-| OSA | `8093` |
-| OPM | `8096` |
+| OPA Dashboard | `8088` |
+| ORA API | `8091` |
+| ORA Dashboard | `8089` |
+| OPL API | `8092` |
+| OSA API | `8093` |
+| OSA Dashboard | `8094` |
+| OPL Dashboard | `8095` |
+| OPM API | `8096` |
+| OPM Dashboard | `8098` |
+
+## Alert Test (OPA)
+
+Dashboard **Test** on an alert rule calls hub `POST /api/alerts/{id}`. The hub queues `opa.alert_test_requests`; the edge agent leader force-delivers the rule’s channel (no condition/cooldown) and writes `opa.alert_history`. Use `OPA_ALERT_NOTIFY_MODE=log` on the agent for safe end-to-end checks without contacting real webhooks/Slack/email.
 
 ## Image tags
 

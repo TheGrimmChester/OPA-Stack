@@ -16,6 +16,8 @@ nav:
   - Home: index.md
   - Architecture: architecture.md
   - Products: products.md
+  - Modules: modules.md
+  - Interop: interop.md
   - NAS deploy: nas-deploy.md
   - Data model: data-model.md
   - Config reference: config-reference.md

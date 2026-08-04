@@ -12,7 +12,15 @@ Products are **optional peers**. No hard dependency at boot. An empty peer URL d
 
 Headers: `Authorization: Bearer <user-jwt>`, `X-Organization-ID`, `X-Project-ID`.
 
-Lab default when standalone: username `admin` / password `admin` (override with `AUTH_ADMIN_USER` / `AUTH_ADMIN_PASSWORD`).
+### Co-deployed browser login (`/hub-auth`)
+
+ORA, OSA, OPL, and OPM dashboards proxy hub auth at same-origin **`/hub-auth/`** (nginx → `hub:8080`). Login pages POST to `/hub-auth/api/auth/login` so the browser never needs a cross-origin hub URL. Product-local `/api/auth/login` on those APIs returns **`503`** in co-deployed mode; status under `/hub-auth/api/auth/status` reports `issuer=opa-hub`.
+
+OPA Dashboard talks to the hub URL directly (no `/hub-auth` bridge).
+
+### Lab credentials
+
+Smoke / lab default seed user: username **`admin`** / password **`admin`** (hub issuer, and each product’s local issuer in standalone). Override with `AUTH_ADMIN_USER` / `AUTH_ADMIN_PASSWORD`. Change immediately outside throwaway lab environments.
 
 ## ClickHouse databases
 
@@ -94,4 +102,4 @@ On NAS (`open-family`), `ORA_PUBLIC_URL` / `OPA_PUBLIC_URL` currently share the 
 
 ## All-in-one compose
 
-See [`compose.all.yaml`](../compose.all.yaml): one ClickHouse, databases `opa`/`ora`/`osa`/`opl`, shared `JWT_SECRET`, hub-issued tokens (`AUTH_MODE=codeployed`).
+See [`compose.all.yaml`](../compose.all.yaml): one ClickHouse, databases `opa`/`ora`/`osa`/`opl`, shared `JWT_SECRET`, hub-issued tokens (`AUTH_MODE=codeployed`). Product dashboards use the `/hub-auth/` nginx bridge for browser login. Lab seed user is `admin` / `admin`.

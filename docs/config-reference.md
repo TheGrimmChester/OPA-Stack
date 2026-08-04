@@ -10,7 +10,10 @@
 | `TRANSPORT_TCP` | string | empty | process | ND-JSON TCP listen addr (e.g. `:9090`) |
 | `SOCKET_PATH` | string | empty | process | Unix socket path |
 | `JWT_SECRET` | string | ephemeral | process | ≥32 bytes when `OPA_AUTH_REQUIRED=1` (user JWTs) |
-| `OPEN_SERVICE_JWT_SECRET` | string | empty | process | Service JWT mint/validate; prefer distinct from `JWT_SECRET` (required on NAS) |
+| `OPEN_SERVICE_JWT_SECRET` | string | empty | process | Service JWT mint/validate; **must be distinct from** `JWT_SECRET` on NAS (required; no compose fallback) |
+| `AUTH_MODE` | string | auto | process | `standalone` \| `codeployed`; empty auto-resolves from `PEER_OPA_URL` |
+| `AUTH_ADMIN_USER` | string | `admin` | process | Lab seed username for local / hub issuer |
+| `AUTH_ADMIN_PASSWORD` | string | `admin` | process | Lab seed password (change outside throwaway lab) |
 | `OPA_AUTH_REQUIRED` | bool | `0` | process | Enforce JWT on data/admin APIs |
 | `OPA_REDACT` | bool | `0` | process | PII redaction |
 | `OPA_LEADER_ELECTION` | bool | `1` | process | Single-writer background jobs |
