@@ -65,6 +65,7 @@ Ports: API `8096`, dashboard `8098`. Control plane: `opm-api` + `opm-orchestrato
 - Orchestrator spawn probe (`/api/spawn-probe`) — `spawnReady: true` when docker CLI + daemon + runner image work
 - NAS verify: `GET :8096/api/health` → **200** `{ status: ok, service: opm-api, auth_mode: codeployed }`; `:8098/` → **200**
 - **GitHub Milestones + Projects v2 bind** — ORA peer `scm:pm`; OPM list/assign/sync; dashboard pickers on Roadmap + task detail; Status sync on board move (best-effort)
+- **Task ↔ GitHub Issue two-way sync** — `…/github/issues/{link,unlink,push,pull}` via ORA peer `scm:pm` (`/api/peer/scm/issues/{get,create,update}`); attach by number or create from task; push title/description/column-state/milestone; pull mirrors state/assignee/labels/milestone and moves the task on the `done`/reopen boundary only. Failures persist on the task (`githubIssueSyncError`) and in the `github-issue-sync` spec log with a machine-readable `status`; title divergence is reported, not silently resolved. Needs only `issues: write`. Dashboard: issue panel on task detail + board badge
 
 ### Next
 
@@ -72,7 +73,8 @@ Ports: API `8096`, dashboard `8098`. Control plane: `opm-api` + `opm-orchestrato
 
 ### Later
 
-- GitHub Issues two-way sync, multi-repo portfolio views
+- Issue sync follow-ups: candidate-issue picker (`GET …/issues`) so attach is not number-entry only; issue comments ↔ task discussion; webhook-driven refresh (through ORA, like other SCM webhooks) instead of poll-only; multi-assignee mirroring
+- Multi-repo portfolio views
 - Durable job/history store (ClickHouse or equivalent) instead of filesystem-only
 - Deep-link to ORA for review — do not duplicate Repo Watch inside OPM
 - Insights / context / live terminals; pre-merge quality gates
