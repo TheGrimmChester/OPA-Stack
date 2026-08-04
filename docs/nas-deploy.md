@@ -72,7 +72,7 @@ curl -sf -X POST http://127.0.0.1:8098/hub-auth/api/auth/login \
 
 Set **`OPEN_SERVICE_JWT_SECRET`** to a second secret (≥32 bytes), **distinct from** `JWT_SECRET`. Do not reuse the user JWT secret for service-to-service mint/validate. Compose passes it through without falling back to `JWT_SECRET`. After rotating the service secret, recreate **hub, ora-api, osa-api, opl-api, and opm-api** so all peers share the new value.
 
-OPM/OSA GitHub targets: `opm-api` and `osa-api` use `PEER_OPA_URL` (org directory) and `PEER_ORA_URL` (connectors / clone credentials). Configure GitHub App or PAT on **ora-api** (`OPA_GITHUB_APP_*`, `OPA_CONNECTOR_SECRET`). **`opm-api:nas` runtime must include `git`** — task jobs clone via ORA credentials inside the API image. After image upgrades, redeploy `opa-hub`, `ora-api`, `opm-api`, `opm-orchestrator`, `opm-dashboard`, `osa-api`, and `osa-dashboard` (`*:nas` tags only).
+OPM/OSA GitHub targets: `opm-api` and `osa-api` use `PEER_OPA_URL` (org directory) and `PEER_ORA_URL` (connectors / clone credentials). Configure GitHub App or PAT on **ora-api** (`OPA_GITHUB_APP_*`, `OPA_CONNECTOR_SECRET`). **`opm-api:nas` runtime must include `git` and the docker CLI** — task jobs clone via ORA credentials and `docker run` `opm-runner-task:nas` when spawn-ready (compose mounts `docker.sock` on `opm-api` and `opm-orchestrator`). After image upgrades, redeploy `opa-hub`, `ora-api`, `opm-api`, `opm-orchestrator`, `opm-dashboard`, `osa-api`, and `osa-dashboard` (`*:nas` tags only).
 
 ### Public URLs (`ORA_PUBLIC_URL` / `OPA_PUBLIC_URL`)
 
