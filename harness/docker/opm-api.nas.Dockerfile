@@ -29,14 +29,19 @@ FROM debian:bookworm-slim AS opm-runner-task
 RUN apt-get update \
  && apt-get install -y --no-install-recommends ca-certificates \
  && rm -rf /var/lib/apt/lists/*
+COPY OPM-API/scripts/opm-runner-entrypoint.sh /usr/local/bin/opm-runner
+RUN chmod 755 /usr/local/bin/opm-runner
 USER 65532:65532
 WORKDIR /home/opm
-CMD ["sleep", "infinity"]
+ENTRYPOINT ["/usr/local/bin/opm-runner"]
+
+FROM docker:27-cli AS dockercli
 
 FROM debian:bookworm-slim AS opm-api
 RUN apt-get update \
  && apt-get install -y --no-install-recommends ca-certificates git wget \
  && rm -rf /var/lib/apt/lists/*
+COPY --from=dockercli /usr/local/bin/docker /usr/local/bin/docker
 WORKDIR /root/
 COPY --from=builder /out/opm-api /usr/local/bin/opm-api
 ENV LISTEN_ADDR=:8096 \

@@ -20,7 +20,7 @@ Companion product backlog: [opl-opm-backlog.md](opl-opm-backlog.md). Product bou
 |-----------|------------|
 | Delivery | Web dashboard + HTTP API + orchestrator/runners (not a desktop Electron app) |
 | Project identity | **GitHub `owner/repo`** via Hub orgs + ORA connectors (not local folder paths) |
-| Execution | Ephemeral tmp clone + **builtin** in-process executor that writes plan/spec/progress/review/changelog artifacts; orchestrator spawn probe reports docker + `opm-runner-task:nas` readiness (`spawnReady` still false until real agent spawn) |
+| Execution | Ephemeral tmp clone + **container spawn** of `opm-runner-task:nas` when `spawnReady`, then shared artifact helpers; **builtin** in-process fallback (`OPM_FORCE_BUILTIN` / spawn failure) |
 | Auth | Co-deployed Hub JWT + tenant headers |
 | Review depth | Automated review column; **deep review owned by ORA** |
 | Multi-tenancy | Org-scoped projects (`X-Organization-ID`) |
@@ -127,7 +127,7 @@ Enqueued from UI: `run-planning`, `run-implementation`, `run-review`, `run-qa-fi
 
 Store also maps `run-followup-planning` → planning state.
 
-**Execution today:** builtin in-process runner (`execution: "builtin"`) writes real `spec.md` / `implementation_plan.json` / `progress.json` / review + QA artifacts / changelog. Orchestrator exposes `/api/spawn-probe` (docker CLI/daemon + runner image inspect); `spawnReady` remains false until containerized agent spawn is wired. Default runner tag env `OPM_RUNNER_TAG` (prefer `nas` on NAS — never smoke).
+**Execution today:** when spawnReady (docker CLI + daemon + `opm-runner-task:nas`), jobs `docker run` one hardened ephemeral runner (`execution: "container"`), then shared helpers write `spec.md` / plan / progress / review + QA / changelog. Builtin in-process path (`execution: "builtin"`) remains the fallback (`OPM_FORCE_BUILTIN=1` or spawn failure). Orchestrator `/api/spawn-probe` reports `spawnReady: true` when docker works. Default runner tag env `OPM_RUNNER_TAG` (prefer `nas` on NAS — never smoke).
 
 ### 3.4 Data layout (`OPM_DATA_DIR`)
 
@@ -146,7 +146,8 @@ projects/<id>/board.json, status.json, changelog.md
 | `http://192.168.100.101:8096/api/health` | **200** `{ status: ok, service: opm-api, auth_mode: codeployed }` (re-checked same day) |
 | `http://192.168.100.101:8098/` | **200** dashboard HTML |
 | `GET /api/projects` (Hub JWT + `X-Organization-ID`) | **200** — GitHub-linked projects listed |
-| Builtin E2E | plan → approve → impl loop → review → changelog **PASS** (`execution=builtin`, `*:nas` only) |
+| Builtin E2E | plan → approve → impl loop → review → changelog **PASS** (`execution=builtin` or `container` when spawnReady; `*:nas` only) |
+| Container spawn | `/api/spawn-probe` → `spawnReady: true` when docker CLI + daemon + `opm-runner-task:nas`; jobs set `execution: "container"` after successful `docker run` |
 | Host `:8099` | TrueNAS/nginx UI redirect — **not** `opm-orchestrator` public health (orchestrator is compose-internal; see [nas-deploy.md](nas-deploy.md)) |
 
 ---
@@ -252,7 +253,7 @@ Legend: **Done** = OPM has usable equivalent · **Missing** = gap for implemente
 
 ## 5. Suggested implementation order (for coding agents)
 
-1. **Containerized agent spawn** — wire `docker run` of `opm-runner-task:nas` (spawn probe already reports readiness).
+1. **Model-backed agents in runner** — container spawn works; prompts/agent CLI inside `opm-runner-task` still follow-on.
 2. **Roadmap/ideation agents** — replace placeholder enqueue with real generators.
 3. **Skip-to-phase** — finish interruptible pipeline controls (pause/resume done).
 4. **ORA deep-links** — PR/review instead of in-app merge/discard.
@@ -264,7 +265,7 @@ Legend: **Done** = OPM has usable equivalent · **Missing** = gap for implemente
 
 Ranked for an operator using OPM on NAS today:
 
-1. **Containerized agent runners** — spawn probe shipped; model-backed `docker run` still missing.
+1. **Model-backed agents in runner** — container `docker run` of `opm-runner-task:nas` works; prompts/agent CLI inside the image still follow-on.
 2. **Roadmap / ideation agent quality** — discovery/features/typed ideation beyond placeholders.
 3. **Skip-to-phase** — pause/resume done; skip still open.
 4. **Live terminals / richer job logs UI** — Jobs list is coarse.
@@ -273,9 +274,9 @@ Ranked for an operator using OPM on NAS today:
 7. **Pre-merge quality gates** — tests/lint before done.
 8. **Insights / context pages** — after automation matures.
 
-Shipped this pass (NAS-verified): board DnD + task action menu; stuck/mark + recover-subtask; pause/resume; orchestrator spawn probe; docs matrix update.
+Shipped this pass: containerized task spawn (`spawnReady: true`, `execution: "container"`, builtin fallback); docker CLI in `opm-api:nas`; compose `docker.sock` on api + orchestrator.
 
-Prior pass (NAS-verified builtin E2E): task detail, approve + require-review, planning → implementation → review → changelog, roadmap/ideation edit/delete. Health `:8096` and dashboard `:8098` remain **200** on `*:nas`.
+Prior pass (NAS-verified): board DnD + stuck/recover + pause/resume; task detail, approve, planning → implementation → review → changelog. Health `:8096` and dashboard `:8098` remain **200** on `*:nas`.
 
 Honorable mentions: parallel job slots, durable ClickHouse job history, analytics.
 
