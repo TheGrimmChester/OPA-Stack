@@ -21,13 +21,18 @@ Ports: API `8092`, dashboard `8095`. Control plane: `opl-api` + `opl-orchestrato
 - Results KPIs prefer `summary_json` (JMeter aggregates); sample table uses `step_name`
 - OPA Trace Explorer deep-links default to same-host `:8088` (`?load_run_id=`)
 - **Lab ops API on NAS `opl-api:nas`** (Hub JWT): `GET /api/perf/load-policies` → **200** (not 404); soft-archive / duplicate / validate; `GET .../runs/{id}/steps|report|runners`; `POST .../import-jtl`
-- **JMeter visual test case editor** — VU tree (HTTP / Txn / If / While / Loop) + DnD reorder/nest; JMX round-trip for controllers; archive/duplicate/validate/runners/steps/report in Dashboard
-- **Custom load curve + scheduler UX** — point-curve editor → `schedule.curve` / load-policies custom; Run & scale schedule panel (`enabled` / `every_minutes` / `daily_at`); scenario multi-run history (≤25)
+- **JMeter visual test case editor** — VU tree (HTTP / Txn / If / While / Loop / ForEach / Fragment+Link) + DnD reorder/nest; JMX round-trip for controllers; archive/duplicate/validate/runners/steps/report in Dashboard
+- **Custom load curve + scheduler UX** — point-curve editor → `schedule.curve` / load-policies custom; Run & scale schedule panel (`enabled` / `every_minutes` / `daily_at`); scenario multi-run history (≤25) + sparklines
+- **Postman import** — `POST /api/perf/scenarios/import-postman` + Capture UI
+- **Validate triage + auto-correlation** — `triage[]` + `correlation_suggestions[]`; Apply extract in Design
+- **Restore archived + JTL import UI** — `POST .../unarchive`, list `?archived=1`; Results JTL upload
 
 ### Next
 
-- **Redeploy `opl-api:nas` + `opl-dashboard:nas`** — ship controllers / curve / scheduler from this pass (sync-nas-src before rebuild)
+- **Redeploy `opl-api:nas` + `opl-dashboard:nas`** — ship ForEach/fragments/Postman/triage/restore from this pass (sync-nas-src before rebuild)
+- **Notifications** webhook on terminal run status
 - **Baselines / federation peers** — dashboard skips `/api/performance/baselines` and `/api/federation/peers` (edge agent today; `opl-api` 404). Proxy/peer cleanly or drop dead UI affordances
+- Arrivals-accurate curve / PDF bench pack / full trend widgets (see [opl-lab-capabilities.md](opl-lab-capabilities.md))
 - **Visual editor depth** — multi-select, search/replace across tree, disable nodes, fragments / foreach
 - **JTL import UI** — API live; Results affordance missing
 - **Terminal-run notifications** — webhook on failed/gate fail
