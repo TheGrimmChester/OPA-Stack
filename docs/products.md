@@ -50,6 +50,10 @@ API and dashboard host ports from `compose.all.yaml` (and the solo `compose.*.ya
 
 Dashboard **Test** on an alert rule calls hub `POST /api/alerts/{id}`. The hub queues `opa.alert_test_requests`; the edge agent leader force-delivers the rule’s channel (no condition/cooldown) and writes `opa.alert_history`. Use `OPA_ALERT_NOTIFY_MODE=log` on the agent for safe end-to-end checks without contacting real webhooks/Slack/email.
 
+## OPL (Open Perf Lab) backlog
+
+See [opl-opm-backlog.md](opl-opm-backlog.md) for Done / Next / Later. Short version still open: Agent-owned baselines/federation peers, scenario delete, runner live status, K8s runner, gateway peel.
+
 ## Image tags
 
 - Laptop / CI smoke: `*:smoke`

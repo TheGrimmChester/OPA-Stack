@@ -17,13 +17,16 @@ Ports: API `8092`, dashboard `8095`. Control plane: `opl-api` + `opl-orchestrato
 - ClickHouse DB `opl` with tenant-scoped `load_*` lists (headers or write-tenant defaults)
 - Dashboard Perf Lab studio: Design, Users & data, Capture, JMX, Run & scale, Results, Compare, SLA tabs
 - NAS health + seeded scenarios/runs under `default-org` / `default-project`
+- Run lifecycle: undispatched → `created`, failed dispatch → `failed`, `POST .../runs/{id}/cancel`; gate JSON includes `pass`
+- Results KPIs prefer `summary_json` (JMeter aggregates); sample table uses `step_name`
+- OPA Trace Explorer deep-links default to same-host `:8088` (`?load_run_id=`)
 
 ### Next
 
-- **Run completion & results** — NAS runs can stay `status=running` with empty `summary_json`; harden metrics postback, orchestrator/dispatch visibility, and Results-tab polling
-- **OPA correlation** — deep-link `load_run_id` into hub Trace Explorer; document when target apps are not instrumented
-- **Baselines / federation peers** — dashboard skips `/api/performance/baselines` and `/api/federation/peers` (those live on the edge agent today; `opl-api` returns 404). Either proxy/peer them cleanly or drop dead UI affordances
-- **Scenario / run lifecycle UX** — delete/archive scenarios, cancel stuck runs, clearer dispatch errors (egress/allowlist)
+- **Baselines / federation peers** — dashboard skips `/api/performance/baselines` and `/api/federation/peers` (edge agent today; `opl-api` 404). Proxy/peer cleanly or drop dead UI affordances
+- **Scenario delete/archive** — API+UI still upsert-only
+- **Runner live status** — container inspect / orchestrator visibility beyond run status + samples
+- **Instrumented target honesty** — document when apps are not OPA-instrumented (example.com never yields traces)
 
 ### Later
 
