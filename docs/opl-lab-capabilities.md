@@ -39,7 +39,7 @@ OPL is a **self-hosted load lab** next to OPA, not a SaaS multi-cloud load grid.
 | XHR capture import | `import-xhr` / `export-xhr` | Lab-oriented capture interchange |
 | Soft-archive + **restore** | API + Dashboard (Show archived + restore) | Soft-delete; `POST .../unarchive`; list `?archived=1` |
 | Load policy presets | `GET /api/perf/load-policies` + Run & scale picker | smooth / sustained / stress / custom |
-| **Custom load curve** | `schedule.curve` points → peak VUs / duration / ramp | Dashboard `LoadCurveEditor`; ThreadGroup honesty |
+| **Custom load curve** | `schedule.curve` + `curve_mode=vus\|arrivals` | Dashboard `LoadCurveEditor`; VU peak/ramp or arrivals open-model segments |
 | **Scheduler UX** | `POST .../schedule` + in-process tick + Run & scale panel | `every_minutes` / `daily_at` UTC; not distributed campaign scheduler |
 | **Multi-run history + sparklines** | Scenario-scoped run table (≤25) + p95/error sparklines on Run & scale | Complements two-run Compare |
 | CSV / datasets | `datasets_json` → CSVDataSet in generated JMX | Inline CSV in Users & data tab |
@@ -81,7 +81,6 @@ Most prior Code-ready items are now Done. Remaining:
 | **Variables** (secret, counter, random, file-backed CSV UX) | Safer, richer parameterization | Headers + inline CSV | Variable store + secret refs |
 | **Multi-profile** scenarios (mix VUs / locations) | Mixed traffic shapes | One scenario → one journey | Multi-scenario campaign or profiles array |
 | **Geo / cloud locations** + IP ranges | Multi-region realism | Single-host Docker | Federation peers ≠ public regions (honesty) |
-| Arrivals-accurate **load curve** injectors | Point-accurate arrival rates | ThreadGroup peak/ramp/duration approximation | Optional plugin path — honesty first |
 | Distributed **campaign** scheduler | Multi-host cron orchestration | In-process tick only | Orchestrator job fan-out |
 | **Live reporting** sinks (external APM/metrics) | External ops sinks | ClickHouse + OPA only | Optional exporters |
 | **Notifications** (email, Slack, Teams, Jira, webhook) | Failures noticed outside dashboard | None in OPL | Hook OPA alerts or OPL webhooks on terminal status |
@@ -120,16 +119,16 @@ Ranked for a team that **designs HTTP/API load tests, runs them in lab, gates CI
 
 | Rank | Gap | Why it hurts a lab | Sibling hint |
 |------|-----|--------------------|--------------|
-| 1 | Arrivals-accurate **curve** / multi-profile | ThreadGroup approximation ≠ realistic arrivals | Honesty-preserving injector path |
-| 2 | **Notifications** on terminal runs | Failures unnoticed outside the dashboard | Webhook on `failed` / gate fail |
-| 3 | Full **trend** report builder | Sparklines exist; no widget/template builder | CH + Trend tab widgets |
-| 4 | **PDF / bench pack** | Shareable offline artifacts incomplete | HTML/PDF from `/report` |
-| 5 | Distributed **scheduler** | In-process tick is single-host only | Orchestrator cron fan-out |
-| 6 | CI/CD **wizards** | Script/harness only slows adoption | Snippets in dashboard |
-| 7 | ModuleController path fidelity | Link expands inline; not JMeter ModuleController | Optional ModuleController emit |
-| 8 | **Variables** store (secret/counter/random) | Parameterization still thin | Variable store + secret refs |
-| 9 | Rendezvous / queue / JSR223 (gated) | Exotic controllers still missing | Extend VU DSL carefully |
-| 10 | Workspace collaboration polish | Multi-project hygiene | Tags, cross-project copy |
+| 1 | Distributed **scheduler** | In-process tick is single-host only | Orchestrator cron fan-out |
+| 2 | CI/CD **wizards** | Script/harness only slows adoption | Snippets in dashboard |
+| 3 | ModuleController path fidelity | Link expands inline; not JMeter ModuleController | Optional ModuleController emit |
+| 4 | **Variables** store (secret/counter/random) | Parameterization still thin | Variable store + secret refs |
+| 5 | Rendezvous / queue / JSR223 (gated) | Exotic controllers still missing | Extend VU DSL carefully |
+| 6 | Workspace collaboration polish | Multi-project hygiene | Tags, cross-project copy |
+| 7 | Richer notify channels | Webhook / none | Email / chat adapters |
+| 8 | Trend/report **templates** | Packs/widgets may exist; no saved layouts | Persist templates |
+| 9 | Geo / multi-host injectors | Single-host Docker only | Federation ≠ public regions |
+| 10 | Multi-profile campaigns | One scenario → one journey | Campaign / profiles array |
 
 **Honorable mentions (high effort or owned elsewhere):** Playwright/WebDriver VUs; geo cloud locations; infrastructure monitors (use OPA); MCP server.
 
@@ -139,18 +138,22 @@ Ranked for a team that **designs HTTP/API load tests, runs them in lab, gates CI
 
 For **OPL-API / OPL-Dashboard** implementers working load lab capabilities:
 
-1. **Near-term:** Notifications webhook on terminal runs; arrivals-curve honesty; PDF/bench pack.
+1. **Near-term:** Multi-profile campaigns; report/trend templates; richer notify channels.
 2. **Flagship track:** Keep JMeter-compatible VU tree as the design destination; HAR/JMX/Postman import remains the on-ramp.
 3. Keep **honesty strings** on run/list responses when adding fan-out, locations, or “cloud-like” UX.
 4. Do **not** reimplement infrastructure monitoring inside OPL — link OPA (`load_run_id`, infra hosts).
 5. NAS / production: rebuild and tag `opl-api:nas` / `opl-dashboard:nas` only; laptop smoke is fine locally. Always `sync-nas-src` before rebuild.
 6. Cross-check [opl-opm-backlog.md](opl-opm-backlog.md) when closing Next items so backlog and this inventory stay aligned.
 
+### Recently closed
+
+- Arrivals-accurate load curve (`curve_mode=arrivals` open-model segments)
+
 ### Next (this inventory)
 
-- Notifications (webhook) on terminal runs; arrivals-accurate curve (optional, honesty-first)
-- PDF / bench pack; full trend report builder widgets
-- ModuleController fidelity; variables store; CI wizards
+- Multi-profile campaigns; ModuleController fidelity; variables store; CI wizards
+- Report/trend templates; richer notify channels
+- Distributed scheduler; geo honesty (federation ≠ cloud regions)
 
 ---
 
