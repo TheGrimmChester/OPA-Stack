@@ -50,7 +50,7 @@ Capabilities a mature OPM should cover (UI + jobs + storage).
 | Settings | Theme, providers, profiles (where Hub does not already own them) |
 | Onboarding | Welcome / first-run wizard |
 
-External issue/PR lists (GitHub/GitLab/Linear) prefer **link-out or ORA** rather than in-app clones unless later sync is justified.
+External issue/PR lists (GitHub and other SCM/issue hosts) prefer **link-out or ORA** rather than in-app clones unless later sync is justified.
 
 ### 2.2 Kanban columns (OPM)
 
@@ -143,8 +143,9 @@ projects/<id>/board.json, status.json, changelog.md
 
 | Check | Result |
 |-------|--------|
-| `http://192.168.100.101:8096/api/health` | **200** `{ status: ok, service: opm-api, auth_mode: codeployed }` |
+| `http://192.168.100.101:8096/api/health` | **200** `{ status: ok, service: opm-api, auth_mode: codeployed }` (re-checked same day) |
 | `http://192.168.100.101:8098/` | **200** dashboard HTML |
+| `GET /api/projects` (Hub JWT + `X-Organization-ID`) | **200** — GitHub-linked projects listed |
 | Builtin E2E | plan → approve → impl loop → review → changelog **PASS** (`execution=builtin`, `*:nas` only) |
 | Host `:8099` | TrueNAS/nginx UI redirect — **not** `opm-orchestrator` public health (orchestrator is compose-internal; see [nas-deploy.md](nas-deploy.md)) |
 
@@ -233,7 +234,7 @@ Legend: **Done** = OPM has usable equivalent · **Missing** = gap for implemente
 | Capability | Status | Notes |
 |------------|--------|-------|
 | In-app GitHub Issues/PRs views | **Different-by-design** | Link out / ORA; optional later sync |
-| GitLab / Linear import | **Different-by-design** | Later backlog |
+| Non-GitHub issue import | **Different-by-design** | Later backlog |
 | GitHub Issues two-way sync | **Missing** (Later) | Listed in [opl-opm-backlog.md](opl-opm-backlog.md) |
 
 ### 4.8 Cross-cutting
@@ -276,7 +277,7 @@ Ranked for an operator using OPM on NAS today:
 9. **Pre-merge quality gates** — tests/lint before done.
 10. **Insights / context pages** — after automation matures.
 
-Shipped this pass (NAS-verified builtin E2E): task detail (plan/progress/spec/logs), approve + require-review, planning → implementation → review → changelog generate/save, roadmap/ideation edit/delete.
+Shipped and NAS-verified (builtin E2E): task detail (plan/progress/spec/logs), approve + require-review, planning → implementation → review → changelog generate/save, roadmap/ideation edit/delete. Health `:8096` and dashboard `:8098` remain **200** on `*:nas`.
 
 Honorable mentions: parallel job slots, durable ClickHouse job history, analytics.
 
