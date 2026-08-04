@@ -159,7 +159,7 @@ curl -sf -o /dev/null -w '%{http_code}\n' http://127.0.0.1:8098/
 
 ### Hub dashboard routes (authenticated)
 
-Recent hub batches moved Infrastructure, Compare Traces, System, and Databases reads to **opa-hub** (`18080`). Smoke with hub login:
+Recent hub batches moved Infrastructure, Compare Traces, System, Databases, and Trace Explorer facets reads to **opa-hub** (`18080`). Smoke with hub login:
 
 ```bash
 TOKEN=$(curl -sf -X POST http://127.0.0.1:18080/api/auth/login \
@@ -176,13 +176,16 @@ for path in \
   /api/db/instances \
   /api/db/statements \
   /api/db/fingerprint-match \
-  /api/db/unused-indexes; do
+  /api/db/unused-indexes \
+  /api/explore/facets \
+  /api/traces \
+  /api/services/metadata; do
   curl -sf -o /dev/null -w '%{http_code} %s\n' -H "Authorization: Bearer $TOKEN" \
     "http://127.0.0.1:18080$path" "$path"
 done
 ```
 
-Expect `200` on each path. Product APIs should return `503` on local login in co-deployed mode:
+Expect `200` on each path (`/api/explore/facets` is hub-owned as of opa-hub **v0.7.3** / [OPA-Hub #20](https://github.com/TheGrimmChester/OPA-Hub/pull/20); edge `:18081` stays **404**). Product APIs should return `503` on local login in co-deployed mode:
 
 ```bash
 curl -sf -o /dev/null -w '%{http_code} ora\n' -X POST http://127.0.0.1:8091/api/auth/login \
@@ -203,6 +206,8 @@ curl -sf "http://127.0.0.1:8092/api/perf/scenarios" "${H[@]}" | jq '.scenarios |
 ```
 
 **Batch 4 deferred routes (expected 404 on hub `:18080`):** Network (`/api/network/*`), Cloud (`/api/cloud/*`), Catalog (`/api/catalog*`), mgmt (`/api/mgmt/v1*`), and call-graph compare (`/api/callgraph/compare`). These dashboard pages are scaffolds with no backend yet — do not treat 404 as a regression. Filter suggestions (`/api/filter-suggestions/*`) return **404 on hub** and **200 on edge** `:18081` (dashboard does not call them today).
+
+**Not deferred:** `GET /api/explore/facets` is **hub-owned** (v0.7.3). Expect **200** on hub with JWT; do not treat it as a batch-4 scaffold.
 
 ## Alert email delivery
 
