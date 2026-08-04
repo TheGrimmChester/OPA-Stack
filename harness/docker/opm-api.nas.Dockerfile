@@ -8,12 +8,16 @@ ENV GOSUMDB=sum.golang.org
 COPY Open-Auth-Go /modules/Open-Auth-Go
 COPY Open-Client-Go /modules/Open-Client-Go
 COPY Open-Job-Go /modules/Open-Job-Go
+COPY Open-Tenant-Go /modules/Open-Tenant-Go
+COPY Open-HTTP-Go /modules/Open-HTTP-Go
 COPY OPM-API/ /src/OPM-API/
 WORKDIR /src/OPM-API
 RUN sed -i \
   -e 's|=> ../Open-Auth-Go|=> /modules/Open-Auth-Go|' \
   -e 's|=> ../Open-Client-Go|=> /modules/Open-Client-Go|' \
   -e 's|=> ../Open-Job-Go|=> /modules/Open-Job-Go|' \
+  -e 's|=> ../Open-Tenant-Go|=> /modules/Open-Tenant-Go|' \
+  -e 's|=> ../Open-HTTP-Go|=> /modules/Open-HTTP-Go|' \
   go.mod \
   && go mod download \
   && CGO_ENABLED=0 GOOS=linux go build -o /out/opm-api .
