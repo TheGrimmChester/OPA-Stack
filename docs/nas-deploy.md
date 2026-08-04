@@ -213,7 +213,7 @@ curl -sf -o /dev/null -w '%{http_code} ora\n' -X POST http://127.0.0.1:8091/api/
 
 ### Product list APIs need tenant headers
 
-With `OPA_AUTH_REQUIRED=1`, OSA/OPL ClickHouse list endpoints scope to **`default-org` / `default-project`** when `X-Organization-ID` / `X-Project-ID` are omitted (HTTP 200, after Open-Tenant-Go ≥ 0.2.2). Send both headers to target another tenant. Canonical curl matrix: [interop.md — Tenant headers](interop.md#tenant-headers-required-when-auth-is-on).
+With `OPA_AUTH_REQUIRED=1`, OSA/OPL ClickHouse list endpoints scope to **`default-org` / `default-project`** when `X-Organization-ID` / `X-Project-ID` are omitted (HTTP 200, after Open-Tenant-Go ≥ 0.2.2). Send both headers to target another tenant. Canonical curl matrix: [security-tenant-scopes.md](security-tenant-scopes.md) (also [interop.md — Tenant headers](interop.md#tenant-headers-required-when-auth-is-on)). Run `HOST=192.168.100.101 ./harness/security-tenant-matrix.sh` before merging tenancy changes.
 
 ```bash
 TOKEN=$(curl -sf -X POST http://127.0.0.1:18080/api/auth/login \

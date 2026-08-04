@@ -7,6 +7,7 @@
 - [OPL + OPM backlog](opl-opm-backlog.md) — Done / Next / Later for Perf Lab and Project Manager
 - [Modules catalog](modules.md) — shared `Open-*` libraries and images
 - [Interop](interop.md) — peer URLs, co-deployed `/hub-auth` login, service JWT scopes
+- [Security tenant scopes](security-tenant-scopes.md) — cross-product auth/org curl matrix (NAS)
 - [NAS deploy](nas-deploy.md) — `open-family`, `*:nas` images, host ports
 
 Single entry point for the self-hosted observability stack.
