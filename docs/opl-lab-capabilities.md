@@ -83,7 +83,7 @@ Most prior Code-ready items are now Done. Remaining:
 | **Geo / cloud locations** + IP ranges | Multi-region realism | Single-host Docker | Federation peers ≠ public regions (honesty) |
 | Distributed **campaign** scheduler | Multi-host cron orchestration | In-process tick only | Orchestrator job fan-out |
 | **Live reporting** sinks (external APM/metrics) | External ops sinks | ClickHouse + OPA only | Optional exporters |
-| **Notifications** (email, Slack, Teams, Jira, webhook) | Failures noticed outside dashboard | None in OPL | Hook OPA alerts or OPL webhooks on terminal status |
+| **Notifications** (email, Slack, Teams, Jira, webhook) | Failures noticed outside dashboard | Webhook on terminal status (`OPL_RUN_WEBHOOK_URL`); email/Slack/Teams later | Extend channels; optional OPA alert bridge |
 | **Bench report** builder (widgets, templates, **PDF**) | Shareable offline packs | JSON/CSV report Done | PDF/HTML pack later |
 | Full **trend** report builder (widgets, templates) | Sprint-over-sprint regressions | Sparklines + history table Done; no widget builder | CH queries + Trend tab charts |
 | **Infrastructure monitoring** during test | Host/DB health while load runs | Defer to **OPA** | Deep-link OPA infra; do not fork monitors into OPL |
@@ -125,7 +125,7 @@ Ranked for a team that **designs HTTP/API load tests, runs them in lab, gates CI
 | 4 | **Variables** store (secret/counter/random) | Parameterization still thin | Variable store + secret refs |
 | 5 | Rendezvous / queue / JSR223 (gated) | Exotic controllers still missing | Extend VU DSL carefully |
 | 6 | Workspace collaboration polish | Multi-project hygiene | Tags, cross-project copy |
-| 7 | Richer notify channels | Webhook / none | Email / chat adapters |
+| 7 | Richer notify channels | Webhook Done; ops often want chat/email | Email / chat adapters |
 | 8 | Trend/report **templates** | Packs/widgets may exist; no saved layouts | Persist templates |
 | 9 | Geo / multi-host injectors | Single-host Docker only | Federation ≠ public regions |
 | 10 | Multi-profile campaigns | One scenario → one journey | Campaign / profiles array |
@@ -152,7 +152,7 @@ For **OPL-API / OPL-Dashboard** implementers working load lab capabilities:
 ### Next (this inventory)
 
 - Multi-profile campaigns; ModuleController fidelity; variables store; CI wizards
-- Report/trend templates; richer notify channels
+- Report/trend templates; richer notify channels (webhook Done)
 - Distributed scheduler; geo honesty (federation ≠ cloud regions)
 
 ---

@@ -305,6 +305,12 @@ services:
       OPA_JMETER_WORK: /opa-jmeter
       OPA_JMETER_VOLUME: ${COMPOSE_PROJECT_NAME:-open-family}_jmeter_work
       OPA_JMETER_NETWORK: ${COMPOSE_PROJECT_NAME:-open-family}_open_internal
+      # Terminal-run webhook (optional — set in .env; never commit secrets)
+      OPL_RUN_WEBHOOK_URL: ${OPL_RUN_WEBHOOK_URL:-}
+      OPL_RUN_NOTIFY_MODE: ${OPL_RUN_NOTIFY_MODE:-deliver}
+      OPL_RUN_NOTIFY_STATUSES: ${OPL_RUN_NOTIFY_STATUSES:-}
+      OPL_RUN_WEBHOOK_SECRET: ${OPL_RUN_WEBHOOK_SECRET:-}
+      OPL_PUBLIC_URL: ${OPL_PUBLIC_URL:-}
     volumes:
       - jmeter_work:/opa-jmeter
       - /var/run/docker.sock:/var/run/docker.sock
