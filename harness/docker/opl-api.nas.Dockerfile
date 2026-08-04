@@ -7,11 +7,15 @@ ENV GOPROXY=https://proxy.golang.org,direct
 ENV GOSUMDB=sum.golang.org
 COPY Open-Auth-Go /modules/Open-Auth-Go
 COPY Open-Job-Go /modules/Open-Job-Go
+COPY Open-Tenant-Go /modules/Open-Tenant-Go
+COPY Open-ClickHouse-Go /modules/Open-ClickHouse-Go
 COPY OPL-API/ /src/OPL-API/
 WORKDIR /src/OPL-API
 RUN sed -i \
   -e 's|=> ../Open-Auth-Go|=> /modules/Open-Auth-Go|' \
   -e 's|=> ../Open-Job-Go|=> /modules/Open-Job-Go|' \
+  -e 's|=> ../Open-Tenant-Go|=> /modules/Open-Tenant-Go|' \
+  -e 's|=> ../Open-ClickHouse-Go|=> /modules/Open-ClickHouse-Go|' \
   go.mod \
   && go mod download \
   && CGO_ENABLED=0 GOOS=linux go build -o /out/opl-api .
