@@ -14,6 +14,15 @@ The Open-* family is five optional products plus shared modules. Install only wh
 
 Hub-and-spoke, push-primary: edge `opa-agent` registers and pushes telemetry outbound to `opa-hub`. `opa-dashboard` uses one URL and talks only to the hub.
 
+Recent hub batches moved dashboard query routes off the edge agent onto **opa-hub** (NAS port `18080`):
+
+| Batch | Routes (hub-owned) | Dashboard pages |
+|-------|-------------------|-----------------|
+| 2 | `GET /api/infra/hosts`, `GET /api/transactions/compare` | Infrastructure, Compare Traces (cohort) |
+| 3 | `GET /api/version`, `GET /api/topology`, `GET /api/ops/status`, `GET /api/audit`, `GET /api/db/*` list surfaces | System, Databases |
+
+The dashboard never calls edge hosts. Filter suggestions and call-graph compare remain edge-only or unimplemented — see [OPA-Hub ownership](https://github.com/TheGrimmChester/OPA-Hub/blob/main/docs/ownership.md).
+
 ## Smoke ports (laptop)
 
 API and dashboard host ports from `compose.all.yaml` (and the solo `compose.*.yaml` profiles). NAS production uses the same dashboard ports for OSA/OPL; see [nas-deploy.md](nas-deploy.md).

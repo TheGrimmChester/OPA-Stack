@@ -18,6 +18,17 @@ ORA, OSA, OPL, and OPM dashboards proxy hub auth at same-origin **`/hub-auth/`**
 
 OPA Dashboard talks to the hub URL directly (no `/hub-auth` bridge).
 
+NAS verification (all four peer dashboards):
+
+```bash
+for port in 8089 8094 8095 8098; do
+  curl -sf "http://127.0.0.1:$port/hub-auth/api/auth/status" | jq -r .issuer   # opa-hub
+done
+curl -sf -X POST http://127.0.0.1:8098/hub-auth/api/auth/login \
+  -H 'Content-Type: application/json' \
+  -d '{"username":"admin","password":"admin"}' | jq -r .token
+```
+
 ### Lab credentials
 
 Smoke / lab default seed user: username **`admin`** / password **`admin`** (hub issuer, and each product’s local issuer in standalone). Override with `AUTH_ADMIN_USER` / `AUTH_ADMIN_PASSWORD`. Change immediately outside throwaway lab environments.
@@ -34,6 +45,12 @@ One ClickHouse server can host all products. Each service sets its own database:
 | OPL | `opl` |
 
 `compose.all.yaml` creates all four databases on first boot (`clickhouse/init-databases.sql`). Solo profiles create the same init script so a shared server stays consistent. Prefer `CLICKHOUSE_DB`; `CLICKHOUSE_DATABASE` is an accepted alias.
+
+### ORA connector backfill (legacy `opa.connectors`)
+
+Co-deployed stacks split databases: hub writes `opa.*`, ORA writes `ora.*`. GitHub connector rows created before the product split may still live only in **`opa.connectors`**. On boot, `ora-api` rewrites new SQL to `ora.connectors`, then **backfills** missing legacy rows from hub `opa.connectors` into the product DB (via `QueryExact` on the hub database). Without this, peer `POST /api/peer/scm/clone-credentials` can return `404 connector not found` after restart even when connectors appear in the UI.
+
+After upgrading `ora-api:nas`, recreate the container and confirm hydrate logs report legacy backfill counts. No manual SQL migration is required for normal operation.
 
 ## Service-to-service
 
@@ -64,6 +81,8 @@ OPM projects are **GitHub repositories** only (no local folder registry).
 | Code review / Repo Watch | **ORA** (deep-link; do not duplicate) |
 
 NAS/open-family already sets `PEER_OPA_URL` and `PEER_ORA_URL` on `opm-api` and `osa-api`. Redeploy `opm-api:nas`, `osa-api:nas`, `osa-dashboard:nas`, `opa-hub:nas`, and `ora-api:nas` after upgrading images.
+
+**Task job workspaces:** `opm-orchestrator` runs `run-planning` and other task jobs inside the **`opm-api:nas` runtime image**, which must include **`git`** for ORA-mediated clone credentials. If jobs fail with `git: executable file not found in $PATH`, rebuild `opm-api:nas` (runtime stage includes git) and recreate `opm-api` / `opm-orchestrator`. See [OPM-API github-setup](https://github.com/TheGrimmChester/OPM-API/blob/main/docs/github-setup.md).
 
 ## Allowed peer calls
 
