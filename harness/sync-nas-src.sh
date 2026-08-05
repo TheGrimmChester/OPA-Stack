@@ -38,6 +38,7 @@ REPOS=(
   OSA-API
   OPL-API
   OPM-API
+  OAM-API
   Open-Auth-Go
   Open-ClickHouse-Go
   Open-Client-Go
@@ -51,6 +52,7 @@ REPOS=(
   OSA-Dashboard
   OPL-Dashboard
   OPM-Dashboard
+  OAM-Dashboard
   Open-Client-JS
   Open-UI-JS
 )

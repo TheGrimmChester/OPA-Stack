@@ -182,4 +182,4 @@ fi
 
 echo "==> Done. Images tagged *:$TAG:"
 docker images --format '{{.Repository}}:{{.Tag}}\t{{.ID}}\t{{.CreatedSince}}' \
-  | grep -E ":(nas)\s" | grep -E '^(opa-|ora-|osa-|opl-|opm-|open-)' || true
+  | grep -E ":(nas)\s" | grep -E '^(opa-|ora-|osa-|opl-|opm-|oam-|open-)' || true
