@@ -175,8 +175,12 @@ if wants dashboards || wants all; then
     product="${pair%%:*}"
     image="${pair##*:}"
     echo "==> Building ${image}:$TAG (PRODUCT=$product)"
+    # NAS publishes OAM on :18097 (smoke uses :8097). Bake peer ports into SPA
+    # external links so ORA CTAs open the right origin without nginx 302s.
     docker build -f "$DOCKER_DIR/dashboard.nas.Dockerfile" \
       --build-arg "PRODUCT=$product" \
+      --build-arg "VITE_OAM_DASHBOARD_PORT=18097" \
+      --build-arg "VITE_OPM_DASHBOARD_PORT=8098" \
       -t "${image}:$TAG" \
       "$FAMILY_ROOT"
   done

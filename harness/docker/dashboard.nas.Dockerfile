@@ -3,6 +3,9 @@
 #     --build-arg PRODUCT=ORA-Dashboard -t ora-dashboard:nas .
 FROM node:18-alpine AS builder
 ARG PRODUCT=ORA-Dashboard
+# Peer dashboard ports baked into SPA external links (NAS OAM is :18097).
+ARG VITE_OAM_DASHBOARD_PORT=8097
+ARG VITE_OPM_DASHBOARD_PORT=8098
 WORKDIR /family
 COPY Open-Client-JS /family/Open-Client-JS
 COPY Open-UI-JS /family/Open-UI-JS
@@ -12,6 +15,8 @@ RUN npm install && npm run build
 WORKDIR /family/Open-UI-JS
 RUN npm install && npm run build
 WORKDIR /family/${PRODUCT}
+ENV VITE_OAM_DASHBOARD_PORT=$VITE_OAM_DASHBOARD_PORT
+ENV VITE_OPM_DASHBOARD_PORT=$VITE_OPM_DASHBOARD_PORT
 RUN npm install \
  && npm run build
 
