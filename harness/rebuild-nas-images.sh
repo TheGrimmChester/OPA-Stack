@@ -161,9 +161,11 @@ if wants dashboards || wants all; then
   need OAM-Dashboard
   need Open-Client-JS
   need Open-UI-JS
-  # OPA dashboard has no file: Open-* deps — build from its own context.
-  build_ctx OPA-Dashboard "opa-dashboard:$TAG"
+  # All product dashboards depend on file:../Open-UI-JS (and most on Open-Client-JS).
+  # Build from the family root so those siblings are in the context — the product's
+  # own Dockerfile only copies that one repo and fails on @open-family/ui.
   for pair in \
+    "OPA-Dashboard:opa-dashboard" \
     "ORA-Dashboard:ora-dashboard" \
     "OSA-Dashboard:osa-dashboard" \
     "OPL-Dashboard:opl-dashboard" \
