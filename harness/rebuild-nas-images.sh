@@ -158,6 +158,7 @@ if wants dashboards || wants all; then
   need OSA-Dashboard
   need OPL-Dashboard
   need OPM-Dashboard
+  need OAM-Dashboard
   need Open-Client-JS
   need Open-UI-JS
   # OPA dashboard has no file: Open-* deps — build from its own context.
@@ -166,7 +167,8 @@ if wants dashboards || wants all; then
     "ORA-Dashboard:ora-dashboard" \
     "OSA-Dashboard:osa-dashboard" \
     "OPL-Dashboard:opl-dashboard" \
-    "OPM-Dashboard:opm-dashboard"
+    "OPM-Dashboard:opm-dashboard" \
+    "OAM-Dashboard:oam-dashboard"
   do
     product="${pair%%:*}"
     image="${pair##*:}"

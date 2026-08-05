@@ -46,6 +46,8 @@ API and dashboard host ports from `compose.all.yaml` (and the solo `compose.*.ya
 | OPL Dashboard | `8095` |
 | OPM API | `8096` |
 | OPM Dashboard | `8098` |
+| OAM API | `8090` |
+| OAM Dashboard | `8097` |
 
 ## Alert Test (OPA)
 

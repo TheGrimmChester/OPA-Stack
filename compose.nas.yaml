@@ -417,6 +417,20 @@ services:
       timeout: 3s
       retries: 20
 
+  # The account console. This is where per-agent model bindings are configured, so
+  # it is the surface that replaces the OPM_MODEL* environment variables — see
+  # docs/config-reference.md.
+  oam-dashboard:
+    image: oam-dashboard:nas
+    container_name: open_oam_dashboard
+    restart: unless-stopped
+    depends_on:
+      - oam-api
+    ports:
+      - "18097:80"
+    networks:
+      - open_internal
+
   opm-api:
     image: opm-api:nas
     container_name: open_opm_api

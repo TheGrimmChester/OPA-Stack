@@ -66,6 +66,8 @@ stale definition — recreate them (`docker compose up -d --no-deps <service>`).
 | OPL Dashboard | `opl-dashboard:nas` | `8095` |
 | OPM API | `opm-api:nas` | `8096` |
 | OPM Dashboard | `opm-dashboard:nas` | `8098` |
+| OAM API | `oam-api:nas` | `18090` → `8090` |
+| OAM Dashboard | `oam-dashboard:nas` | `18097` → `80` |
 | Egress proxy | `open-egress-proxy:nas` | (internal) |
 | Collector | `opa-collector:nas` (`open_collector`) | host network → agent ND-JSON `:9090` (not OTLP) |
 
@@ -73,7 +75,8 @@ Orchestrators for ORA/OSA/OPL/OPM use the same API images with an `orchestrator`
 
 ## ClickHouse
 
-One server, four product databases: `opa`, `ora`, `osa`, `opl`.
+One server, five product databases: `opa`, `ora`, `osa`, `opl`, `oam`. (OPM is
+filesystem-backed and has none.)
 
 **Volume migration:** the compose file mounts the existing Docker volume `opa-stack_opa_clickhouse_data` as an **external** volume. Do not delete or recreate this volume. Create missing product databases with:
 
@@ -82,6 +85,7 @@ CREATE DATABASE IF NOT EXISTS opa;
 CREATE DATABASE IF NOT EXISTS ora;
 CREATE DATABASE IF NOT EXISTS osa;
 CREATE DATABASE IF NOT EXISTS opl;
+CREATE DATABASE IF NOT EXISTS oam;
 ```
 
 Pre-split review/security/perf tables that still live under database `opa` are left in place. New ORA/OSA/OPL writes go to their own databases. No destructive table moves are performed by this stack rename.

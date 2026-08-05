@@ -36,9 +36,17 @@ user could choose their own model.
 
 Model choice now lives in OAM as a per-agent binding, resolved per job for the
 acting user (`task override → user → org → product default → family default`).
-Configure it in the OAM console's **Agents & Models** page, or via
+Configure it in the OAM console's **Agents & Models** page —
+`http://<host>:8097/agents` on the laptop stack, `:18097` on NAS — or via
 `POST /api/models/bindings/set`. The variables above are read only when
 `PEER_OAM_URL` is unset, and are kept solely so a deployment can roll back.
+
+The console's table has one row per agent a product has **published** to
+`/api/agents/catalog`, and names the layer each effective model came from, so
+"which model will this task run, and why" is answerable before running it. A
+product that adds a job kind without publishing it silently inherits the product
+default — the boot log lists the keys it registered, so check there first when an
+agent is missing from the page.
 
 `OPM_MODEL_API_KEY` / `CURSOR_API_KEY` remain readable as an explicit
 admin-scope development fallback, default off. They are never a tenant fallback:

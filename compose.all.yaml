@@ -155,6 +155,14 @@ services:
       PEER_OPA_URL: http://hub:8080
     depends_on: [clickhouse]
 
+  # The account console: directory, users, credentials, audit, and the
+  # Agents & Models page that replaces the OPM_MODEL* environment variables.
+  oam-dashboard:
+    image: oam-dashboard:smoke
+    ports: ["8097:80"]
+    environment:
+      VITE_API_URL: http://127.0.0.1:8090
+
   opm:
     image: opm-api:smoke
     ports: ["8096:8096"]
