@@ -54,6 +54,10 @@ services:
       LISTEN_ADDR: ":8080"
       CLICKHOUSE_URL: "http://clickhouse:8123"
       CLICKHOUSE_DB: opa
+      # Organizations come from the OAM directory when this is set; the in-memory
+      # agent registry is the fallback (it only knows orgs telemetry arrived
+      # under, and resets on restart).
+      PEER_OAM_URL: http://oam-api:8090
       JWT_SECRET: ${JWT_SECRET}
       AUTH_MODE: ${AUTH_MODE:-codeployed}
       # Prefer a distinct service secret from JWT_SECRET (set OPEN_SERVICE_JWT_SECRET in .env).

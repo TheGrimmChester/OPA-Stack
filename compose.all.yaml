@@ -1,7 +1,7 @@
-# All-products stack — one ClickHouse server, product databases (OPA/ORA/OSA/OPL; OPM is filesystem-backed).
+# All-products stack — one ClickHouse server, product databases (OPA/ORA/OSA/OPL/OAM; OPM is filesystem-backed).
 # Laptop smoke only. Production/NAS must use *:nas image tags exclusively.
 #
-# Databases created on first boot: opa, ora, osa, opl (see clickhouse/init-databases.sql).
+# Databases created on first boot: opa, ora, osa, opl, oam (see clickhouse/init-databases.sql).
 # Co-deployed auth: set JWT_SECRET shared across services and PEER_OPA_URL=http://hub:8080
 # so ORA/OSA/OPL/OPM validate hub-issued tokens. Standalone: leave PEER_OPA_URL empty
 # (or AUTH_MODE=standalone) for local /api/auth/login on each product.
@@ -22,6 +22,10 @@ services:
       LISTEN_ADDR: ":8080"
       CLICKHOUSE_URL: http://clickhouse:8123
       CLICKHOUSE_DB: opa
+      # The hub serves /api/tenancy/organizations from OAM when this is set. Its
+      # own fallback is the in-memory agent registry, which only knows orgs that
+      # telemetry has arrived under and resets on restart.
+      PEER_OAM_URL: http://oam:8090
       JWT_SECRET: ${JWT_SECRET:-dev-shared-jwt-secret-at-least-32b}
       AUTH_MODE: codeployed
       OPEN_SERVICE_JWT_SECRET: ${OPEN_SERVICE_JWT_SECRET:-dev-service-jwt-secret-at-least-32b}
