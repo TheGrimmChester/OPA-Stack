@@ -28,9 +28,27 @@ RUN sed -i \
 
 FROM debian:bookworm-slim AS opm-runner-task
 RUN apt-get update \
- && apt-get install -y --no-install-recommends ca-certificates \
- && rm -rf /var/lib/apt/lists/*
+ && apt-get install -y --no-install-recommends ca-certificates curl bash \
+ && rm -rf /var/lib/apt/lists/* \
+ && (NO_COLOR=1 curl -fsS https://cursor.com/install | bash \
+      && test -x /root/.local/bin/agent \
+      && REAL="$(readlink -f /root/.local/bin/agent)" \
+      && REL="${REAL#/root/.local/share/cursor-agent/}" \
+      && mkdir -p /opt/cursor-agent \
+      && cp -a /root/.local/share/cursor-agent/. /opt/cursor-agent/ \
+      && test -x "/opt/cursor-agent/$REL" \
+      && ln -sfn "/opt/cursor-agent/$REL" /usr/local/bin/agent \
+      && ln -sfn "/opt/cursor-agent/$REL" /usr/local/bin/cursor-agent \
+      && chmod -R a+rX /opt/cursor-agent \
+      && find /opt/cursor-agent -type f \( -name 'cursor-agent' -o -name 'node' -o -name '*.so*' \) -exec chmod a+x {} +) \
+    || echo "WARN: Cursor Agent CLI install skipped" \
+ && mkdir -p /home/opm \
+ && chown -R 65532:65532 /home/opm \
+ && rm -rf /root/.npm /root/.local /tmp/*
 COPY --from=builder /out/opm-runner /usr/local/bin/opm-runner
+ENV HOME=/home/opm \
+    OPM_MODEL=auto \
+    PATH="/usr/local/bin:/usr/bin:/bin"
 USER 65532:65532
 WORKDIR /home/opm
 ENTRYPOINT ["/usr/local/bin/opm-runner"]

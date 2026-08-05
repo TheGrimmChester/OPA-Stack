@@ -391,19 +391,25 @@ services:
       PEER_OPL_URL: http://opl-api:8092
       OPM_RUNNER_TAG: nas
       OPM_DATA_DIR: /data
-      OPM_JOB_TMP: /tmp/opm-jobs
+      # Must be the same host path inside and outside the container: docker run -v
+      # from opm-api uses the Docker host's path view. A named volume at /tmp/opm-jobs
+      # made runner /repo mounts empty. Mirror ORA's opa-jobs host-bind pattern.
+      OPM_JOB_TMP: /mnt/Apps/config-docker/open-stack/opm-jobs
       # Model-backed runner (optional — set in .env; never commit secrets)
       OPM_MODEL_API_KEY: ${OPM_MODEL_API_KEY:-}
       OPM_MODEL_BASE_URL: ${OPM_MODEL_BASE_URL:-}
-      OPM_MODEL: ${OPM_MODEL:-}
-      OPM_MODEL_PLANNING: ${OPM_MODEL_PLANNING:-}
-      OPM_MODEL_CODING: ${OPM_MODEL_CODING:-}
-      OPM_MODEL_REVIEW: ${OPM_MODEL_REVIEW:-}
+      OPM_MODEL: ${OPM_MODEL:-auto}
+      OPM_MODEL_PLANNING: ${OPM_MODEL_PLANNING:-auto}
+      OPM_MODEL_CODING: ${OPM_MODEL_CODING:-auto}
+      OPM_MODEL_REVIEW: ${OPM_MODEL_REVIEW:-auto}
+      OPM_MODEL_IDEATION: ${OPM_MODEL_IDEATION:-auto}
+      OPM_MODEL_ROADMAP_DISCOVERY: ${OPM_MODEL_ROADMAP_DISCOVERY:-auto}
+      OPM_MODEL_ROADMAP_FEATURES: ${OPM_MODEL_ROADMAP_FEATURES:-auto}
       OPM_RUNNER_NETWORK: ${OPM_RUNNER_NETWORK:-bridge}
       # GitHub App/PAT live on ora-api — OPM discovers via PEER_ORA_URL + hub orgs via PEER_OPA_URL
     volumes:
       - opm_data:/data
-      - opm_job_tmp:/tmp/opm-jobs
+      - /mnt/Apps/config-docker/open-stack/opm-jobs:/mnt/Apps/config-docker/open-stack/opm-jobs
       - /var/run/docker.sock:/var/run/docker.sock
     ports:
       - "8096:8096"
@@ -426,7 +432,7 @@ services:
       OPM_DATA_DIR: /data
       OPM_MODEL_API_KEY: ${OPM_MODEL_API_KEY:-}
       OPM_MODEL_BASE_URL: ${OPM_MODEL_BASE_URL:-}
-      OPM_MODEL: ${OPM_MODEL:-}
+      OPM_MODEL: ${OPM_MODEL:-auto}
     volumes:
       - opm_data:/data
       - /var/run/docker.sock:/var/run/docker.sock
@@ -498,7 +504,6 @@ volumes:
     name: opa-stack_opa_orchestrator_workspace
   jmeter_work:
   opm_data:
-  opm_job_tmp:
 
 networks:
   open_internal:
