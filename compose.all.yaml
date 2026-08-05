@@ -86,6 +86,10 @@ services:
       OPEN_SERVICE_JWT_SECRET: ${OPEN_SERVICE_JWT_SECRET:-dev-service-jwt-secret-at-least-32b}
       PEER_OPA_URL: http://hub:8080
       PEER_ORA_URL: http://ora:8091
+      # The dashboard's project picker reads /api/oam/projects, which proxies
+      # OAM's directory. Organizations still come via the hub. Unset, the project
+      # picker is empty rather than broken.
+      PEER_OAM_URL: http://oam:8090
     depends_on: [clickhouse]
 
   osa-orchestrator:

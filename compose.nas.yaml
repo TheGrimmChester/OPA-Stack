@@ -258,6 +258,10 @@ services:
       OPA_AUTH_REQUIRED: ${OPA_AUTH_REQUIRED:-1}
       PEER_OPA_URL: http://hub:8080
       PEER_ORA_URL: http://ora-api:8091
+      # The dashboard's project picker reads /api/oam/projects, which proxies
+      # OAM's directory. Organizations still come via the hub. Unset, the project
+      # picker is empty rather than broken.
+      PEER_OAM_URL: http://oam-api:8090
       OPA_JOB_SANDBOX: ${OPA_JOB_SANDBOX:-off}
       OSA_RUNNER_TAG: nas
       OPA_JOB_IMAGE_TAG: nas
