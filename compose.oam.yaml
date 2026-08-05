@@ -1,0 +1,34 @@
+# OAM product profile — the family's account, org and credential plane.
+#
+# Solo profile for working on OAM alone. In a family stack use compose.all.yaml,
+# which wires PEER_OAM_URL on the products that consume it.
+name: oam
+
+services:
+  clickhouse:
+    image: clickhouse/clickhouse-server:24.3
+    profiles: ["oam"]
+    volumes:
+      - ./clickhouse/init-databases.sql:/docker-entrypoint-initdb.d/init-databases.sql:ro
+
+  oam:
+    image: oam-api:smoke
+    profiles: ["oam"]
+    ports: ["8090:8090"]
+    environment:
+      LISTEN_ADDR: ":8090"
+      CLICKHOUSE_URL: ${CLICKHOUSE_URL:-http://clickhouse:8123}
+      CLICKHOUSE_DB: oam
+      JWT_SECRET: ${JWT_SECRET:-}
+      AUTH_MODE: ${AUTH_MODE:-standalone}
+      # Credential resolution (POST /api/agents/resolve) refuses to serve without
+      # this: it is the only route that returns a plaintext key, and a peer that
+      # cannot be authenticated must not receive one. Set it even in a solo
+      # profile if you want to exercise the job path.
+      OPEN_SERVICE_JWT_SECRET: ${OPEN_SERVICE_JWT_SECRET:-}
+      # Encrypts secrets at rest. Booting without it is allowed — the directory
+      # and model-binding surfaces still work — but every credential write is
+      # refused and /api/health reports secret_key_present: false.
+      OAM_SECRET_KEY: ${OAM_SECRET_KEY:-${OPA_CONNECTOR_SECRET:-}}
+      PEER_OPA_URL: ${PEER_OPA_URL:-}
+    depends_on: [clickhouse]

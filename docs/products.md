@@ -1,9 +1,10 @@
 # Open-* products
 
-The Open-* family is five optional products plus shared modules. Install only what you need. Each product ships its own API (or hub), dashboard, and (where required) orchestrator + runners.
+The Open-* family is five optional products plus a shared account plane and shared modules. Install only what you need. Each product ships its own API (or hub), dashboard, and (where required) orchestrator + runners.
 
 | Short | Full name | Control plane | Dashboard | Owns |
 |-------|-----------|---------------|-----------|------|
+| **OAM** | Open Account Manager | `oam-api` | `oam-dashboard` | Shared account plane: organizations, projects, users/RBAC, connectors, API keys, AI provider credentials, per-agent model bindings |
 | **OPA** | Open Profiling Agent | `opa-hub` (central) + `opa-agent` (edge) | `opa-dashboard` | Observability only: edge ingest, hub registry/query/auth, APM, RUM, metrics, alerts/SLOs, synthetics |
 | **ORA** | Open Review Agent | `ora-api` + `ora-orchestrator` | `ora-dashboard` | Repo Watch, SCM connectors, automated code review, review check-runs, coding agents, roadmaps |
 | **OSA** | Open Security Agent | `osa-api` + `osa-orchestrator` | `osa-dashboard` | AppSec findings (secrets/SAST/IaC), security runs, vulns/IAST, AppSec CI gates |

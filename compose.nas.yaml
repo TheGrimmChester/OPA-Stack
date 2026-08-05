@@ -374,6 +374,45 @@ services:
     networks:
       - open_internal
 
+  # OAM — Open Account Manager: the family's account, org and credential plane.
+  # Orgs, users, connectors, API keys, AI provider credentials and per-agent model
+  # bindings live here; every product reads them over HTTP.
+  oam-api:
+    image: oam-api:nas
+    container_name: open_oam_api
+    restart: unless-stopped
+    depends_on:
+      clickhouse:
+        condition: service_healthy
+    environment:
+      LISTEN_ADDR: ":8090"
+      CLICKHOUSE_URL: "http://clickhouse:8123"
+      CLICKHOUSE_DB: oam
+      JWT_SECRET: ${JWT_SECRET}
+      AUTH_MODE: ${AUTH_MODE:-codeployed}
+      OPA_AUTH_REQUIRED: ${OPA_AUTH_REQUIRED:-1}
+      # REQUIRED. Credential resolution refuses to serve without a service secret:
+      # a peer that cannot be authenticated must not receive plaintext keys, and
+      # that holds regardless of OPA_AUTH_REQUIRED.
+      OPEN_SERVICE_JWT_SECRET: ${OPEN_SERVICE_JWT_SECRET}
+      # Encrypts secrets at rest. MUST derive to the same bytes as the key ORA
+      # already uses, because the migration copies ORA's ciphertext verbatim
+      # rather than re-encrypting it. Defaulting to OPA_CONNECTOR_SECRET means an
+      # existing install migrates with no new configuration; setting this to a
+      # *different* value is the one change that makes migrated credentials
+      # undecryptable (it fails closed and logs — it never returns garbage).
+      OAM_SECRET_KEY: ${OAM_SECRET_KEY:-${OPA_CONNECTOR_SECRET}}
+      PEER_OPA_URL: http://hub:8080
+    ports:
+      - "18090:8090"
+    networks:
+      - open_internal
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "-", "http://localhost:8090/api/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
   opm-api:
     image: opm-api:nas
     container_name: open_opm_api
@@ -395,7 +434,16 @@ services:
       # from opm-api uses the Docker host's path view. A named volume at /tmp/opm-jobs
       # made runner /repo mounts empty. Mirror ORA's opa-jobs host-bind pattern.
       OPM_JOB_TMP: /mnt/Apps/config-docker/open-stack/opm-jobs
-      # Model-backed runner (optional — set in .env; never commit secrets)
+      # Models and API keys resolve PER JOB from OAM: scoped to the acting user's
+      # org and the per-agent binding for that job's phase, so "light model to
+      # plan, strong model to implement" is configurable per org or per user
+      # instead of per deployment. A job whose org has no credential fails closed
+      # with credential_unavailable rather than borrowing a deployment-wide key.
+      PEER_OAM_URL: http://oam-api:8090
+      # LEGACY model path — used only when PEER_OAM_URL is unset. Kept so a
+      # deployment can roll back to the pre-OAM behaviour without a code change.
+      # These no longer participate while OAM is configured; the console's
+      # Agents & Models page is where model choice lives now.
       OPM_MODEL_API_KEY: ${OPM_MODEL_API_KEY:-}
       OPM_MODEL_BASE_URL: ${OPM_MODEL_BASE_URL:-}
       OPM_MODEL: ${OPM_MODEL:-auto}

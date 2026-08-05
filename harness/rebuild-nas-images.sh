@@ -113,6 +113,16 @@ if wants osa-api || wants all; then
   docker build -f "$DOCKER_DIR/osa-api.nas.Dockerfile" -t "osa-runner-scan:$TAG" --target osa-runner-scan "$FAMILY_ROOT"
 fi
 
+if wants oam-api || wants all; then
+  need OAM-API
+  need Open-Auth-Go
+  need Open-Tenant-Go
+  need Open-ClickHouse-Go
+  need Open-HTTP-Go
+  need Open-Logger-Go
+  build_df oam-api.nas.Dockerfile "oam-api:$TAG" --target oam-api
+fi
+
 if wants opl-api || wants all; then
   need OPL-API
   need Open-Auth-Go

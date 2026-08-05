@@ -87,6 +87,7 @@ One ClickHouse server can host all products. Each service sets its own database:
 | ORA | `ora` |
 | OSA | `osa` |
 | OPL | `opl` |
+| OAM | `oam` |
 
 `compose.all.yaml` creates all four databases on first boot (`clickhouse/init-databases.sql`). Solo profiles create the same init script so a shared server stays consistent. Prefer `CLICKHOUSE_DB`; `CLICKHOUSE_DATABASE` is an accepted alias.
 
@@ -122,6 +123,9 @@ Caller sets `PEER_{OPA|ORA|OSA|OPL|OPM}_URL` and mints a **service JWT** with `O
 | `health:read` | Peer probe |
 | `connectors:read` | List ORA GitHub connectors / repos (OPM → ORA) |
 | `scm:clone` | Short-lived clone credentials for ephemeral job workspaces (OPM → ORA) |
+| `creds:resolve` | Resolve a job's model + API key (any product → OAM). The only scope that yields a plaintext credential |
+| `catalog:write` | Publish a product's agent/task catalog (any product → OAM) |
+| `orgs:read` / `users:read` | Read the OAM directory (hub, products → OAM) |
 | `scm:pm` | Milestones + Projects v2 list/bind/sync (OPM → ORA peer `/api/peer/scm/milestones/*`, `/api/peer/scm/projects/*`) |
 
 ## OPM + Hub + GitHub
@@ -130,10 +134,46 @@ OPM projects are **GitHub repositories** only (no local folder registry).
 
 | Concern | Owner |
 |---------|-------|
-| User JWTs / org directory | **OPA-Hub** (`PEER_OPA_URL`) |
-| GitHub App / PAT connectors | **ORA** (`PEER_ORA_URL`; configure `OPA_GITHUB_APP_*` / PAT on `ora-api`) |
+| Organizations / projects / users / RBAC | **OAM** (`PEER_OAM_URL`) |
+| Connectors, API keys, AI provider credentials, per-agent model bindings | **OAM** (`PEER_OAM_URL`) |
+| User JWTs / org directory | **OPA-Hub** (`PEER_OPA_URL`) — reads the OAM directory when `PEER_OAM_URL` is set |
+| GitHub App / PAT *protocol* work (install-url, callback, clone creds, PR/issue writes) | **ORA** (`PEER_ORA_URL`), using OAM-stored credentials |
 | Kanban / roadmap / task jobs | **OPM** |
 | Code review / Repo Watch | **ORA** (deep-link; do not duplicate) |
+
+### Per-job credentials and models (OAM)
+
+A job resolves the model **and** the API key it runs with from OAM, in one call,
+scoped to the user who enqueued it:
+
+```
+POST /api/agents/resolve   (service JWT, scope creds:resolve)
+  { organization_id, project_id, user_id, product, agent_key, override? }
+→ { provider, model, base_url, api_key, key_scope, model_source, agent_key_known }
+```
+
+Model resolution: `task override → user → org → product default → family default`.
+The family default is `cli_cursor` / `auto`, which is what every product runs
+today, so adopting OAM changes no behaviour until someone sets an override.
+Credential resolution: `user → org → fail closed` — never an admin key, never a
+process environment variable. A job whose org has no credential fails with
+`credential_unavailable` rather than borrowing a deployment-wide key.
+
+Model and key come back **together** on purpose: two separate calls can disagree
+(an org's key paired with a user's model, or a rotation landing between the
+lookups) and a job must never run that combination.
+
+**Agent keys belong to the product.** OAM normalises formatting and nothing else —
+it does not translate a job action into an agent key, because that is not a string
+transform: in OPM, `run-implementation` is the **coding** phase and both
+`run-planning` and `run-followup-planning` are **planning**. Each product owns its
+mapping and publishes its keys via `POST /api/agents/catalog/publish` on boot; a
+key that was never published resolves against a default and reports
+`agent_key_known: false`.
+
+**OPM adoption:** with `PEER_OAM_URL` set, `OPM_MODEL*` and `CURSOR_API_KEY` no
+longer participate. Unset it and OPM falls back to that environment path exactly
+as before — including its per-phase `OPM_MODEL_<PHASE>` overrides.
 
 NAS/open-family already sets `PEER_OPA_URL` and `PEER_ORA_URL` on `opm-api` and `osa-api`. Redeploy `opm-api:nas`, `osa-api:nas`, `osa-dashboard:nas`, `opa-hub:nas`, and `ora-api:nas` after upgrading images.
 
@@ -178,8 +218,10 @@ JWT_SECRET=
 AUTH_MODE=                 # standalone | codeployed (auto from PEER_OPA_URL when empty)
 OPEN_SERVICE_JWT_SECRET=
 CLICKHOUSE_URL=http://clickhouse:8123
-CLICKHOUSE_DB=             # opa | ora | osa | opl per service
+CLICKHOUSE_DB=             # opa | ora | osa | opl | oam per service
+OAM_SECRET_KEY=            # oam-api only; must match ORA's OPA_CONNECTOR_SECRET
 PEER_OPA_URL=
+PEER_OAM_URL=              # account plane; unset = pre-OAM env behaviour
 PEER_ORA_URL=
 PEER_OSA_URL=
 PEER_OPL_URL=

@@ -128,6 +128,29 @@ services:
     environment:
       VITE_API_URL: http://127.0.0.1:8092
 
+  # OAM — Open Account Manager. Orgs, users, connectors, API keys, AI provider
+  # credentials and per-agent model bindings for the whole family.
+  #
+  # OAM_SECRET_KEY encrypts secrets at rest and must match the value ORA already
+  # uses (OPA_CONNECTOR_SECRET): the migration copies ORA's ciphertext verbatim,
+  # so a different key makes every migrated credential undecryptable. OAM accepts
+  # OPA_CONNECTOR_SECRET as a fallback for exactly that reason.
+  oam:
+    image: oam-api:smoke
+    ports: ["8090:8090"]
+    environment:
+      LISTEN_ADDR: ":8090"
+      CLICKHOUSE_URL: http://clickhouse:8123
+      CLICKHOUSE_DB: oam
+      JWT_SECRET: ${JWT_SECRET:-dev-shared-jwt-secret-at-least-32b}
+      AUTH_MODE: codeployed
+      # Required: credential resolution refuses to serve without it, because a
+      # peer that cannot be authenticated must not receive plaintext keys.
+      OPEN_SERVICE_JWT_SECRET: ${OPEN_SERVICE_JWT_SECRET:-dev-service-jwt-secret-at-least-32b}
+      OAM_SECRET_KEY: ${OAM_SECRET_KEY:-${OPA_CONNECTOR_SECRET:-dev-connector-secret-at-least-32b}}
+      PEER_OPA_URL: http://hub:8080
+    depends_on: [clickhouse]
+
   opm:
     image: opm-api:smoke
     ports: ["8096:8096"]
@@ -140,6 +163,10 @@ services:
       PEER_ORA_URL: http://ora:8091
       PEER_OSA_URL: http://osa:8093
       PEER_OPL_URL: http://opl:8092
+      # With PEER_OAM_URL set, jobs resolve their model AND API key per job from
+      # OAM, scoped to the acting user's org and per-agent binding. Unset it and
+      # OPM falls back to the deployment-wide OPM_MODEL*/CURSOR_API_KEY path.
+      PEER_OAM_URL: http://oam:8090
       OPM_DATA_DIR: /data
       OPM_JOB_TMP: /tmp/opm-jobs
 
