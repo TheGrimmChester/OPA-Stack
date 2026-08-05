@@ -156,6 +156,22 @@ if wants opm-api || wants all; then
   fi
 fi
 
+# OAM is newer than this script's first version, so `all` used to skip it and
+# compose.all.yaml then failed on a missing oam-api:smoke / oam-dashboard:smoke.
+if wants oam-api || wants all; then
+  need OAM-API
+  need Open-Auth-Go
+  need Open-Tenant-Go
+  need Open-ClickHouse-Go
+  need Open-HTTP-Go
+  need Open-Logger-Go
+  if [[ -f "$DOCKER_DIR/oam-api.nas.Dockerfile" ]]; then
+    build_df oam-api.nas.Dockerfile "oam-api:$TAG" --target oam-api
+  else
+    build_ctx OAM-API "oam-api:$TAG"
+  fi
+fi
+
 if wants egress || wants all; then
   need Open-Egress-Proxy
   build_ctx Open-Egress-Proxy "open-egress-proxy:$TAG"
@@ -167,15 +183,21 @@ if wants dashboards || wants all; then
   need OSA-Dashboard
   need OPL-Dashboard
   need OPM-Dashboard
+  need OAM-Dashboard
   need Open-Client-JS
   need Open-UI-JS
-  build_ctx OPA-Dashboard "opa-dashboard:$TAG"
+  # OPA-Dashboard builds from the family root like the rest: it imports
+  # @open-family/ui (src/main.jsx) via a file:../Open-UI-JS dependency, so a
+  # repo-only context cannot resolve it and Rollup fails on styles.css. It is
+  # only in the fallback branch below for trees without the shared Dockerfile.
   if [[ -f "$DOCKER_DIR/dashboard.nas.Dockerfile" ]]; then
     for pair in \
+      "OPA-Dashboard:opa-dashboard" \
       "ORA-Dashboard:ora-dashboard" \
       "OSA-Dashboard:osa-dashboard" \
       "OPL-Dashboard:opl-dashboard" \
-      "OPM-Dashboard:opm-dashboard"
+      "OPM-Dashboard:opm-dashboard" \
+      "OAM-Dashboard:oam-dashboard"
     do
       product="${pair%%:*}"
       image="${pair##*:}"
@@ -185,6 +207,17 @@ if wants dashboards || wants all; then
         -t "${image}:$TAG" \
         "$FAMILY_ROOT"
     done
+  else
+    # No shared Dockerfile in this tree: fall back to each repo's own context.
+    # Any dashboard with file: sibling deps will fail here — that is the reason
+    # the shared Dockerfile exists, so surface it rather than skipping silently.
+    echo "warn: $DOCKER_DIR/dashboard.nas.Dockerfile missing; building from per-repo contexts" >&2
+    build_ctx OPA-Dashboard "opa-dashboard:$TAG"
+    build_ctx ORA-Dashboard "ora-dashboard:$TAG"
+    build_ctx OSA-Dashboard "osa-dashboard:$TAG"
+    build_ctx OPL-Dashboard "opl-dashboard:$TAG"
+    build_ctx OPM-Dashboard "opm-dashboard:$TAG"
+    build_ctx OAM-Dashboard "oam-dashboard:$TAG"
   fi
 fi
 
@@ -195,4 +228,4 @@ fi
 
 echo "==> Done. Images tagged *:$TAG:"
 docker images --format '{{.Repository}}:{{.Tag}}\t{{.ID}}\t{{.CreatedSince}}' \
-  | grep -E ":(smoke)\s" | grep -E '^(opa-|ora-|osa-|opl-|opm-|open-)' || true
+  | grep -E ":(smoke)\s" | grep -E '^(opa-|oam-|ora-|osa-|opl-|opm-|open-)' || true
