@@ -20,6 +20,7 @@ Read from the stack `.env` beside `compose.nas.yaml`. Template:
 | `LISTEN_ADDR` | string | `:8090` | oam-api | Listen address |
 | `CLICKHOUSE_DB` | string | `oam` | oam-api | Product database |
 | `OAM_SECRET_KEY` | string | falls back to `OPA_CONNECTOR_SECRET` | oam-api | AES-256-GCM key material for secrets at rest. **Must derive to the same bytes as the key ORA already uses**, because the migration copies ORA's ciphertext verbatim rather than re-encrypting it. Setting this to a *different* value is the one change that makes migrated credentials undecryptable — it fails closed and logs, it never returns garbage. Booting with no key is allowed (directory + model bindings still work) but every credential write is refused and `/api/health` reports `secret_key_present: false` |
+| `OAM_RESOLVE_MAX_CANDIDATES` | int | `3` | oam-api | How many endpoints a single resolve returns, so a job can fall through to the next when one is down or over quota. This is an **exposure bound**, not a tuning knob: a job env holds one credential per candidate. Every one is a key that actor already resolves at that scope, so it widens exposure without escalating privilege — but a leaked job env leaks up to this many. Clamped to 1..10; setting `1` restores the pre-failover blast radius exactly. Read per request, so it can be tightened without a restart |
 | `OPEN_SERVICE_JWT_SECRET` | string | empty | oam-api | **Required for credential resolution.** `POST /api/agents/resolve` refuses to serve without it, regardless of `OPA_AUTH_REQUIRED`: it is the only route returning a plaintext key, and a peer that cannot be authenticated must not receive one |
 
 Consumers set `PEER_OAM_URL`. With it unset, a product uses its pre-OAM
@@ -40,6 +41,28 @@ Configure it in the OAM console's **Agents & Models** page —
 `http://<host>:8097/agents` on the laptop stack, `:18097` on NAS — or via
 `POST /api/models/bindings/set`. The variables above are read only when
 `PEER_OAM_URL` is unset, and are kept solely so a deployment can roll back.
+
+### Endpoints are registered, not enumerated
+
+An organisation or user registers **many** AI endpoints — OpenAI-compatible and
+Anthropic-compatible APIs (official or not), several Cursor accounts, Claude Code,
+or any other agent CLI — each with its own credential, in a user-sortable priority
+order. Manage them on the console's **AI Endpoints** page.
+
+A job resolves the top `OAM_RESOLVE_MAX_CANDIDATES` of that order and walks them:
+on a 429, an unreachable host or a bad key it advances to the next. Failover
+happens **inside the job**, so a control-plane blip cannot fail a run that has
+already started.
+
+Priority is strict — always start at the top and descend only on failure. Nothing
+is remembered between jobs, so an exhausted endpoint is retried first by every
+later job and costs one fast 429 before the fall-through. Each resolve records its
+offered order and skip count in `oam.audit_log`, so the pattern is visible on the
+console's Audit page.
+
+With **no** endpoints registered a deployment behaves exactly as it did before:
+resolution synthesises one candidate from the binding's provider and that
+provider's single fixed key.
 
 The console's table has one row per agent a product has **published** to
 `/api/agents/catalog`, and names the layer each effective model came from, so
