@@ -43,6 +43,181 @@ services:
       timeout: 3s
       retries: 20
 
+  # Per-family security Redis — control-plane caches only (not job runners).
+  # Hardening: requirepass, maxmemory 256mb, FLUSHALL/CONFIG/DEBUG renamed,
+  # appendonly yes, open_internal only, no host ports. Sensitive values use
+  # enc:v2 via Open-Cache-Go; runners must never receive REDIS_URL (denylisted
+  # in Open-Job-Env-Go / ORA job_env.go).
+  redis-opa: &redis_security
+    image: redis:7-alpine
+    container_name: open_redis_opa
+    restart: unless-stopped
+    environment:
+      REDIS_PASSWORD: ${REDIS_OPA_PASSWORD:?set REDIS_OPA_PASSWORD in .env}
+    command:
+      - redis-server
+      - --requirepass
+      - ${REDIS_OPA_PASSWORD:?set REDIS_OPA_PASSWORD in .env}
+      - --maxmemory
+      - 256mb
+      - --maxmemory-policy
+      - allkeys-lru
+      - --appendonly
+      - "yes"
+      - --rename-command
+      - FLUSHALL
+      - ""
+      - --rename-command
+      - CONFIG
+      - ""
+      - --rename-command
+      - DEBUG
+      - ""
+    volumes:
+      - redis_opa_data:/data
+    networks:
+      - open_internal
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli -a \"$$REDIS_PASSWORD\" ping | grep -q PONG"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  redis-oam:
+    <<: *redis_security
+    container_name: open_redis_oam
+    environment:
+      REDIS_PASSWORD: ${REDIS_OAM_PASSWORD:?set REDIS_OAM_PASSWORD in .env}
+    command:
+      - redis-server
+      - --requirepass
+      - ${REDIS_OAM_PASSWORD:?set REDIS_OAM_PASSWORD in .env}
+      - --maxmemory
+      - 256mb
+      - --maxmemory-policy
+      - allkeys-lru
+      - --appendonly
+      - "yes"
+      - --rename-command
+      - FLUSHALL
+      - ""
+      - --rename-command
+      - CONFIG
+      - ""
+      - --rename-command
+      - DEBUG
+      - ""
+    volumes:
+      - redis_oam_data:/data
+
+  redis-ora:
+    <<: *redis_security
+    container_name: open_redis_ora
+    environment:
+      REDIS_PASSWORD: ${REDIS_ORA_PASSWORD:?set REDIS_ORA_PASSWORD in .env}
+    command:
+      - redis-server
+      - --requirepass
+      - ${REDIS_ORA_PASSWORD:?set REDIS_ORA_PASSWORD in .env}
+      - --maxmemory
+      - 256mb
+      - --maxmemory-policy
+      - allkeys-lru
+      - --appendonly
+      - "yes"
+      - --rename-command
+      - FLUSHALL
+      - ""
+      - --rename-command
+      - CONFIG
+      - ""
+      - --rename-command
+      - DEBUG
+      - ""
+    volumes:
+      - redis_ora_data:/data
+
+  redis-osa:
+    <<: *redis_security
+    container_name: open_redis_osa
+    environment:
+      REDIS_PASSWORD: ${REDIS_OSA_PASSWORD:?set REDIS_OSA_PASSWORD in .env}
+    command:
+      - redis-server
+      - --requirepass
+      - ${REDIS_OSA_PASSWORD:?set REDIS_OSA_PASSWORD in .env}
+      - --maxmemory
+      - 256mb
+      - --maxmemory-policy
+      - allkeys-lru
+      - --appendonly
+      - "yes"
+      - --rename-command
+      - FLUSHALL
+      - ""
+      - --rename-command
+      - CONFIG
+      - ""
+      - --rename-command
+      - DEBUG
+      - ""
+    volumes:
+      - redis_osa_data:/data
+
+  redis-opl:
+    <<: *redis_security
+    container_name: open_redis_opl
+    environment:
+      REDIS_PASSWORD: ${REDIS_OPL_PASSWORD:?set REDIS_OPL_PASSWORD in .env}
+    command:
+      - redis-server
+      - --requirepass
+      - ${REDIS_OPL_PASSWORD:?set REDIS_OPL_PASSWORD in .env}
+      - --maxmemory
+      - 256mb
+      - --maxmemory-policy
+      - allkeys-lru
+      - --appendonly
+      - "yes"
+      - --rename-command
+      - FLUSHALL
+      - ""
+      - --rename-command
+      - CONFIG
+      - ""
+      - --rename-command
+      - DEBUG
+      - ""
+    volumes:
+      - redis_opl_data:/data
+
+  redis-opm:
+    <<: *redis_security
+    container_name: open_redis_opm
+    environment:
+      REDIS_PASSWORD: ${REDIS_OPM_PASSWORD:?set REDIS_OPM_PASSWORD in .env}
+    command:
+      - redis-server
+      - --requirepass
+      - ${REDIS_OPM_PASSWORD:?set REDIS_OPM_PASSWORD in .env}
+      - --maxmemory
+      - 256mb
+      - --maxmemory-policy
+      - allkeys-lru
+      - --appendonly
+      - "yes"
+      - --rename-command
+      - FLUSHALL
+      - ""
+      - --rename-command
+      - CONFIG
+      - ""
+      - --rename-command
+      - DEBUG
+      - ""
+    volumes:
+      - redis_opm_data:/data
+
   hub:
     image: opa-hub:nas
     container_name: open_hub
@@ -50,10 +225,13 @@ services:
     depends_on:
       clickhouse:
         condition: service_healthy
+      redis-opa:
+        condition: service_healthy
     environment:
       LISTEN_ADDR: ":8080"
       CLICKHOUSE_URL: "http://clickhouse:8123"
       CLICKHOUSE_DB: opa
+      REDIS_URL: redis://:${REDIS_OPA_PASSWORD}@redis-opa:6379/0
       # Organizations come from the OAM directory when this is set; the in-memory
       # agent registry is the fallback (it only knows orgs telemetry arrived
       # under, and resets on restart).
@@ -145,11 +323,14 @@ services:
     depends_on:
       clickhouse:
         condition: service_healthy
+      redis-ora:
+        condition: service_healthy
     environment:
       LISTEN_ADDR: ":8091"
       HTTP_ADDR: ":8091"
       CLICKHOUSE_URL: "http://clickhouse:8123"
       CLICKHOUSE_DB: ora
+      REDIS_URL: redis://:${REDIS_ORA_PASSWORD}@redis-ora:6379/0
       JWT_SECRET: ${JWT_SECRET}
       AUTH_MODE: ${AUTH_MODE:-codeployed}
       # Prefer a distinct service secret from JWT_SECRET (set OPEN_SERVICE_JWT_SECRET in .env).
@@ -168,7 +349,8 @@ services:
       OPA_CURSOR_AGENT_BIN: /usr/local/bin/agent
       OPA_SCM_MOCK_GITHUB: ${OPA_SCM_MOCK_GITHUB:-0}
       SKIP_CURSOR_AI: ${SKIP_CURSOR_AI:-0}
-      OPA_JOB_SANDBOX: ${OPA_JOB_SANDBOX:-off}
+      # NAS default: docker sandbox (host exec is break-glass via OPA_JOB_SANDBOX=off).
+      OPA_JOB_SANDBOX: ${OPA_JOB_SANDBOX:-docker}
       OPA_JOB_IMAGE_TAG: nas
       OPA_JOB_EGRESS_PROXY_IMAGE: ${OPA_JOB_EGRESS_PROXY_IMAGE:-open-egress-proxy:nas}
       OPA_JOB_IMAGE_ALLOW: ${OPA_JOB_IMAGE_ALLOW:-ora-runner-*,osa-runner-*,node:22*,mysql:8.4*,redis:7*,php:8.4*,hebabil/php-8.4-cli*}
@@ -254,10 +436,13 @@ services:
     depends_on:
       clickhouse:
         condition: service_healthy
+      redis-osa:
+        condition: service_healthy
     environment:
       LISTEN_ADDR: ":8093"
       CLICKHOUSE_URL: "http://clickhouse:8123"
       CLICKHOUSE_DB: osa
+      REDIS_URL: redis://:${REDIS_OSA_PASSWORD}@redis-osa:6379/0
       JWT_SECRET: ${JWT_SECRET}
       AUTH_MODE: ${AUTH_MODE:-codeployed}
       # Prefer a distinct service secret from JWT_SECRET (set OPEN_SERVICE_JWT_SECRET in .env).
@@ -269,7 +454,7 @@ services:
       # OAM's directory. Organizations still come via the hub. Unset, the project
       # picker is empty rather than broken.
       PEER_OAM_URL: http://oam-api:8090
-      OPA_JOB_SANDBOX: ${OPA_JOB_SANDBOX:-off}
+      OPA_JOB_SANDBOX: ${OPA_JOB_SANDBOX:-docker}
       OSA_RUNNER_TAG: nas
       OPA_JOB_IMAGE_TAG: nas
       OPA_JOB_EGRESS_PROXY_IMAGE: ${OPA_JOB_EGRESS_PROXY_IMAGE:-open-egress-proxy:nas}
@@ -318,11 +503,14 @@ services:
     depends_on:
       clickhouse:
         condition: service_healthy
+      redis-opl:
+        condition: service_healthy
     environment:
       LISTEN_ADDR: ":8092"
       HTTP_ADDR: ":8092"
       CLICKHOUSE_URL: "http://clickhouse:8123"
       CLICKHOUSE_DB: opl
+      REDIS_URL: redis://:${REDIS_OPL_PASSWORD}@redis-opl:6379/0
       JWT_SECRET: ${JWT_SECRET}
       AUTH_MODE: ${AUTH_MODE:-codeployed}
       # Prefer a distinct service secret from JWT_SECRET (set OPEN_SERVICE_JWT_SECRET in .env).
@@ -399,10 +587,13 @@ services:
     depends_on:
       clickhouse:
         condition: service_healthy
+      redis-oam:
+        condition: service_healthy
     environment:
       LISTEN_ADDR: ":8090"
       CLICKHOUSE_URL: "http://clickhouse:8123"
       CLICKHOUSE_DB: oam
+      REDIS_URL: redis://:${REDIS_OAM_PASSWORD}@redis-oam:6379/0
       JWT_SECRET: ${JWT_SECRET}
       AUTH_MODE: ${AUTH_MODE:-codeployed}
       OPA_AUTH_REQUIRED: ${OPA_AUTH_REQUIRED:-1}
@@ -446,8 +637,12 @@ services:
     image: opm-api:nas
     container_name: open_opm_api
     restart: unless-stopped
+    depends_on:
+      redis-opm:
+        condition: service_healthy
     environment:
       LISTEN_ADDR: ":8096"
+      REDIS_URL: redis://:${REDIS_OPM_PASSWORD}@redis-opm:6379/0
       JWT_SECRET: ${JWT_SECRET}
       AUTH_MODE: ${AUTH_MODE:-codeployed}
       # Prefer a distinct service secret from JWT_SECRET (set OPEN_SERVICE_JWT_SECRET in .env).
@@ -480,7 +675,10 @@ services:
       OPM_MODEL_IDEATION: ${OPM_MODEL_IDEATION:-auto}
       OPM_MODEL_ROADMAP_DISCOVERY: ${OPM_MODEL_ROADMAP_DISCOVERY:-auto}
       OPM_MODEL_ROADMAP_FEATURES: ${OPM_MODEL_ROADMAP_FEATURES:-auto}
-      OPM_RUNNER_NETWORK: ${OPM_RUNNER_NETWORK:-bridge}
+      # internal+proxy: per-job sealed network + open-egress-proxy (ORA sentinel).
+      # OPM spawn must interpret this like ORA job_proxy — until then, override
+      # OPM_RUNNER_NETWORK=bridge as break-glass only.
+      OPM_RUNNER_NETWORK: ${OPM_RUNNER_NETWORK:-internal+proxy}
       # Connector storage is OAM; GitHub App/PAT protocol + short-lived SCM creds are on ora-api.
       # OPM discovers orgs via PEER_OPA_URL, models/keys via PEER_OAM_URL, SCM via PEER_ORA_URL.
     volumes:
@@ -580,6 +778,12 @@ volumes:
     name: opa-stack_opa_orchestrator_workspace
   jmeter_work:
   opm_data:
+  redis_opa_data:
+  redis_oam_data:
+  redis_ora_data:
+  redis_osa_data:
+  redis_opl_data:
+  redis_opm_data:
 
 networks:
   open_internal:

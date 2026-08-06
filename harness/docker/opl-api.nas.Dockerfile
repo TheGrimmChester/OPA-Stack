@@ -11,6 +11,8 @@ COPY Open-Tenant-Go /modules/Open-Tenant-Go
 COPY Open-ClickHouse-Go /modules/Open-ClickHouse-Go
 COPY Open-HTTP-Go /modules/Open-HTTP-Go
 COPY Open-Logger-Go /modules/Open-Logger-Go
+COPY Open-Cache-Go /modules/Open-Cache-Go
+COPY Open-Crypto-Go /modules/Open-Crypto-Go
 COPY OPL-API/ /src/OPL-API/
 WORKDIR /src/OPL-API
 RUN sed -i \
@@ -21,6 +23,9 @@ RUN sed -i \
   -e 's|=> ../Open-HTTP-Go|=> /modules/Open-HTTP-Go|' \
   -e 's|=> ../Open-Logger-Go|=> /modules/Open-Logger-Go|' \
   go.mod \
+  && go mod edit \
+      -replace github.com/TheGrimmChester/open-cache-go=/modules/Open-Cache-Go \
+      -replace github.com/TheGrimmChester/open-crypto-go=/modules/Open-Crypto-Go \
   && go mod download \
   && CGO_ENABLED=0 GOOS=linux go build -o /out/opl-api .
 

@@ -103,7 +103,6 @@ Smoke / lab default seed user: username **`admin`** / password **`admin`** (`acc
 ## ClickHouse databases
 
 One ClickHouse server can host all products. Each service sets its own database:
-
 | Product | `CLICKHOUSE_DB` |
 |---------|-----------------|
 | OPA hub | `opa` |
@@ -129,6 +128,46 @@ Before per-product databases (`ora` / `osa` / `opl`), some product APIs wrote SC
 | OPL | `load_scenarios`, `load_runs`, `load_run_samples` | Uses explicit `chTable()` — no rewrite; no backfill needed when empty |
 
 After upgrading ORA/OSA images on a NAS that still has legacy hub rows, restart the API once and confirm product DB counts match hub (or exceed hub when dual-written). OPL already qualifies tables explicitly and does not rely on rewrite.
+
+## Per-family security Redis
+
+Each control-plane API gets **its own Redis** for security workloads (rate limits, dedup markers, encrypted cache blobs). Job runners and the edge agent **never** receive `REDIS_URL`.
+
+| Service | Redis | Consumer | Typical keys |
+|---------|-------|----------|--------------|
+| `hub` | `redis-opa` | OPA hub | `opa:sec:*` — OAM directory stale cache |
+| `oam-api` | `redis-oam` | OAM | `oam:sec:*` — login throttle counters |
+| `ora-api` | `redis-ora` | ORA | `ora:sec:*` — webhook dedup, install-perm cache |
+| `osa-api` | `redis-osa` | OSA | `osa:sec:*` — OSV CVE L2 cache |
+| `opl-api` | `redis-opl` | OPL | `opl:sec:*` — dispatch idempotency |
+| `opm-api` | `redis-opm` | OPM | `opm:sec:*` — peer SCM event dedup |
+
+Compose wiring (`compose.nas.yaml` / `compose.all.yaml`):
+
+- Six `redis-*` services on `open_internal` only — **no host ports**
+- Per-instance `requirepass`, `maxmemory 256mb`, `FLUSHALL` / `CONFIG` / `DEBUG` renamed
+- `appendonly yes` + named volumes for durable negative cache entries
+- Each `*-api` / `hub` sets `REDIS_URL=redis://:${REDIS_*_PASSWORD}@redis-<product>:6379/0` and `depends_on` the matching Redis healthcheck
+
+### Tenant encryption (`enc:v2`)
+
+Sensitive cache values and ClickHouse credential columns use **Open-Crypto-Go** `enc:v2` wire format — never cleartext in Redis or backups:
+
+| Scope | Key material | Used for |
+|-------|--------------|----------|
+| `org` | Org DEK (wrapped in OAM `org_encryption_keys`) | Org-scoped secrets |
+| `user` | HKDF(master, org_id, user_id) | User secrets within an org |
+| `personal` | HKDF(master, user_id) | Personal account secrets |
+| `admin` | Master key | Platform admin secrets |
+| `public` | Optional plaintext | Dedup markers, OSV negatives |
+
+**Open-Cache-Go** stores only `enc:v2` blobs in L2 Redis; L1 memory holds plaintext inside the API process (same trust boundary as today's in-memory maps).
+
+### Runner isolation
+
+`REDIS_URL` is **denylisted** from job sandbox env (ORA `job_env.go` today; **Open-Job-Env-Go** after extraction). Job containers run on sealed `opa-job-*` networks with no route to `redis-*`. Verify with `job_env_test.go` / runner network tests — a job box must not resolve `redis-osa` or reach ClickHouse.
+
+NAS defaults (`compose.nas.yaml`): `OPA_JOB_SANDBOX=docker` on ora-api/osa-api; `OPM_RUNNER_NETWORK=internal+proxy` on opm-api (OPM spawn must interpret this sentinel like ORA — see [nas-deploy.md](nas-deploy.md)). Break-glass: `OPA_JOB_SANDBOX=off`, `OPM_RUNNER_NETWORK=bridge`.
 
 ## Service-to-service
 
@@ -348,6 +387,13 @@ AUTH_MODE=                 # standalone | codeployed (auto from PEER_OPA_URL whe
 OPEN_SERVICE_JWT_SECRET=
 CLICKHOUSE_URL=http://clickhouse:8123
 CLICKHOUSE_DB=             # opa | ora | osa | opl | oam per service
+REDIS_URL=                 # per-product dedicated redis-<product> (hub + *-api only)
+REDIS_OPA_PASSWORD=        # stack .env — one password per redis-* instance
+REDIS_OAM_PASSWORD=
+REDIS_ORA_PASSWORD=
+REDIS_OSA_PASSWORD=
+REDIS_OPL_PASSWORD=
+REDIS_OPM_PASSWORD=
 OAM_SECRET_KEY=            # oam-api only; must match ORA's OPA_CONNECTOR_SECRET
 PEER_OPA_URL=
 PEER_OAM_URL=              # account plane; unset = pre-OAM env behaviour

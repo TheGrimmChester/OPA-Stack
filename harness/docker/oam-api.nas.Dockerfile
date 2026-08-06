@@ -10,6 +10,8 @@ COPY Open-Tenant-Go /modules/Open-Tenant-Go
 COPY Open-ClickHouse-Go /modules/Open-ClickHouse-Go
 COPY Open-HTTP-Go /modules/Open-HTTP-Go
 COPY Open-Logger-Go /modules/Open-Logger-Go
+COPY Open-Cache-Go /modules/Open-Cache-Go
+COPY Open-Crypto-Go /modules/Open-Crypto-Go
 COPY OAM-API/ /src/OAM-API/
 WORKDIR /src/OAM-API
 # OAM-API's committed go.mod resolves from the module proxy (so a single-repo CI
@@ -23,6 +25,8 @@ RUN go mod edit \
       -replace github.com/TheGrimmChester/open-clickhouse-go=/modules/Open-ClickHouse-Go \
       -replace github.com/TheGrimmChester/open-http-go=/modules/Open-HTTP-Go \
       -replace github.com/TheGrimmChester/open-logger-go=/modules/Open-Logger-Go \
+      -replace github.com/TheGrimmChester/open-cache-go=/modules/Open-Cache-Go \
+      -replace github.com/TheGrimmChester/open-crypto-go=/modules/Open-Crypto-Go \
  && go mod tidy \
  && CGO_ENABLED=0 GOOS=linux go build -o /out/oam-api .
 

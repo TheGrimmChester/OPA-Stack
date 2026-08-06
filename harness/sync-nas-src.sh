@@ -46,6 +46,9 @@ REPOS=(
   Open-Tenant-Go
   Open-HTTP-Go
   Open-Logger-Go
+  Open-Cache-Go
+  Open-Crypto-Go
+  Open-Job-Env-Go
   Open-Egress-Proxy
   OPA-Dashboard
   ORA-Dashboard

@@ -13,6 +13,23 @@ Read from the stack `.env` beside `compose.nas.yaml`. Template:
 | `COMPOSE_PROJECT_NAME` | string | `open-family` | compose | Project name; also builds the JMeter volume and network names passed to `opl-api` |
 | `OPA_DOCKER_GID` | int | `999` | collector | GID owning `/var/run/docker.sock`, added to the collector (which runs as uid/gid `65534`) so it can read container stats. Check with `getent group docker` |
 
+## Security Redis (stack `.env`)
+
+Required when using `compose.nas.yaml`. Each control plane gets a dedicated Redis; passwords must be distinct (≥16 bytes recommended).
+
+| Variable | Type | Default | Scope | Description |
+|----------|------|---------|-------|-------------|
+| `REDIS_OPA_PASSWORD` | string | *(required)* | stack | Password for `redis-opa` — wired as `REDIS_URL` on `hub` |
+| `REDIS_OAM_PASSWORD` | string | *(required)* | stack | Password for `redis-oam` — wired on `oam-api` |
+| `REDIS_ORA_PASSWORD` | string | *(required)* | stack | Password for `redis-ora` — wired on `ora-api` |
+| `REDIS_OSA_PASSWORD` | string | *(required)* | stack | Password for `redis-osa` — wired on `osa-api` |
+| `REDIS_OPL_PASSWORD` | string | *(required)* | stack | Password for `redis-opl` — wired on `opl-api` |
+| `REDIS_OPM_PASSWORD` | string | *(required)* | stack | Password for `redis-opm` — wired on `opm-api` |
+
+`compose.all.yaml` (laptop smoke) supplies dev defaults when unset. Job runners and `opa_agent` never receive `REDIS_URL` — denylisted in Open-Job-Env-Go / ORA `job_env.go`.
+
+Per-product cache tuning (after Open-Cache-Go wiring): `REDIS_URL`, `{PRODUCT}_SEC_L1_CACHE` (default 20000), `{PRODUCT}_SEC_KEY_PREFIX`.
+
 ## OAM environment (account plane)
 
 | Variable | Type | Default | Scope | Description |

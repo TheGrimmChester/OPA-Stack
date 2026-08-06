@@ -80,6 +80,8 @@ if wants hub || wants all; then
   need Open-ClickHouse-Go
   need Open-HTTP-Go
   need Open-Logger-Go
+  need Open-Cache-Go
+  need Open-Crypto-Go
   build_df opa-hub.nas.Dockerfile "opa-hub:$TAG"
 fi
 
@@ -98,10 +100,13 @@ if wants ora-api || wants all; then
   need Open-Auth-Go
   need Open-Client-Go
   need Open-Job-Go
+  need Open-Job-Env-Go
   need Open-Tenant-Go
   need Open-ClickHouse-Go
   need Open-HTTP-Go
   need Open-Logger-Go
+  need Open-Cache-Go
+  need Open-Crypto-Go
   build_df ora-api.nas.Dockerfile "ora-api:$TAG" --target ora-api
   docker build "${NO_CACHE_ARGS[@]}" -f "$DOCKER_DIR/ora-api.nas.Dockerfile" -t "ora-runner-git:$TAG" --target ora-runner-git "$FAMILY_ROOT"
   docker build "${NO_CACHE_ARGS[@]}" -f "$DOCKER_DIR/ora-api.nas.Dockerfile" -t "ora-runner-ai:$TAG" --target ora-runner-ai "$FAMILY_ROOT"
@@ -112,10 +117,13 @@ if wants osa-api || wants all; then
   need Open-Auth-Go
   need Open-Client-Go
   need Open-Job-Go
+  need Open-Job-Env-Go
   need Open-Tenant-Go
   need Open-ClickHouse-Go
   need Open-HTTP-Go
   need Open-Logger-Go
+  need Open-Cache-Go
+  need Open-Crypto-Go
   build_df osa-api.nas.Dockerfile "osa-api:$TAG" --target osa-api
   docker build "${NO_CACHE_ARGS[@]}" -f "$DOCKER_DIR/osa-api.nas.Dockerfile" -t "osa-runner-scan:$TAG" --target osa-runner-scan "$FAMILY_ROOT"
 fi
@@ -127,6 +135,8 @@ if wants oam-api || wants all; then
   need Open-ClickHouse-Go
   need Open-HTTP-Go
   need Open-Logger-Go
+  need Open-Cache-Go
+  need Open-Crypto-Go
   build_df oam-api.nas.Dockerfile "oam-api:$TAG" --target oam-api
 fi
 
@@ -138,6 +148,8 @@ if wants opl-api || wants all; then
   need Open-ClickHouse-Go
   need Open-HTTP-Go
   need Open-Logger-Go
+  need Open-Cache-Go
+  need Open-Crypto-Go
   build_df opl-api.nas.Dockerfile "opl-api:$TAG" --target opl-api
   docker build "${NO_CACHE_ARGS[@]}" -f "$DOCKER_DIR/opl-api.nas.Dockerfile" -t "opl-runner-jmeter:$TAG" --target opl-runner-jmeter "$FAMILY_ROOT"
 fi
@@ -147,9 +159,12 @@ if wants opm-api || wants all; then
   need Open-Auth-Go
   need Open-Client-Go
   need Open-Job-Go
+  need Open-Job-Env-Go
   need Open-Tenant-Go
   need Open-HTTP-Go
   need Open-Logger-Go
+  need Open-Cache-Go
+  need Open-Crypto-Go
   build_df opm-api.nas.Dockerfile "opm-api:$TAG" --target opm-api
   docker build "${NO_CACHE_ARGS[@]}" -f "$DOCKER_DIR/opm-api.nas.Dockerfile" -t "opm-runner-task:$TAG" --target opm-runner-task "$FAMILY_ROOT"
 fi

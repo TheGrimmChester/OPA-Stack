@@ -69,9 +69,47 @@ stale definition — recreate them (`docker compose up -d --no-deps <service>`).
 | OAM API | `oam-api:nas` | `18090` → `8090` |
 | OAM Dashboard | `oam-dashboard:nas` | `18097` → `80` |
 | Egress proxy | `open-egress-proxy:nas` | (internal) |
+| Redis (×6) | `redis:7-alpine` | (internal — no host ports) |
 | Collector | `opa-collector:nas` (`open_collector`) | host network → agent ND-JSON `:9090` (not OTLP) |
 
 Orchestrators for ORA/OSA/OPL/OPM use the same API images with an `orchestrator` command. Runner images (`ora-runner-git:nas`, `osa-runner-scan:nas`, `opl-runner-jmeter:nas`, `opm-runner-task:nas`) are built for on-demand jobs and are not always-on services.
+
+## Security Redis (per family)
+
+Six dedicated Redis instances back control-plane security caches only — not job runners, not the edge agent.
+
+| Service | Volume | Password env | Wired on |
+|---------|--------|--------------|----------|
+| `redis-opa` | `redis_opa_data` | `REDIS_OPA_PASSWORD` | `hub` |
+| `redis-oam` | `redis_oam_data` | `REDIS_OAM_PASSWORD` | `oam-api` |
+| `redis-ora` | `redis_ora_data` | `REDIS_ORA_PASSWORD` | `ora-api` |
+| `redis-osa` | `redis_osa_data` | `REDIS_OSA_PASSWORD` | `osa-api` |
+| `redis-opl` | `redis_opl_data` | `REDIS_OPL_PASSWORD` | `opl-api` |
+| `redis-opm` | `redis_opm_data` | `REDIS_OPM_PASSWORD` | `opm-api` |
+
+**Hardening** (baked into compose): `requirepass`, `maxmemory 256mb`, `allkeys-lru`, `appendonly yes`, dangerous commands renamed (`FLUSHALL`, `CONFIG`, `DEBUG`), `open_internal` network only, no published ports.
+
+Set all six passwords in `.env` before first bring-up — compose fails closed if any is unset (`${REDIS_*_PASSWORD:?…}`). Generate with `openssl rand -base64 24`; use distinct values per instance.
+
+**Recreate order** after password rotation or compose upgrade:
+
+```bash
+cd /mnt/Apps/config-docker/open-stack
+docker compose up -d redis-opa redis-oam redis-ora redis-osa redis-opl redis-opm
+docker compose up -d hub oam-api ora-api osa-api opl-api opm-api
+```
+
+**Master key alignment:** `OAM_SECRET_KEY` / `OPA_CONNECTOR_SECRET` must stay aligned for `enc:v2` org DEK wrap and lazy migration from `enc:v1`. Rotating the master key requires re-wrap of org DEKs and lazy re-encrypt on read — see [interop.md](interop.md#tenant-encryption-encv2).
+
+**Runner denylist:** `REDIS_URL` must never appear in job sandbox env. Open-Job-Env-Go (extracted from ORA `job_env.go`) denylist includes `REDIS_URL`, `CLICKHOUSE_URL`, `OAM_SECRET_KEY`, and secret-shaped env fragments. Job networks must not route to `redis-*`.
+
+### Job sandbox defaults
+
+| Variable | NAS default | Notes |
+|----------|-------------|-------|
+| `OPA_JOB_SANDBOX` | `docker` | ora-api, osa-api — host exec is break-glass (`off`) |
+| `OPM_RUNNER_NETWORK` | `internal+proxy` | Per-job sealed net + `open-egress-proxy`; **OPM spawn code must interpret this sentinel** (ORA already does). Until then, set `OPM_RUNNER_NETWORK=bridge` as temporary break-glass |
+| `OPA_JOB_EGRESS_PROXY` | on when sandbox=docker | Set `0` to disable allowlist proxy for AI phases |
 
 ## ClickHouse
 
