@@ -12,6 +12,9 @@ COPY Open-Tenant-Go /modules/Open-Tenant-Go
 COPY Open-ClickHouse-Go /modules/Open-ClickHouse-Go
 COPY Open-HTTP-Go /modules/Open-HTTP-Go
 COPY Open-Logger-Go /modules/Open-Logger-Go
+COPY Open-Cache-Go /modules/Open-Cache-Go
+COPY Open-Crypto-Go /modules/Open-Crypto-Go
+COPY Open-Job-Env-Go /modules/Open-Job-Env-Go
 COPY ORA-API/ /src/ORA-API/
 WORKDIR /src/ORA-API
 RUN sed -i \
@@ -23,6 +26,10 @@ RUN sed -i \
   -e 's|=> ../Open-HTTP-Go|=> /modules/Open-HTTP-Go|' \
   -e 's|=> ../Open-Logger-Go|=> /modules/Open-Logger-Go|' \
   go.mod \
+  && go mod edit \
+      -replace github.com/TheGrimmChester/open-cache-go=/modules/Open-Cache-Go \
+      -replace github.com/TheGrimmChester/open-crypto-go=/modules/Open-Crypto-Go \
+      -replace github.com/TheGrimmChester/open-job-env-go=/modules/Open-Job-Env-Go \
   && go mod download \
   && CGO_ENABLED=0 GOOS=linux go build -o /out/ora-api .
 
@@ -53,13 +60,14 @@ RUN apt-get update \
       && ln -sf /root/.local/bin/agent /usr/local/bin/agent \
       && ln -sf /root/.local/bin/cursor-agent /usr/local/bin/cursor-agent) \
     || echo "WARN: Cursor Agent CLI install skipped" \
- && (QWEN_INSTALL_VERSION=0.21.6 \
+ && (export QWEN_INSTALL_VERSION=0.21.6 \
      QWEN_INSTALL_ROOT=/opt/qwen \
      QWEN_INSTALL_LIB_PARENT=/opt/qwen/lib \
      QWEN_INSTALL_BIN_DIR=/usr/local/bin \
      QWEN_NO_MODIFY_PATH=1 \
      QWEN_INSTALL_METHOD=standalone \
-     NO_COLOR=1 curl -fsS \
+     NO_COLOR=1 \
+     && curl -fsS \
        https://qwen-code-assets.oss-cn-hangzhou.aliyuncs.com/installation/install-qwen-standalone.sh \
      | bash -s -- --method standalone --no-modify-path \
      && test -x /usr/local/bin/qwen \
@@ -119,13 +127,14 @@ RUN apt-get update \
       && chmod 0755 /opt/opa/agent \
       && test -x /opt/opa/agent) \
  || (echo "ERROR: Cursor Agent CLI required for ora-runner-ai" >&2; exit 1) \
- && (QWEN_INSTALL_VERSION=0.21.6 \
+ && (export QWEN_INSTALL_VERSION=0.21.6 \
      QWEN_INSTALL_ROOT=/opt/qwen \
      QWEN_INSTALL_LIB_PARENT=/opt/qwen/lib \
      QWEN_INSTALL_BIN_DIR=/usr/local/bin \
      QWEN_NO_MODIFY_PATH=1 \
      QWEN_INSTALL_METHOD=standalone \
-     NO_COLOR=1 curl -fsS \
+     NO_COLOR=1 \
+     && curl -fsS \
        https://qwen-code-assets.oss-cn-hangzhou.aliyuncs.com/installation/install-qwen-standalone.sh \
      | bash -s -- --method standalone --no-modify-path \
      && test -x /usr/local/bin/qwen \

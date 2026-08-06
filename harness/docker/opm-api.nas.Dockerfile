@@ -42,13 +42,14 @@ RUN apt-get update \
       && chmod -R a+rX /opt/cursor-agent \
       && find /opt/cursor-agent -type f \( -name 'cursor-agent' -o -name 'node' -o -name '*.so*' \) -exec chmod a+x {} +) \
     || echo "WARN: Cursor Agent CLI install skipped" \
- && (QWEN_INSTALL_VERSION=0.21.6 \
+ && (export QWEN_INSTALL_VERSION=0.21.6 \
      QWEN_INSTALL_ROOT=/opt/qwen \
      QWEN_INSTALL_LIB_PARENT=/opt/qwen/lib \
      QWEN_INSTALL_BIN_DIR=/usr/local/bin \
      QWEN_NO_MODIFY_PATH=1 \
      QWEN_INSTALL_METHOD=standalone \
-     NO_COLOR=1 curl -fsS \
+     NO_COLOR=1 \
+     && curl -fsS \
        https://qwen-code-assets.oss-cn-hangzhou.aliyuncs.com/installation/install-qwen-standalone.sh \
      | bash -s -- --method standalone --no-modify-path \
      && test -x /usr/local/bin/qwen \
