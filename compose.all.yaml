@@ -155,6 +155,7 @@ services:
       AUTH_MODE: codeployed
       OPEN_SERVICE_JWT_SECRET: ${OPEN_SERVICE_JWT_SECRET:-dev-service-jwt-secret-at-least-32b}
       PEER_OPA_URL: http://hub:8080
+      PEER_OAM_URL: http://oam:8090
       OPL_RUN_WEBHOOK_URL: ${OPL_RUN_WEBHOOK_URL:-}
       OPL_RUN_NOTIFY_MODE: ${OPL_RUN_NOTIFY_MODE:-deliver}
       OPL_RUN_NOTIFY_STATUSES: ${OPL_RUN_NOTIFY_STATUSES:-}

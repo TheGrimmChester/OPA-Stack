@@ -99,17 +99,17 @@ Pre-split review/security/perf tables that still live under database `opa` are l
 
 ## Auth
 
-Co-deployed mode: shared `JWT_SECRET`, `AUTH_MODE=codeployed`, and `OPA_AUTH_REQUIRED=1` on **hub, ora-api, osa-api, opl-api, and opm-api**. Peers set `PEER_OPA_URL=http://hub:8080`. Hub issues user JWTs; product APIs validate them. Product-local `/api/auth/login` returns `503` in co-deployed mode.
+Co-deployed mode: shared `JWT_SECRET`, `AUTH_MODE=codeployed`, and `OPA_AUTH_REQUIRED=1` on **hub, ora-api, osa-api, opl-api, opm-api, and oam-api**. Peers set `PEER_OPA_URL=http://hub:8080` and `PEER_OAM_URL=http://oam-api:8090`. **OAM** issues user JWTs (`iss=oam-api`); hub validates and proxies login when `PEER_OAM_URL` is set. Product-local `/api/auth/login` returns `503` in co-deployed mode.
 
-**Dashboard login:** ora-dashboard (`8089`), osa-dashboard (`8094`), opl-dashboard (`8095`), and opm-dashboard (`8098`) expose a same-origin **`/hub-auth/`** proxy to `hub:8080`. Browsers sign in via `/hub-auth/api/auth/login`; product API `/api/auth/login` stays disabled (`503`). Verify with:
+**Dashboard login:** ora-dashboard (`8089`), osa-dashboard (`8094`), opl-dashboard (`8095`), and opm-dashboard (`8098`) expose same-origin **`/oam-auth/`** (nginx → `oam-api:8090`) for browser sign-in. **`/hub-auth/`** (nginx → `hub:8080`) remains for compatibility; the hub transparently proxies login to OAM. Browsers should prefer `/oam-auth/api/auth/login`; product API `/api/auth/login` stays disabled (`503`). Verify with:
 
 ```bash
 for port in 8089 8094 8095 8098; do
-  curl -sf "http://127.0.0.1:$port/hub-auth/api/auth/status" | jq -r .issuer   # opa-hub
+  curl -sf "http://127.0.0.1:$port/oam-auth/api/auth/status" | jq -r .issuer   # oam-api
 done
-curl -sf -X POST http://127.0.0.1:8098/hub-auth/api/auth/login \
+curl -sf -X POST http://127.0.0.1:8098/oam-auth/api/auth/login \
   -H 'Content-Type: application/json' \
-  -d '{"username":"admin","password":"admin"}' | jq -r .token
+  -d '{"username":"admin","password":"admin"}' | jq '{issuer, account_type, org_id, token}'
 ```
 
 Set **`OPEN_SERVICE_JWT_SECRET`** to a second secret (≥32 bytes), **distinct from** `JWT_SECRET`. Do not reuse the user JWT secret for service-to-service mint/validate. Compose passes it through without falling back to `JWT_SECRET`. After rotating the service secret, recreate **hub, ora-api, osa-api, opl-api, and opm-api** so all peers share the new value.

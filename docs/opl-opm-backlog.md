@@ -1,7 +1,7 @@
 # OPL + OPM remaining backlog
 
 Concise product backlog for **Open Perf Lab** and **Open Project Manager** after the family split.
-Ports: API **8092** / **8096**, dashboards **8095** / **8098**. Co-deployed **`/hub-auth/`** (`issuer=opa-hub`);
+Ports: API **8092** / **8096**, dashboards **8095** / **8098**. Co-deployed **`/oam-auth/`** (`issuer=oam-api`);
 product `/api/auth/login` is disabled. Auth-on list routes scope to **`default-org` / `default-project`** when
 tenant headers are omitted (Open-Tenant-Go ≥ 0.2.2). See [interop.md](interop.md) and
 [nas-deploy.md](nas-deploy.md).
@@ -43,7 +43,7 @@ run dispatch and the schedule tick both live in `opl-api` (`main.go:30` → `lab
 ### Done
 
 - Product split: scenarios, runs, HAR/XHR/JMX import, Docker JMeter engine, k6 export
-- Co-deployed hub login via dashboard `/hub-auth/`; standalone login disabled on the API
+- Co-deployed OAM login via dashboard `/oam-auth/`; standalone login disabled on the API
 - ClickHouse DB `opl` with tenant-scoped `load_*` lists (headers or write-tenant defaults)
 - Dashboard Perf Lab studio: Design, Users & data, Capture, JMX, Run & scale, Results, Compare, SLA tabs
 - Run lifecycle: undispatched → `created`, failed dispatch → `failed`, `POST .../runs/{id}/cancel`; gate JSON includes `pass`
@@ -106,7 +106,7 @@ is set; `OPM_MODEL_*` is legacy rollback only.
 ### Done
 
 - GitHub-linked projects only (no local folder registry); hub orgs + ORA connector list / repos; credentials stored in OAM
-- Co-deployed `/hub-auth/`; `PEER_OPA_URL` / `PEER_ORA_URL` / `PEER_OAM_URL`; `git` in `opm-api:nas` for ephemeral clones
+- Co-deployed `/oam-auth/`; `PEER_OPA_URL` / `PEER_ORA_URL` / `PEER_OAM_URL`; `git` in `opm-api:nas` for ephemeral clones
 - Board + tasks CRUD/move/**DnD** + task action menu; require-review + approve-for-coding; task detail (plan/progress/spec/logs)
 - Roadmap / ideation manual create + inline edit/delete; changelog generate + save
 - Job executor writes artifacts for planning / implementation / review / QA / changelog; **container spawn** of `opm-runner-task` when `spawnReady`
@@ -145,7 +145,7 @@ is set; `OPM_MODEL_*` is legacy rollback only.
 ## Related
 
 - [Products](products.md) — port table and ownership
-- [Interop](interop.md) — hub-auth, tenant headers, OPM ↔ hub/OAM/ORA
+- [Interop](interop.md) — oam-auth, tenant headers, OPM ↔ hub/OAM/ORA
 - [NAS deploy](nas-deploy.md) — `*:nas` images and verify curls
 - [OPL load lab capabilities](opl-lab-capabilities.md) — Done / On a branch, not merged / Missing / Different-by-design + flagship visual editor gap
 - [OPM project manager capabilities](opm-pm-capabilities.md) — Done / On a branch, not merged / Not implemented / Different-by-design inventory + top gaps

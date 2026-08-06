@@ -8,6 +8,8 @@
 set -u
 export PATH="/usr/bin:/bin:/usr/sbin:/sbin:/usr/local/bin:/opt/homebrew/bin:${PATH:-}"
 HOST="${HOST:-192.168.100.101}"
+OAM_PORT="${OAM_PORT:-18090}"
+HUB_PORT="${HUB_PORT:-18080}"
 CHECK_IMAGES="${CHECK_IMAGES:-0}"
 
 pass=0; fail=0; note_n=0
@@ -23,6 +25,25 @@ http_code() {
 }
 
 body() { cat /tmp/opa_tenant_matrix_body.json 2>/dev/null; }
+
+json_get() {
+  local path="$1"
+  python3 -c "
+import json,sys
+try:
+  d=json.load(open('/tmp/opa_tenant_matrix_body.json'))
+  cur=d
+  for p in '''$path'''.strip('.').split('.'):
+    if not p: continue
+    if isinstance(cur, dict): cur=cur.get(p)
+    else: cur=None; break
+  if cur is None: print('')
+  elif isinstance(cur, bool): print('true' if cur else 'false')
+  else: print(cur)
+except Exception:
+  print('')
+" 2>/dev/null
+}
 
 json_len() {
   local path="$1"
@@ -80,12 +101,54 @@ if [ "$CHECK_IMAGES" = 1 ]; then
 fi
 
 echo
-echo "========== 1. HUB JWT =========="
-TOKEN=$(curl -sS -X POST "http://$HOST:18080/api/auth/login" \
+echo "========== 1. HUB JWT (OAM issuer when PEER_OAM_URL set) =========="
+http_code POST "http://$HOST:$HUB_PORT/api/auth/login" \
   -H 'Content-Type: application/json' \
-  -d '{"username":"admin","password":"admin"}' \
-  | python3 -c 'import sys,json; print(json.load(sys.stdin).get("token",""))')
+  -d '{"username":"admin","password":"admin"}' >/dev/null
+TOKEN="$(json_get token)"
+HUB_ISSUER="$(json_get issuer)"
+HUB_ACCT="$(json_get account_type)"
 if [ -n "$TOKEN" ]; then ok "hub login admin/admin -> JWT"; else bad "hub login" "no token"; exit 1; fi
+HUB_MODE="$(json_get mode)"
+if [ "$HUB_ISSUER" = "oam-api" ]; then
+  ok "hub login issuer=oam-api (OAM proxy)"
+  if [ -n "$HUB_ACCT" ]; then ok "hub login returns account_type=$HUB_ACCT"; else bad "hub login account_type" "missing"; fi
+elif [ "$HUB_ISSUER" = "opa-hub" ] || [ "$HUB_MODE" = "hub" ]; then
+  note "hub login pre-cutover (issuer=opa-hub or mode=hub) — redeploy opa-hub:nas + oam-api:nas for OAM issuer"
+else
+  bad "hub login issuer" "got '$HUB_ISSUER' mode='$HUB_MODE'"
+fi
+
+echo
+echo "========== 1b. OAM LOGIN + /oam-auth BRIDGE =========="
+oam_login_code=$(http_code POST "http://$HOST:$OAM_PORT/api/auth/login" \
+  -H 'Content-Type: application/json' \
+  -d '{"username":"admin","password":"admin"}')
+OAM_ISSUER="$(json_get issuer)"
+OAM_ACCT="$(json_get account_type)"
+if [ "$oam_login_code" = 200 ]; then ok "OAM direct login -> 200"; else bad "OAM login" "HTTP $oam_login_code"; fi
+if [ "$OAM_ISSUER" = "oam-api" ]; then ok "OAM login issuer=oam-api"; else bad "OAM issuer" "got '$OAM_ISSUER'"; fi
+if [ -n "$OAM_ACCT" ]; then
+  ok "OAM login account_type=$OAM_ACCT"
+  ACCOUNT_TYPE_CUTOVER=1
+else
+  note "OAM login missing account_type — redeploy oam-api:nas after immutable account_type migration"
+  ACCOUNT_TYPE_CUTOVER=0
+fi
+
+for dash_port in 8089 8094 8095 8098; do
+  bridge_code=$(http_code GET "http://$HOST:$dash_port/oam-auth/api/auth/status")
+  bridge_iss="$(json_get issuer)"
+  if [ "$bridge_code" = 200 ] && [ "$bridge_iss" = "oam-api" ]; then
+    ok "dashboard :$dash_port /oam-auth status issuer=oam-api"
+  elif [ "$bridge_code" = 200 ] && [ -z "$bridge_iss" ]; then
+    note "dashboard :$dash_port /oam-auth not wired yet (SPA fallback) — redeploy *-dashboard:nas"
+  elif [ "$bridge_code" = 000 ]; then
+    note "dashboard :$dash_port /oam-auth unreachable"
+  else
+    bad "dashboard :$dash_port /oam-auth" "HTTP $bridge_code issuer=$bridge_iss"
+  fi
+done
 
 AUTH=(-H "Authorization: Bearer $TOKEN")
 DEF=(-H "Authorization: Bearer $TOKEN" -H "X-Organization-ID: default-org" -H "X-Project-ID: default-project")
@@ -189,9 +252,9 @@ check_tenant_scope() {
 
 echo
 echo "========== 2. NO JWT → 401 =========="
-check_no_jwt hub 18080 /api/infra/hosts
-check_no_jwt hub 18080 /api/alerts
-check_no_jwt hub 18080 /api/tenancy/organizations
+check_no_jwt hub "$HUB_PORT" /api/infra/hosts
+check_no_jwt hub "$HUB_PORT" /api/alerts
+check_no_jwt hub "$HUB_PORT" /api/tenancy/organizations
 check_no_jwt ora 8091 /api/connectors
 check_no_jwt ora 8091 /api/scm/jobs
 check_no_jwt osa 8093 /api/security/runs
@@ -202,9 +265,9 @@ check_no_jwt opm 8096 /api/projects
 
 echo
 echo "========== 3. LOCAL LOGIN → 503 (codeployed) =========="
-hub_login_code=$(http_code POST "http://$HOST:18080/api/auth/login" \
+hub_login_code=$(http_code POST "http://$HOST:$HUB_PORT/api/auth/login" \
   -H 'Content-Type: application/json' -d '{"username":"admin","password":"admin"}')
-if [ "$hub_login_code" = 200 ]; then ok "hub local login allowed (issuer) -> 200"; else bad "hub login" "HTTP $hub_login_code"; fi
+if [ "$hub_login_code" = 200 ]; then ok "hub login allowed (OAM proxy) -> 200"; else bad "hub login" "HTTP $hub_login_code"; fi
 check_local_login_503 ora 8091
 check_local_login_503 osa 8093
 check_local_login_503 opl 8092
@@ -212,8 +275,8 @@ check_local_login_503 opm 8096
 
 echo
 echo "========== 4. TENANT SCOPE MATRIX =========="
-check_tenant_scope hub 18080 /api/infra/hosts hosts
-check_tenant_scope hub 18080 /api/alerts alerts
+check_tenant_scope hub "$HUB_PORT" /api/infra/hosts hosts
+check_tenant_scope hub "$HUB_PORT" /api/alerts alerts
 check_tenant_scope ora 8091 '/api/scm/jobs?limit=50' jobs
 check_tenant_scope ora 8091 /api/connectors connectors
 check_tenant_scope osa 8093 '/api/security/runs?limit=50' runs
@@ -223,9 +286,85 @@ check_tenant_scope opl 8092 '/api/perf/runs?limit=50' runs
 check_tenant_scope opm 8096 /api/projects projects
 
 echo
-echo "========== 5. HUB EXPLORE FACETS =========="
-c1=$(http_code GET "http://$HOST:18080/api/explore/facets?signal=spans&field=service&hours=24")
-c2=$(http_code GET "http://$HOST:18080/api/explore/facets?signal=spans&field=service&hours=24" "${DEF[@]}")
+echo "========== 5. ACCOUNT TYPE + JWT-BOUND HEADERS =========="
+if [ "${ACCOUNT_TYPE_CUTOVER:-0}" != 1 ]; then
+  note "account_type checks skipped — OAM not reporting account_type yet"
+else
+  # Lab seed admin is account_type=personal — org headers must be rejected.
+  if [ "$HUB_ACCT" = "personal" ] || [ "$OAM_ACCT" = "personal" ]; then
+    code_personal_org=$(http_code GET "http://$HOST:8093/api/security/runs?limit=5" \
+      -H "Authorization: Bearer $TOKEN" \
+      -H "X-Organization-ID: nas" -H "X-Project-ID: infra")
+    if [ "$code_personal_org" = 403 ]; then
+      ok "personal account + org header -> 403 (OSA runs)"
+    else
+      bad "personal account org header" "expected 403 got $code_personal_org"
+    fi
+  else
+    note "seed admin account_type=${HUB_ACCT:-$OAM_ACCT} — skip personal org-header check"
+  fi
+
+  # Create a disposable organization member and verify foreign org header -> 403.
+  ORG_USER="harness-org-$$"
+  ORG_PASS="harness-org-pass-$$"
+  if [ -n "$TOKEN" ]; then
+    create_code=$(http_code POST "http://$HOST:$OAM_PORT/api/users/set" \
+      -H "Authorization: Bearer $TOKEN" \
+      -H 'Content-Type: application/json' \
+      -d "{\"username\":\"$ORG_USER\",\"password\":\"$ORG_PASS\",\"role\":\"viewer\",\"account_type\":\"organization\",\"organization_id\":\"nas\",\"project_ids\":[\"infra\"]}")
+    if [ "$create_code" = 200 ] || [ "$create_code" = 201 ]; then
+      ok "created org test user $ORG_USER (nas/infra)"
+      http_code POST "http://$HOST:$OAM_PORT/api/auth/login" \
+        -H 'Content-Type: application/json' \
+        -d "{\"username\":\"$ORG_USER\",\"password\":\"$ORG_PASS\"}" >/dev/null
+      ORG_TOKEN="$(json_get token)"
+      ORG_ACCT="$(json_get account_type)"
+      ORG_ID="$(json_get org_id)"
+      if [ "$ORG_ACCT" = "organization" ] && [ "$ORG_ID" = "nas" ]; then
+        ok "org user login account_type=organization org_id=nas"
+      else
+        bad "org user login claims" "account_type=$ORG_ACCT org_id=$ORG_ID"
+      fi
+      if [ -n "$ORG_TOKEN" ]; then
+        ORG_HDR_CODE=$(http_code GET "http://$HOST:8093/api/security/runs?limit=5" \
+          -H "Authorization: Bearer $ORG_TOKEN" \
+          -H "X-Organization-ID: default-org" -H "X-Project-ID: default-project")
+        if [ "$ORG_HDR_CODE" = 403 ]; then
+          ok "org account + foreign org header -> 403 (OSA runs)"
+        else
+          bad "org account foreign org header" "expected 403 got $ORG_HDR_CODE"
+        fi
+      fi
+      detach_code=$(http_code POST "http://$HOST:$OAM_PORT/api/users/set" \
+        -H "Authorization: Bearer $TOKEN" \
+        -H 'Content-Type: application/json' \
+        -d "{\"username\":\"$ORG_USER\",\"organization_id\":\"\"}")
+      if [ "$detach_code" = 400 ] || [ "$detach_code" = 403 ]; then
+        ok "detach org (empty organization_id) -> $detach_code"
+      else
+        bad "detach org rejected" "expected 400/403 got $detach_code"
+      fi
+      type_code=$(http_code POST "http://$HOST:$OAM_PORT/api/users/set" \
+        -H "Authorization: Bearer $TOKEN" \
+        -H 'Content-Type: application/json' \
+        -d "{\"username\":\"$ORG_USER\",\"account_type\":\"personal\"}")
+      if [ "$type_code" = 400 ] || [ "$type_code" = 403 ]; then
+        ok "account_type change -> $type_code"
+      else
+        bad "immutable account_type" "expected 400/403 got $type_code"
+      fi
+    elif [ "$create_code" = 000 ]; then
+      note "OAM user create unreachable — skip org-account header checks"
+    else
+      note "OAM user create HTTP $create_code — skip org-account checks (ensure org nas exists in OAM directory)"
+    fi
+  fi
+fi
+
+echo
+echo "========== 6. HUB EXPLORE FACETS =========="
+c1=$(http_code GET "http://$HOST:$HUB_PORT/api/explore/facets?signal=spans&field=service&hours=24")
+c2=$(http_code GET "http://$HOST:$HUB_PORT/api/explore/facets?signal=spans&field=service&hours=24" "${DEF[@]}")
 if [ "$c1" = 401 ] || [ "$c1" = 403 ]; then ok "hub facets no-JWT -> $c1"; else bad "hub facets no-JWT" "HTTP $c1"; fi
 if [ "$c2" = 200 ]; then ok "hub facets +JWT -> 200"; else bad "hub facets +JWT" "HTTP $c2"; fi
 

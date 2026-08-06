@@ -7,7 +7,7 @@ Products are **optional peers**. No hard dependency at boot. An empty peer URL d
 | Mode | Mechanism | How to enable |
 |------|-----------|---------------|
 | **Standalone** | Each product issues JWTs with its own `JWT_SECRET` via local `/api/auth/login` | `AUTH_MODE=standalone`, or leave `PEER_OPA_URL` empty |
-| **Co-deployed** | Shared `JWT_SECRET`; **OPA-Hub** issues user JWTs; ORA/OSA/OPL/OPM validate | `AUTH_MODE=codeployed`, or set `PEER_OPA_URL` to the hub |
+| **Co-deployed** | Shared `JWT_SECRET`; **OAM** issues user JWTs (`iss=oam-api`) when `PEER_OAM_URL` is set; hub validates and proxies login; ORA/OSA/OPL/OPM validate | `AUTH_MODE=codeployed`, set `PEER_OPA_URL` and `PEER_OAM_URL` |
 | **CI** | Product tokens (not `JWT_SECRET`) | Pipeline secrets |
 
 Headers: `Authorization: Bearer <user-jwt>`, **`X-Organization-ID`**, **`X-Project-ID`**.
@@ -18,7 +18,9 @@ Full curl matrix (no JWT → 401, wrong org → empty/403, co-deployed local log
 
 When `OPA_AUTH_REQUIRED=1` (NAS default on hub + ORA/OSA/OPL/OPM), Open-Tenant scopes ClickHouse list queries to the org/project in those headers. **Omit either header** (or send the picker marker `"all"`, which is stripped) and list endpoints scope to **`default-org` / `default-project`** — the same write tenant used for INSERT — not an empty array. They still return HTTP 200 (not `401`/`403`). Rows written under another tenant (e.g. `nas` / `infra`) stay invisible until you send those headers.
 
-Always prefer sending both headers with the hub JWT. Canonical names (case-insensitive): `X-Organization-ID`, `X-Project-ID`. Query fallbacks `organization_id` / `project_id` work the same. The `"all"` picker marker is stripped under auth and does not widen scope to every tenant (Open-Tenant-Go ≥ 0.2.2 aligns missing/`all` with `WriteTenant` defaults).
+Always prefer sending both headers with the OAM-issued JWT. Canonical names (case-insensitive): `X-Organization-ID`, `X-Project-ID`. Query fallbacks `organization_id` / `project_id` work the same. The `"all"` picker marker is stripped under auth and does not widen scope to every tenant (Open-Tenant-Go ≥ 0.2.2 aligns missing/`all` with `WriteTenant` defaults).
+
+**Account types (immutable):** users are created as `personal` or `organization` in OAM and the type never changes. **Personal** accounts have empty JWT `org_id`; org headers (`X-Organization-ID` other than `"all"`) are rejected (**403**). **Organization** accounts carry a fixed JWT `org_id`; a mismatched org header is rejected (**403**). Headers select project within the JWT org only — they do not switch organizations. See [security-tenant-scopes.md](security-tenant-scopes.md#account-types-jwt-bound-tenancy).
 
 Verified on NAS (`192.168.100.101`; use `127.0.0.1` when curling on the host) after Open-Tenant-Go 0.2.2:
 
@@ -56,26 +58,47 @@ curl -sf "http://127.0.0.1:8092/api/perf/runs?limit=5" \
 
 Product docs: [OSA api](https://github.com/TheGrimmChester/OSA-API/blob/main/docs/api.md), [OPL interop](https://github.com/TheGrimmChester/OPL-API/blob/main/docs/interop.md), [ORA interop](https://github.com/TheGrimmChester/ORA-API/blob/main/docs/interop.md), [OPM security](https://github.com/TheGrimmChester/OPM-API/blob/main/docs/security.md).
 
-### Co-deployed browser login (`/hub-auth`)
+### Co-deployed browser login (`/oam-auth` and `/hub-auth`)
 
-ORA, OSA, OPL, and OPM dashboards proxy hub auth at same-origin **`/hub-auth/`** (nginx → `hub:8080`). Login pages POST to `/hub-auth/api/auth/login` so the browser never needs a cross-origin hub URL. Product-local `/api/auth/login` on those APIs returns **`503`** in co-deployed mode; status under `/hub-auth/api/auth/status` reports `issuer=opa-hub`.
+When **`PEER_OAM_URL`** is set (family / NAS stacks), **OAM** is the sole JWT issuer (`iss=oam-api`). Durable users live in `oam.users`; login returns `account_type`, `org_id`, and `project_ids`.
 
-OPA Dashboard talks to the hub URL directly (no `/hub-auth` bridge).
+ORA, OSA, OPL, and OPM dashboards expose same-origin nginx bridges:
+
+| Path | Upstream | Use |
+|------|----------|-----|
+| **`/oam-auth/`** | `oam-api:8090` | **Preferred** — product login pages POST here |
+| **`/hub-auth/`** | `hub:8080` | Legacy bridge; hub **proxies** login to OAM when `PEER_OAM_URL` is set |
+
+Product-local `/api/auth/login` on peer APIs returns **`503`** in co-deployed mode. Status under `/oam-auth/api/auth/status` (or proxied `/hub-auth/api/auth/status`) reports `issuer=oam-api`.
+
+OAM Dashboard talks to OAM directly. OPA Dashboard talks to the hub URL (no product bridge).
 
 NAS verification (all four peer dashboards):
 
 ```bash
+# Preferred: direct OAM bridge
 for port in 8089 8094 8095 8098; do
-  curl -sf "http://127.0.0.1:$port/hub-auth/api/auth/status" | jq -r .issuer   # opa-hub
+  curl -sf "http://127.0.0.1:$port/oam-auth/api/auth/status" | jq -r .issuer   # oam-api
 done
-curl -sf -X POST http://127.0.0.1:8098/hub-auth/api/auth/login \
+curl -sf -X POST http://127.0.0.1:8098/oam-auth/api/auth/login \
   -H 'Content-Type: application/json' \
-  -d '{"username":"admin","password":"admin"}' | jq -r .token
+  -d '{"username":"admin","password":"admin"}' | jq '{token, issuer, account_type, org_id}'
+
+# Hub bridge still works (transparent proxy to OAM)
+curl -sf "http://127.0.0.1:8098/hub-auth/api/auth/status" | jq -r .issuer   # oam-api when PEER_OAM_URL set
+```
+
+Direct OAM API (NAS port `18090`, laptop smoke `8090`):
+
+```bash
+curl -sf -X POST http://127.0.0.1:18090/api/auth/login \
+  -H 'Content-Type: application/json' \
+  -d '{"username":"admin","password":"admin"}' | jq '{issuer, account_type, org_id}'
 ```
 
 ### Lab credentials
 
-Smoke / lab default seed user: username **`admin`** / password **`admin`** (hub issuer, and each product’s local issuer in standalone). Override with `AUTH_ADMIN_USER` / `AUTH_ADMIN_PASSWORD`. Change immediately outside throwaway lab environments.
+Smoke / lab default seed user: username **`admin`** / password **`admin`** (`account_type=personal`, role admin; OAM issuer in co-deployed mode, local issuer in standalone). Override with `AUTH_ADMIN_USER` / `AUTH_ADMIN_PASSWORD`. Change immediately outside throwaway lab environments.
 
 ## ClickHouse databases
 
@@ -235,9 +258,9 @@ OPM projects are **GitHub repositories** only (no local folder registry).
 
 | Concern | Owner |
 |---------|-------|
-| Organizations / projects / users / RBAC | **OAM** (`PEER_OAM_URL`) |
+| Organizations / projects / users / RBAC / **login** | **OAM** (`PEER_OAM_URL`) — `POST /api/auth/login`, `iss=oam-api` |
 | Connectors, API keys, AI provider credentials, per-agent model bindings | **OAM** (`PEER_OAM_URL`) |
-| User JWTs / org directory | **OPA-Hub** (`PEER_OPA_URL`) — reads the OAM directory when `PEER_OAM_URL` is set |
+| Hub observability auth | **OPA-Hub** (`PEER_OPA_URL`) — validates OAM JWTs; proxies login to OAM when `PEER_OAM_URL` is set; org directory reads from OAM |
 | GitHub App / PAT *protocol* work (install-url, callback, clone creds, PR/issue writes) | **ORA** (`PEER_ORA_URL`), using OAM-stored credentials |
 | Kanban / roadmap / task jobs | **OPM** |
 | Code review / Repo Watch | **ORA** (deep-link; do not duplicate) |
@@ -339,4 +362,4 @@ On NAS (`open-family`), `ORA_PUBLIC_URL` / `OPA_PUBLIC_URL` currently share the 
 
 ## All-in-one compose
 
-See [`compose.all.yaml`](../compose.all.yaml): one ClickHouse, databases `opa`/`ora`/`osa`/`opl`/`oam` (OPM uses filesystem only), shared `JWT_SECRET`, hub-issued tokens (`AUTH_MODE=codeployed`). Product dashboards use the `/hub-auth/` nginx bridge for browser login. Lab seed user is `admin` / `admin`.
+See [`compose.all.yaml`](../compose.all.yaml): one ClickHouse, databases `opa`/`ora`/`osa`/`opl`/`oam` (OPM uses filesystem only), shared `JWT_SECRET`, OAM-issued tokens when `PEER_OAM_URL` is set (`AUTH_MODE=codeployed`, `iss=oam-api`). Product dashboards use the `/oam-auth/` nginx bridge for browser login (`/hub-auth/` proxies through the hub to OAM). Lab seed user is `admin` / `admin` (`account_type=personal`).

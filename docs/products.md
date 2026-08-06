@@ -4,7 +4,7 @@ The Open-* family is five optional products plus a shared account plane and shar
 
 | Short | Full name | Control plane | Dashboard | Owns |
 |-------|-----------|---------------|-----------|------|
-| **OAM** | Open Account Manager | `oam-api` | `oam-dashboard` | Shared account plane: organizations, projects, users/RBAC, connector **storage**, API keys, AI provider credentials, per-agent model bindings |
+| **OAM** | Open Account Manager | `oam-api` | `oam-dashboard` | Shared account plane: organizations, projects, users/RBAC, **family login** (`iss=oam-api`), connector **storage**, API keys, AI provider credentials, per-agent model bindings |
 | **OPA** | Open Profiling Agent | `opa-hub` (central) + `opa-agent` (edge) | `opa-dashboard` | Observability only: edge ingest, hub registry/query/auth, APM, RUM, metrics, alerts/SLOs, synthetics |
 | **ORA** | Open Review Agent | `ora-api` + `ora-orchestrator` | `ora-dashboard` | Repo Watch, GitHub App/PAT **protocol** (install, clone/push/PR, issues), automated code review, review check-runs, coding agents |
 | **OSA** | Open Security Agent | `osa-api` + `osa-orchestrator` | `osa-dashboard` | AppSec findings (secrets/SAST/IaC), security runs, vulns/IAST, AppSec CI gates |
@@ -14,6 +14,8 @@ The Open-* family is five optional products plus a shared account plane and shar
 ## Topology (OPA)
 
 Hub-and-spoke, push-primary: edge `opa-agent` registers and pushes telemetry outbound to `opa-hub`. `opa-dashboard` uses one URL and talks only to the hub.
+
+In co-deployed family stacks (`PEER_OAM_URL` set), **OAM** is the sole user JWT issuer (`iss=oam-api`). OPA-Hub validates OAM tokens and proxies browser login to OAM; product dashboards prefer the `/oam-auth/` nginx bridge. OPA observability routes do not mint user credentials — they consume the same OAM-issued JWTs as ORA/OSA/OPL/OPM.
 
 Recent hub batches moved dashboard query routes off the edge agent onto **opa-hub** (NAS port `18080`):
 

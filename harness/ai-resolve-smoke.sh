@@ -12,6 +12,7 @@
 # between runs.
 #
 # What it pins down, beyond health:
+#   - OAM login returns account_type (immutable personal|organization at creation)
 #   - resolve accepts a service JWT only — never a user token, wrong scope, or
 #     wrong audience
 #   - model and credential come back in ONE response (they must never be able to
@@ -95,6 +96,18 @@ for pair in "opa-dash:8088" "ora-dash:8089" "osa-dash:8094" "opl-dash:8095" "oam
   got="$(code GET "http://$HOST:$port/")"
   if [[ "$got" == 200 ]]; then ok "$name serving"; else bad "$name" "got $got"; fi
 done
+
+########################################################################
+sec "1b. OAM login contract (account_type)"
+expect_code "OAM admin login" 200 POST "$OAM/api/auth/login" -H "$JSON" \
+  -d '{"username":"admin","password":"admin"}'
+expect_field "login issuer is OAM" issuer oam-api
+ACCT="$(jq_get account_type)"
+if [[ -n "$ACCT" ]]; then
+  expect_field "seed admin is personal account" account_type personal
+else
+  printf '  NOTE  OAM login missing account_type — redeploy oam-api after immutable account_type migration\n'
+fi
 
 ########################################################################
 sec "2. Directory seed (OAM is authoritative)"

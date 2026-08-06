@@ -14,15 +14,60 @@ Related: [interop.md](interop.md) (tenant headers), [nas-deploy.md](nas-deploy.m
 | JWT + correct org | Tenant’s data (HTTP **200**) |
 | JWT with `project_ids` + non-member project | Hub + ORA/OSA/OPL/OPM → **403** (`project access denied`); admins exempt |
 | Product-local `POST /api/auth/login` (ORA/OSA/OPL/OPM) | **503** when `AUTH_MODE=codeployed` |
-| Hub `POST /api/auth/login` | **200** (hub is the JWT issuer) |
+| Hub or OAM `POST /api/auth/login` (co-deployed + `PEER_OAM_URL`) | **200** — OAM is the issuer (`iss=oam-api`); response includes `account_type` |
+| Personal account + non-empty org header | **403** (`tenant mismatch`) on protected routes |
+| Organization account + org header ≠ JWT `org_id` | **403** (`tenant mismatch`) |
 
-Canonical headers (case-insensitive): `Authorization: Bearer <hub-jwt>`, `X-Organization-ID`, `X-Project-ID`. Query fallbacks `organization_id` / `project_id` match. Picker marker `"all"` is stripped under auth and does **not** widen scope.
+Canonical headers (case-insensitive): `Authorization: Bearer <oam-jwt>`, `X-Organization-ID`, `X-Project-ID`. Query fallbacks `organization_id` / `project_id` match. Picker marker `"all"` is stripped under auth and does **not** widen scope.
+
+## Account types (JWT-bound tenancy)
+
+Users are created in OAM with immutable `account_type`: **`personal`** or **`organization`**. There is no attach, detach, or type change after creation.
+
+| `account_type` | JWT `org_id` | Org headers | Project headers |
+|----------------|--------------|-------------|-----------------|
+| `personal` | always empty | Rejected when set (except picker `"all"`, which is stripped) | Allowed — scope personal namespace |
+| `organization` | fixed home org | Must match JWT `org_id` or be omitted (overwritten from JWT) | Allowed within org; `project_ids` ACL still applies |
+
+Open-Auth-Go enforces this in `ApplyUserTenantHeaders` before list/write handlers run. Personal accounts always get `X-Tenant-User-ID` stamped from the JWT username; organization accounts get `X-Organization-ID` overwritten from JWT `org_id`.
+
+```bash
+HOST=192.168.100.101   # NAS; OAM on :18090, hub on :18080
+
+# Login — note account_type in the JSON body
+curl -sf -X POST "http://$HOST:18090/api/auth/login" \
+  -H 'Content-Type: application/json' \
+  -d '{"username":"admin","password":"admin"}' \
+  | jq '{issuer, account_type, org_id}'
+
+PERSONAL_TOKEN=$(curl -sf -X POST "http://$HOST:18090/api/auth/login" \
+  -H 'Content-Type: application/json' \
+  -d '{"username":"admin","password":"admin"}' | jq -r .token)
+
+# Personal account + explicit org header → 403 on a protected list
+curl -s -o /dev/null -w '%{http_code}\n' \
+  "http://$HOST:8093/api/security/runs?limit=5" \
+  -H "Authorization: Bearer $PERSONAL_TOKEN" \
+  -H "X-Organization-ID: nas" -H "X-Project-ID: infra"
+# expect 403
+
+# Organization member (create via OAM admin API first) — foreign org header → 403
+# ORG_TOKEN=…  # user with account_type=organization, org_id=nas
+# curl -s -o /dev/null -w '%{http_code}\n' \
+#   "http://$HOST:8093/api/security/runs?limit=5" \
+#   -H "Authorization: Bearer $ORG_TOKEN" \
+#   -H "X-Organization-ID: default-org" -H "X-Project-ID: default-project"
+# expect 403
+```
+
+Attempting to change `account_type` or `organization_id` via `POST /api/users/set` returns **400** (`immutable_account_type` / `immutable_organization`).
 
 ## NAS ports
 
 | Product | API host port | Representative protected list |
 |---------|---------------|-------------------------------|
 | Hub | `18080` | `GET /api/infra/hosts`, `GET /api/alerts`, `GET /api/tenancy/organizations` |
+| OAM | `18090` | `GET /api/users`, `POST /api/auth/login` |
 | ORA | `8091` | `GET /api/connectors`, `GET /api/scm/jobs` |
 | OSA | `8093` | `GET /api/security/runs`, `GET /api/security/secrets` |
 | OPL | `8092` | `GET /api/perf/scenarios`, `GET /api/perf/runs` |
@@ -107,6 +152,9 @@ HOST=192.168.100.101 ./harness/security-tenant-matrix.sh
 
 - Every protected route above returns **401** without JWT.
 - Peer product local login returns **503**.
+- OAM (or hub-proxied) login returns **`account_type`** and **`issuer=oam-api`** when `PEER_OAM_URL` is set.
+- Personal accounts reject non-empty org headers (**403**); organization accounts reject foreign org headers (**403**).
+- `POST /api/users/set` rejects `account_type` / `organization_id` changes (**400**).
 - Wrong-org list length is **0** (or HTTP **403**); counts must not match another real tenant’s non-empty set.
 - No-header counts match explicit `default-org` / `default-project` for ClickHouse-backed lists (OSA, OPL, and WriteTenant-aligned ORA/OPM/hub surfaces).
 - OPM `GET /api/projects/{id}` (+ board/jobs/tasks/status) with a foreign org header returns **404**, not the default-org project.
@@ -115,6 +163,8 @@ HOST=192.168.100.101 ./harness/security-tenant-matrix.sh
 - Running containers for hub / ora-api / osa-api / opl-api / opm-api resolve to **`*:nas`** image names (never `*:smoke`).
 
 ## NAS verification (2026-08-04)
+
+> **Post-cutover note (2026-08-06):** OAM is now the family JWT issuer (`issuer=oam-api`, dashboard `/oam-auth/`). The matrix below used hub-issued tokens; re-run the harness against OAM-issued JWTs after NAS `*:nas` rebuild before declaring cutover complete.
 
 Executed against `192.168.100.101` with hub JWT `admin`/`admin` and `CHECK_IMAGES=1` (all `Config.Image=*:nas`, no `*:smoke`):
 
@@ -148,5 +198,5 @@ Family harness: **56 PASS / 0 FAIL**. Sibling ORA/OSA curl matrix reported **13/
 ## Notes
 
 - Hub observability JSON may omit an `organization_id` field on rows; scoping is still enforced via query filters when headers are present ([OPA-Hub #25](https://github.com/TheGrimmChester/OPA-Hub/pull/25)).
-- Peer clone credentials require a **service JWT** (`OPEN_SERVICE_JWT_SECRET`, scope `scm:clone`) — never a hub user JWT.
-- Dashboard `/hub-auth/` bridges (ports `8089` / `8094` / `8095` / `8098`) are browser login only — product APIs stay on the ports above.
+- Peer clone credentials require a **service JWT** (`OPEN_SERVICE_JWT_SECRET`, scope `scm:clone`) — never a user JWT.
+- Dashboard **`/oam-auth/`** bridges (ports `8089` / `8094` / `8095` / `8098`) are the preferred browser login path to OAM; **`/hub-auth/`** still works (hub proxies to OAM when `PEER_OAM_URL` is set). Product APIs stay on the ports above.
