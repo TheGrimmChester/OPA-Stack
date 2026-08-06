@@ -74,6 +74,12 @@ They were held private during the product split and migration, then reopened on 
 
 Removed endpoints are absent (normal HTTP 404). Do not ship redirects, dual path namespaces, or keep-alive stubs for APIs that moved between products. Update callers in the same change set.
 
+## SCM checker platform
+
+GitHub PR/push automation is a **family platform**: ORA owns webhook ingress and fans out SCM events to compatible peers (OSA, OPL, OPM). OAM owns connector tenancy; each product exposes `POST /api/peer/scm/events` and decides which checkers run. OPA (observability) is not on this path.
+
+Full contract, compatibility matrix, and dual webhook setup: [interop.md — SCM checker platform](interop.md#scm-checker-platform).
+
 ## Related docs
 
 - [OPL + OPM remaining backlog](opl-opm-backlog.md) — Done / Next / Later for Perf Lab and Project Manager

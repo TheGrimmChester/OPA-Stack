@@ -122,11 +122,112 @@ Caller sets `PEER_{OPA|ORA|OSA|OPL|OPM}_URL` and mints a **service JWT** with `O
 | `ingest:load_run` | Load-run correlation |
 | `health:read` | Peer probe |
 | `connectors:read` | List ORA GitHub connectors / repos (OPM → ORA) |
+| `connectors:write` | Upsert connector directory metadata (ORA → OAM `POST /api/internal/connectors/sync`) |
+| `scm:events` | Receive SCM checker fan-out envelope (ORA → OSA/OPL/OPM `POST /api/peer/scm/events`) |
 | `scm:clone` | Short-lived clone credentials for ephemeral job workspaces (OPM → ORA) |
 | `creds:resolve` | Resolve a job's model + API key (any product → OAM). The only scope that yields a plaintext credential |
 | `catalog:write` | Publish a product's agent/task catalog (any product → OAM) |
 | `orgs:read` / `users:read` | Read the OAM directory (hub, products → OAM) |
 | `scm:pm` | Milestones + Projects v2 list/bind/sync (OPM → ORA peer `/api/peer/scm/milestones/*`, `/api/peer/scm/projects/*`) |
+
+## SCM checker platform
+
+Shared GitHub-driven automation for compatible Open family products. **ORA** is the only webhook entry point; products never receive raw GitHub webhooks directly.
+
+See also: [ORA repo-watch](https://github.com/TheGrimmChester/ORA-API/blob/main/docs/repo-watch.md) (App vs repo-hook setup), [OAM connector sync](https://github.com/TheGrimmChester/OAM-API/blob/main/docs/api.md#connectors-directory).
+
+### Rules (all compatible products)
+
+1. **Single webhook entry** — ORA only. Repo hooks URL: `{ORA_PUBLIC_URL}/v1/scm/github/webhook/{connector_id}`; App webhooks: `{ORA_PUBLIC_URL}/v1/scm/github/webhook`.
+2. **OAM tenancy required** — every connector and enabled watch has `organization_id` + `project_id`. No silent `default-org` fallback for SCM automation.
+3. **Peer endpoint** — each compatible product exposes `POST /api/peer/scm/events` (service JWT scope **`scm:events`**, `aud=<product>-api`).
+4. **Checker response** — list of `{id, check_run_name, should_run, reason, …}`; ORA creates GitHub status surfaces keyed `{product}:{checker_id}`.
+5. **Works without App** — repo-webhook + PAT mode uses the **same** fan-out; products must not assume App installation APIs.
+6. **Dashboards** — connector/repo setup lives in **OAM Dashboard**; each product dashboard shows its own checkers/findings.
+
+Products opt in when `PEER_<PRODUCT>_URL` is set on ORA. Unconfigured peers are skipped (no error).
+
+### Product compatibility matrix
+
+| Product | SCM peer events | Planned checkers (this platform) | Ship status |
+|---------|-----------------|----------------------------------|-------------|
+| **OAM** | No (account plane) | Connector directory, org linkage | Sync API + UI |
+| **ORA** | Native (hub) | `review`, optional `coding` | Refactor to checker model |
+| **OSA** | Yes | `dependencies` (CVE lockfiles), later `secrets`/`sast`/`iac` | **`dependencies` full** |
+| **OPL** | Yes | `perf-gate` when load assets change (JMX/HAR paths) | Stub `{checkers:[]}` + contract |
+| **OPM** | Yes | `delivery` on PR merge / issue sync hooks | Stub `{checkers:[]}` + contract |
+| **OPA** | No | Observability ingest — not PR checker compatible | Out of scope |
+
+### Dual webhook ingress
+
+| Mode | Credential | Webhook URL | Notes |
+|------|------------|-------------|-------|
+| **GitHub App** | App installation under OAM org | `{ORA_PUBLIC_URL}/v1/scm/github/webhook` | Check Runs when token allows; OAM-scoped install state |
+| **Repository hooks** | PAT under OAM org (`admin:repo_hook` or fine-grained equivalent) | `{ORA_PUBLIC_URL}/v1/scm/github/webhook/{connector_id}` | Per-repo encrypted secret on `watched_repos`; events `pull_request`, `push` |
+
+Both routes share the same unified pipeline: verify → tenant resolve → build SCM envelope → parallel fan-out to configured peers → aggregate checker results → publish GitHub statuses.
+
+### Watched-repo checks registry
+
+`watched_repos.checks_json` names **product checkers**, not only legacy ORA strings:
+
+```json
+["ora:review", "osa:dependencies", "opl:perf-gate"]
+```
+
+Default for new watches (when peers configured): include all **compatible** checkers for that repo profile. ORA fan-out still calls every configured peer; each peer decides `should_run` from the envelope (`changed_paths`, event type, checks filter).
+
+### Peer contract: `POST /api/peer/scm/events`
+
+**Caller:** ORA (`iss=ora-api`, scope `scm:events`, `aud=osa-api|opl-api|opm-api`).
+
+**Request envelope (representative fields):**
+
+```json
+{
+  "id": "scmenv-…",
+  "event_type": "pull_request.opened",
+  "organization_id": "acme",
+  "project_id": "proj-1",
+  "connector_id": "conn-…",
+  "repo_full_name": "acme/app",
+  "ref": "feature/cve-fix",
+  "default_branch": "main",
+  "pr_number": 42,
+  "commit_sha": "abc123",
+  "scm_job_id": "job-…",
+  "changed_paths": ["package-lock.json"],
+  "checks": ["ora:review", "osa:dependencies"],
+  "dispatch": true
+}
+```
+
+**Response:**
+
+```json
+{
+  "checkers": [
+    {
+      "id": "dependencies",
+      "check_run_name": "OSA Dependencies",
+      "should_run": true,
+      "reason": "lockfile changed"
+    }
+  ]
+}
+```
+
+Stub peers (OPL, OPM this ship) return `{ "checkers": [] }` until their checker bodies land. ORA publishes Check Run or commit-status fallback per returned checker (`{product}/{checker_id}` context).
+
+### OAM connector directory
+
+Connector **metadata** (org, project, kind, `webhook_mode`) lives in OAM `connectors`; ORA keeps encrypted tokens and GitHub protocol. ORA dual-writes on create/update:
+
+```
+POST /api/internal/connectors/sync   (service JWT, scope connectors:write, aud=oam-api)
+```
+
+OAM Dashboard lists connectors (proxied to ORA today) and shows org/project badges plus checker preview for repo registration.
 
 ## OPM + Hub + GitHub
 
@@ -204,6 +305,7 @@ See [OSA-API api.md](https://github.com/TheGrimmChester/OSA-API/blob/main/docs/a
 |-----------------|---------|-----------|
 | OPL → OPA hub | `load_run_id` correlation | Optional |
 | ORA → OSA | findings / `security_run_id` / gate status | Optional |
+| ORA → OSA/OPL/OPM | SCM checker fan-out (`POST /api/peer/scm/events`, scope `scm:events`) | Optional (per `PEER_*_URL`) |
 | OSA → OPA hub | runtime context deep links | Optional |
 | ORA → OPA hub | dashboard deep links | Optional |
 | ORA → OPM | Roadmap / task handoff (optional) | Optional |

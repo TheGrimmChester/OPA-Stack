@@ -83,7 +83,10 @@ services:
       AUTH_MODE: codeployed
       OPEN_SERVICE_JWT_SECRET: ${OPEN_SERVICE_JWT_SECRET:-dev-service-jwt-secret-at-least-32b}
       PEER_OPA_URL: http://hub:8080
+      PEER_OAM_URL: http://oam:8090
       PEER_OSA_URL: http://osa:8093
+      PEER_OPL_URL: http://opl:8092
+      PEER_OPM_URL: http://opm:8096
     depends_on:
       clickhouse:
         condition: service_healthy

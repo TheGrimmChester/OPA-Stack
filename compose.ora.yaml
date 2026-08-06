@@ -22,7 +22,10 @@ services:
       AUTH_MODE: ${AUTH_MODE:-standalone}
       OPEN_SERVICE_JWT_SECRET: ${OPEN_SERVICE_JWT_SECRET:-}
       PEER_OPA_URL: ${PEER_OPA_URL:-}
+      PEER_OAM_URL: ${PEER_OAM_URL:-}
       PEER_OSA_URL: ${PEER_OSA_URL:-}
+      PEER_OPL_URL: ${PEER_OPL_URL:-}
+      PEER_OPM_URL: ${PEER_OPM_URL:-}
     depends_on: [clickhouse]
 
   ora-orchestrator:

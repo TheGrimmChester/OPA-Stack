@@ -156,7 +156,9 @@ services:
       OPEN_SERVICE_JWT_SECRET: ${OPEN_SERVICE_JWT_SECRET}
       OPA_AUTH_REQUIRED: ${OPA_AUTH_REQUIRED:-1}
       PEER_OPA_URL: http://hub:8080
+      PEER_OAM_URL: http://oam-api:8090
       PEER_OSA_URL: http://osa-api:8093
+      PEER_OPL_URL: http://opl-api:8092
       PEER_OPM_URL: http://opm-api:8096
       OPA_SECURITY_WORKSPACE: ${OPA_SECURITY_WORKSPACE:-/workspace}
       OPA_SCM_STATE_DIR: ${OPA_SCM_STATE_DIR:-/workspace/scm-state}
