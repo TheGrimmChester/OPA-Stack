@@ -30,7 +30,7 @@ Companion product backlog: [opl-opm-backlog.md](opl-opm-backlog.md). Product bou
 |-----------|------------|
 | Delivery | Web dashboard + HTTP API + runner containers (not a desktop Electron app). The `opm-orchestrator` service is a health/probe endpoint, not a scheduler — it calls itself a "job scheduler stub" at `OPM-API/main.go:114` |
 | Project identity | **GitHub `owner/repo`** via Hub orgs + ORA connectors (not local folder paths) |
-| Execution | **Container spawn** of `opm-runner-task:nas` when `spawnReady`, then shared artifact helpers; **builtin** in-process fallback (`OPM_FORCE_BUILTIN` / spawn failure). A tmp clone is prepared but never used (`job_runner.go:45-50`) — job output goes to `OPM_DATA_DIR`, never to the repository |
+| Execution | **Container spawn** of `opm-runner-task:nas` when `spawnReady`, then shared artifact helpers. AI jobs **fail closed** on spawn/credential failure; in-process builtins only for control-plane actions or explicit `OPM_FORCE_BUILTIN=1`. Job output goes to `OPM_DATA_DIR`, never to the repository |
 | Auth | Co-deployed Hub JWT + tenant headers |
 | Review depth | Automated review column; **deep review owned by ORA** |
 | Multi-tenancy | Org-scoped projects (`X-Organization-ID`) |
@@ -110,7 +110,7 @@ Pluggable providers; per-phase model overrides; prompt packs (a repo-level promp
 
 | Route | Page | Notes |
 |-------|------|-------|
-| `/` | Projects | Link GitHub repos via Hub orgs + ORA connectors |
+| `/` | Projects | Link GitHub repos via Hub orgs + ORA connector list (manage installs in OAM) |
 | `/board` | Board | CRUD + **DnD** + task action menu; require-review; Plan/Build/Approve/Pause/Recover; task detail drawer |
 | `/roadmap` | Roadmap | Create / edit / delete phases and features |
 | `/ideation` | Ideation | Create / edit / delete; promote to task |
@@ -140,7 +140,7 @@ Enqueued from UI (`OPM-Dashboard/src/pages/Jobs.jsx`): `run-planning`, `run-impl
 
 Store also maps `run-followup-planning` → planning state.
 
-**Execution today:** when spawnReady (docker CLI + daemon + `opm-runner-task:nas`), jobs `docker run` one hardened ephemeral runner (`execution: "container"`), then shared helpers write `spec.md` / plan / progress / review + QA / changelog. Builtin in-process path (`execution: "builtin"`) remains the fallback (`OPM_FORCE_BUILTIN=1` or spawn failure). Orchestrator `/api/spawn-probe` reports `spawnReady: true` when docker works. Default runner tag env `OPM_RUNNER_TAG` (prefer `nas` on NAS — never smoke).
+**Execution today:** when spawnReady (docker CLI + daemon + `opm-runner-task:nas`), jobs `docker run` one hardened ephemeral runner (`execution: "container"`), then shared helpers write `spec.md` / plan / progress / review + QA / changelog. AI-backed actions fail closed without spawn + OAM credentials; builtins are for control-plane actions or `OPM_FORCE_BUILTIN=1` only. Orchestrator `/api/spawn-probe` reports `spawnReady: true` when docker works. Default runner tag env `OPM_RUNNER_TAG` (prefer `nas` on NAS — never smoke).
 
 **Two limits that shape the rows below.**
 

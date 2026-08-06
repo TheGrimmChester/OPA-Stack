@@ -31,4 +31,6 @@ services:
       # refused and /api/health reports secret_key_present: false.
       OAM_SECRET_KEY: ${OAM_SECRET_KEY:-${OPA_CONNECTOR_SECRET:-}}
       PEER_OPA_URL: ${PEER_OPA_URL:-}
+      # Required for public connector mutations (BFF → ORA protocol / tokens).
+      PEER_ORA_URL: ${PEER_ORA_URL:-}
     depends_on: [clickhouse]

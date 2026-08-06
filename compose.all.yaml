@@ -252,6 +252,8 @@ services:
       PEER_OSA_URL: http://osa:8093
       PEER_OPL_URL: http://opl:8092
       PEER_OPM_URL: http://opm:8096
+      # Post-install / claim browser redirects land on OAM Connectors (not OPA :8088).
+      OAM_DASHBOARD_URL: ${OAM_DASHBOARD_URL:-http://127.0.0.1:8097}
       REDIS_URL: redis://:${REDIS_ORA_PASSWORD:-dev-redis-ora-at-least-16b}@redis-ora:6379/0
     depends_on:
       clickhouse:
@@ -376,6 +378,8 @@ services:
       OPEN_SERVICE_JWT_SECRET: ${OPEN_SERVICE_JWT_SECRET:-dev-service-jwt-secret-at-least-32b}
       OAM_SECRET_KEY: ${OAM_SECRET_KEY:-${OPA_CONNECTOR_SECRET:-dev-connector-secret-at-least-32b}}
       PEER_OPA_URL: http://hub:8080
+      # Directory project import discovers repos via ORA connectors.
+      PEER_ORA_URL: http://ora:8091
       REDIS_URL: redis://:${REDIS_OAM_PASSWORD:-dev-redis-oam-at-least-16b}@redis-oam:6379/0
     depends_on:
       clickhouse:
