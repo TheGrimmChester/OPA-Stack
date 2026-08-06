@@ -1,4 +1,5 @@
 # Example — copy into a consuming app repo. Not enabled in OPA-stack CI by default.
+# Calls OPL GET /api/perf/runs/{id}/gate (not the legacy hub /api/performance/gate).
 name: opa-perf-gate
 on:
   workflow_dispatch:
@@ -8,11 +9,21 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Call OPA perf gate
+      - name: Call OPL perf gate
         env:
-          AGENT_URL: ${{ secrets.OPA_AGENT_URL }}
-          BASELINE_ID: ${{ secrets.OPA_PERF_BASELINE_ID }}
+          AGENT_URL: ${{ secrets.OPL_API_URL }}
+          RUN_ID: ${{ secrets.OPL_PERF_RUN_ID }}
+          ORG_ID: ${{ secrets.OPA_ORG_ID }}
+          PROJECT_ID: ${{ secrets.OPA_PROJECT_ID }}
+          AGENT_TOKEN: ${{ secrets.OPA_HUB_JWT }}
         run: |
-          curl -fsS -o gate.json "$AGENT_URL/api/performance/gate?id=$BASELINE_ID"
+          : "${AGENT_URL:?set OPL_API_URL (e.g. http://host:8092)}"
+          : "${RUN_ID:?set OPL_PERF_RUN_ID}"
+          curl -fsS -o gate.json \
+            ${AGENT_TOKEN:+-H "Authorization: Bearer $AGENT_TOKEN"} \
+            -H "X-Organization-ID: ${ORG_ID:-default-org}" \
+            -H "X-Project-ID: ${PROJECT_ID:-default-project}" \
+            "$AGENT_URL/api/perf/runs/${RUN_ID}/gate"
           cat gate.json
-          grep -q '"pass":false\|"ok":false' gate.json && exit 1 || true
+          grep -Eq '"ok"[[:space:]]*:[[:space:]]*false|"pass"[[:space:]]*:[[:space:]]*false' gate.json && exit 1 || true
+          grep -Eq '"ok"[[:space:]]*:[[:space:]]*true' gate.json

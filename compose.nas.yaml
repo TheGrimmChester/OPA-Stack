@@ -183,7 +183,12 @@ services:
       OPA_DASHBOARD_URL: ${OPA_DASHBOARD_URL:-http://192.168.100.101:8088}
       OPA_SCM_CRON: ${OPA_SCM_CRON:-1}
       OPA_GITLEAKS_CONFIG: /etc/opa/gitleaks.toml
-      OPA_CONNECTOR_SECRET: ${JWT_SECRET}
+      # AES-GCM for connector ciphertext. MUST be distinct from JWT_SECRET.
+      # Must match OAM_SECRET_KEY (or leave OAM_SECRET_KEY unset so it falls back here).
+      # Required in .env — compose fails closed if unset (do not alias to JWT_SECRET).
+      # If ciphertext was encrypted under the old JWT alias, set this to that same
+      # historical value until you rotate/re-encrypt, then recreate ora-api + oam-api.
+      OPA_CONNECTOR_SECRET: ${OPA_CONNECTOR_SECRET:?set OPA_CONNECTOR_SECRET in .env — distinct from JWT_SECRET}
       # Sibling module sources for OPA Checkup. Family services pin shared
       # libraries with go.mod filesystem replaces (../Open-Auth-Go); without
       # this the isolated job checkout cannot compile and the check reports
@@ -448,8 +453,6 @@ services:
       OPA_AUTH_REQUIRED: ${OPA_AUTH_REQUIRED:-1}
       PEER_OPA_URL: http://hub:8080
       PEER_ORA_URL: http://ora-api:8091
-      PEER_OSA_URL: http://osa-api:8093
-      PEER_OPL_URL: http://opl-api:8092
       OPM_RUNNER_TAG: nas
       OPM_DATA_DIR: /data
       # Must be the same host path inside and outside the container: docker run -v
@@ -476,7 +479,8 @@ services:
       OPM_MODEL_ROADMAP_DISCOVERY: ${OPM_MODEL_ROADMAP_DISCOVERY:-auto}
       OPM_MODEL_ROADMAP_FEATURES: ${OPM_MODEL_ROADMAP_FEATURES:-auto}
       OPM_RUNNER_NETWORK: ${OPM_RUNNER_NETWORK:-bridge}
-      # GitHub App/PAT live on ora-api — OPM discovers via PEER_ORA_URL + hub orgs via PEER_OPA_URL
+      # Connector storage is OAM; GitHub App/PAT protocol + short-lived SCM creds are on ora-api.
+      # OPM discovers orgs via PEER_OPA_URL, models/keys via PEER_OAM_URL, SCM via PEER_ORA_URL.
     volumes:
       - opm_data:/data
       - /mnt/Apps/config-docker/open-stack/opm-jobs:/mnt/Apps/config-docker/open-stack/opm-jobs

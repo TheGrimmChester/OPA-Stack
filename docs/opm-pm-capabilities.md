@@ -58,7 +58,7 @@ status claim** — some rows here are not implemented. Section 4 is the only pla
 | Context | Project index / context |
 | Agent tools | Agent utility / tool-server surface |
 | Terminals / live runs | Live agent / runner visibility |
-| Settings | Theme, providers, profiles (where Hub does not already own them) |
+| Settings | Theme; AI providers / models live in **OAM** (deep-link), not Hub |
 | Onboarding | Welcome / first-run wizard |
 
 External issue/PR lists (GitHub and other SCM/issue hosts) prefer **link-out or ORA** rather than in-app clones unless later sync is justified.
@@ -212,12 +212,12 @@ does not. "Done" is a claim about source code on `origin/main` only — see §3.
 
 | Capability | Status | Notes |
 |------------|--------|-------|
-| Multi-project registry | **Done** | GitHub-linked via Hub + ORA |
+| Multi-project registry | **Done** | GitHub-linked via Hub + ORA protocol; credentials in OAM |
 | Local folder / Electron app | **Different-by-design** | Web-only; API rejects path create |
 | Hub auth + tenant headers | **Done** | Co-deployed `/hub-auth/` |
-| Project via ORA connectors | **Done** | Family-native path |
+| Project via ORA connectors | **Done** | List via ORA; storage in OAM |
 | Onboarding / welcome wizard | **Not implemented** | No onboarding route in `OPM-Dashboard/src/App.jsx` |
-| Settings (theme, providers, profiles) | **Not implemented** | OPM inherits Hub; per-phase model ids come from runner env only (`OPM-API/cmd/opm-runner/main.go:118-134`) |
+| Settings (theme, providers, profiles) | **Partial** | Theme may be local; AI providers / per-agent models belong in **OAM** (`PEER_OAM_URL`); legacy `OPM_MODEL_*` only when OAM unset |
 
 ### 4.2 Board & tasks
 
@@ -240,10 +240,10 @@ does not. "Done" is a claim about source code on `origin/main` only — see §3.
 |------------|--------|-------|
 | Job list / enqueue / cancel | **Done** | `execution` + `message` fields |
 | Optional `specId` on enqueue | **Done** | Jobs page + board/detail |
-| Runner container calls a model | **Done** (three actions only) | `OPM-API/cmd/opm-runner/main.go:69-100` calls a chat-completions endpoint when `OPM_MODEL_API_KEY` is set and writes `/out/result.json`. The control plane applies it for planning, implementation, and review only — `model_apply.go:17-29` falls to `default: return false` for every other action, so roadmap, ideation, and changelog always take the builtin path whether or not a key is set. Output is prose and plan JSON, never a repository change |
+| Runner container calls a model | **Done** | With `PEER_OAM_URL`, model + API key resolve from OAM per job phase (`creds:resolve`); legacy `OPM_MODEL_API_KEY` / `CURSOR_API_KEY` when OAM unset. Runner writes `/out/result.json`; control plane applies planning/implementation/review/ideation/roadmap. Builtin path is fallback only |
 | Orchestrator spawn / reaper loop | **Not implemented** | `runOrchestrator` in `OPM-API/main.go` registers only `/api/health` and `/api/spawn-probe`, and its own startup log calls it a "job scheduler stub" (`main.go:114`) — verified by reading the whole function from the `origin/main` blob, not by search. Spawn happens in-process in `opm-api` (`job_runner.go:60-91`); nothing reaps stale containers |
-| `run-planning` (multi-phase) | **Done** (builtin) | Writes `spec.md` + plan; moves for require-review |
-| `run-implementation` + subtask loop | **Done** (plan bookkeeping only) | Flips the next plan subtask to `completed` (`job_runner.go:321-341`); writes no code — see §4.6 |
+| `run-planning` (multi-phase) | **Done** | Writes `spec.md` + plan; moves for require-review |
+| `run-implementation` + subtask loop | **Done** | Model runner returns `files[]` into a task-session workspace; change set recorded for delivery (§4.6). Builtin-only path still advances plan state without source changes |
 | Retry / stuck / recover-subtask | **Done** | `mark-stuck`, `recover-subtask` (`job_runner.go:137-140`); cancel marks stuck |
 | `run-review` / `run-qa-fix` loop | **Done** | PASS/FAIL + `QA_FIX_REQUEST.md`. The verdict comes from plan completeness, not from reading a diff (`model_apply.go:146-152`) |
 | `run-followup-planning` | **Done** | `job_runner.go:129-130`; Jobs picker + detail action |
@@ -251,7 +251,7 @@ does not. "Done" is a claim about source code on `origin/main` only — see §3.
 | Skip-to-phase | **Done** | API: `handlers.go:429` declares `TargetPhase int \`json:"targetPhase"\``, `:441-442` rejects a missing or `<1` value with 400, `:451` assigns it; dispatch at `job_runner.go:153-154` → `builtinSkipToPhase` (`job_runner.go:930-995`), which resolves the target phase, marks earlier phases complete, and rewrites `progress.json`. UI: `OPM-Dashboard/src/components/TaskDetail.jsx:18`, `:311`; `src/pages/Jobs.jsx:17`, `:100`, `:179` |
 | Parallel multi-spec / runner slots | **Not implemented** | One container per job; no slot accounting |
 | Autonomous multi-spec build workflow | **Not implemented** | Every step is a separate operator enqueue |
-| Provider / model selection UI | **Not implemented** | Runner-image env only (`spawn_container.go:74-90`); no dashboard surface |
+| Provider / model selection UI | **Different-by-design** | Configure in **OAM** Agents & Models; OPM should deep-link, not re-own. Legacy `OPM_MODEL_*` env only when `PEER_OAM_URL` unset |
 
 ### 4.4 Roadmap / ideation / changelog
 
@@ -278,11 +278,11 @@ does not. "Done" is a claim about source code on `origin/main` only — see §3.
 
 | Capability | Status | Notes |
 |------------|--------|-------|
-| Durable per-task worktrees | **Different-by-design** | OPM uses an ephemeral job clone under `OPM_JOB_TMP` |
-| **Code delivery from a task (edit / commit / branch / push)** | **Not implemented** | The largest real gap, and a design gap rather than a switch. `executeJob` calls `prepareJobWorkspace` and discards the handle on the next line (`OPM-API/job_runner.go:45`, `:50` `_ = workDir`) — those are the only two references to `workDir` in the file. A positive-control search for `exec.Command…("git"…)` across all of OPM-API returns exactly two hits, both `git clone` (`workspace.go:57`, `:69`); there is no `git add`, `commit`, `push`, or branch creation. A task can therefore be planned, "implemented", reviewed, and marked done while the repository is byte-for-byte unchanged |
-| Create / open pull request from task | **Not implemented** | The same positive-control search finds no pull-request creation anywhere in OPM-API. ORA deep-link is the intended path but is not wired from a task |
-| Review / Merge / Discard UI | **Not implemented** / **Different-by-design** | Nothing exists to merge while the row above holds; deep-link to ORA is preferred over in-app merge |
-| Task diff in UI | **Not implemented** | No diff is produced, so none can be shown |
+| Durable per-task worktrees | **Done** (task sessions) | Coding/review share `$OPM_JOB_TMP/tasks/{projectId}/{specId}/repo` until deliver / human gate / done |
+| **Code delivery from a task (edit / commit / branch / push)** | **Done** | Apply recorded change set; commit on `opm/<specId>`; push + open PR via ORA `scm:pr` (`delivery.go`, `peer_delivery.go`). Builtin path still produces no source changes |
+| Create / open pull request from task | **Done** | `POST …/tasks/{specId}/deliver`; auto-deliver after review PASS when `OPM_IMPL_AUTO_DELIVER` |
+| Review / Merge / Discard UI | **Partial** / **Different-by-design** | Autopilot can merge via ORA `scm:pr`; deep-link to ORA Repo Watch still preferred for full review UX |
+| Task diff in UI | **Partial** | Change set listed on task Delivery; full diff viewer may still be thin |
 
 ### 4.7 External issue sync
 
@@ -324,7 +324,7 @@ Failures are never silent. Any push/pull failure is persisted on the task as `gi
 | i18n | **Not implemented** | |
 | App auto-update | **Different-by-design** | Container image deploys |
 | Prompt packs in runners | **Not implemented** | Runner prompts are the hard-coded strings at `OPM-API/cmd/opm-runner/main.go:137-142`; no repo-level prompt file is read |
-| Pre-merge quality gates (tests/lint) | **Not implemented** | Nothing executes tests or linters, and there is no merge to gate (§4.6) |
+| Pre-merge quality gates (tests/lint) | **Not implemented** | Nothing executes tests or linters inside OPM; OSA/OPL gates are separate products |
 | Analytics (cycle time, pass rates) | **Not implemented** | |
 | Durable job history | **Not implemented** | Runs are files under `$OPM_DATA_DIR/projects/<id>/runs/<runId>.json` |
 
@@ -332,14 +332,11 @@ Failures are never silent. Any push/pull failure is persisted on the task as `gi
 
 ## 5. Suggested implementation order
 
-1. **Code delivery** — the single largest gap. Until a job can write to its clone and open a pull request,
-   "implementation" and "review" are bookkeeping over a plan file (§4.6).
+1. **Live-stack verify delivery + OAM resolve** on NAS after `*:nas` rebuild (§4.6 shipped in code).
 2. **Real orchestrator loop** — replace the `main.go:114` scheduler stub with actual dispatch and container
    reaping, so spawn is not driven in-process by `opm-api`.
-3. **Model-backed roadmap / ideation** — the generators work but emit fixed template text; wiring them into the
-   runner would make them respond to the actual project (§4.4).
-4. **Fix the silent no-op** in Projects v2 draft title refresh, or surface it as an error instead of discarding
-   it (`ORA-API/peer_scm_pm.go:268`).
+3. **PR state tracking** — poll or webhook via ORA (`prState` is a snapshot today).
+4. **ORA review deep-link** — do not duplicate Repo Watch inside OPM.
 5. **Insights / context** — after core automation matures.
 
 ---
@@ -348,19 +345,14 @@ Failures are never silent. Any push/pull failure is persisted on the task as `gi
 
 Ranked for an operator running OPM today:
 
-1. **No code delivery** — a completed task leaves the repository byte-for-byte unchanged (§4.6). This is the
-   one gap that changes what the product can honestly claim to do.
+1. **NAS image lag / live delivery proof** — delivery is in OPM-API; confirm against a real GitHub App on the deployed stack.
 2. **Live terminals / richer job logs UI** — the Jobs list is the only run visibility.
-3. **Roadmap / ideation generate fixed template text** — real artifacts, but not derived from the project
-   beyond its name and task titles (§4.4).
-4. **Projects v2 rename is a silent no-op** — reports success while the board is unchanged (§4.7).
-5. **Provider / model settings** — runner image env only, no UI.
-6. **Pre-merge quality gates** — nothing runs tests or linters.
+3. **Provider / model settings UI** — configure in **OAM**; OPM should deep-link, not re-own.
+4. **PR state not tracked** after open — merged/closed PRs may still show `open` until re-deliver.
+5. **Pre-merge quality gates** — OSA/OPL, not duplicated in OPM.
+6. **ORA Repo Watch deep-link** from a task — still policy-only.
 
-Shipped and verified on `origin/main` this pass: task ↔ GitHub Issue two-way sync (link/unlink/push/pull via
-ORA `scm:pm`, explicit column↔state mapping, machine-readable failure reporting); roadmap/ideation generators
-and skip-to-phase, both merged as PR #18 (`a7c60ee`); containerized task spawn; board drag-and-drop;
-stuck/recover; pause/resume.
+Shipped and verified on `origin/main` this pass: code delivery (`scm:pr`); per-job OAM model/key resolve; task ↔ GitHub Issue two-way sync; roadmap/ideation generators and skip-to-phase; containerized task spawn; board drag-and-drop; stuck/recover; pause/resume.
 
 **Correction (2026-08-04).** An earlier revision of this document downgraded skip-to-phase and the
 roadmap/ideation generators to "not implemented", citing a `builtinMetaNote` placeholder. That was accurate for
@@ -381,7 +373,7 @@ Honorable mentions: parallel job slots, durable ClickHouse job history, analytic
 | Review job action | `run-review` |
 | Spec storage | `$OPM_DATA_DIR/projects/<id>/specs/…` |
 | Enqueue automation | `POST …/jobs` `{ action, specId }` |
-| Merge path | Intended: ephemeral clone → GitHub PR / ORA. Not implemented today (§4.6) |
+| Merge path | Change set → deliver (`scm:pr`) → optional autopilot merge via ORA (§4.6 Done) |
 | Ideation type key | `code_improvements` (underscored) |
 
 ---

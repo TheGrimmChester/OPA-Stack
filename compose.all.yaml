@@ -223,8 +223,6 @@ services:
       OPEN_SERVICE_JWT_SECRET: ${OPEN_SERVICE_JWT_SECRET:-dev-service-jwt-secret-at-least-32b}
       PEER_OPA_URL: http://hub:8080
       PEER_ORA_URL: http://ora:8091
-      PEER_OSA_URL: http://osa:8093
-      PEER_OPL_URL: http://opl:8092
       # With PEER_OAM_URL set, jobs resolve their model AND API key per job from
       # OAM, scoped to the acting user's org and per-agent binding. Unset it and
       # OPM falls back to the deployment-wide OPM_MODEL*/CURSOR_API_KEY path.

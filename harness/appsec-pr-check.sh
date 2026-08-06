@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# Wave 30/34 — PR security check against Agent /v1/security/pr-check (token-gated when set).
+# Wave 30/34 — PR security check against OSA /v1/security/pr-check (token-gated when set).
 set -euo pipefail
-AGENT_URL="${AGENT_URL:-http://127.0.0.1:8080}"
+AGENT_URL="${AGENT_URL:-http://127.0.0.1:8093}"
 TOKEN="${OPA_SECURITY_INGEST_TOKEN:-}"
 SCOPE_ARGS=()
 if [[ -n "${SECURITY_RUN_ID:-}" ]]; then

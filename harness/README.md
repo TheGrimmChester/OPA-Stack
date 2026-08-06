@@ -4,24 +4,25 @@ Local smoke helpers and fixtures for the compose stack (`docker-compose.yaml`).
 
 ## Security features enabled for smoke
 
-Compose turns on practical AppSec knobs so Dashboard Security / OSV / IAST / scanners work without manual env edits:
+AppSec control plane is **OSA** (`osa-api` `:8093`). Smoke routing in `lib/smoke-common.sh`
+sends `/api/security/*`, `/api/vulns/*`, `/api/iast/*` there. Perf Lab is **OPL** (`:8092`).
+ORA (`:8091`) owns SCM/connectors/AI review protocol.
 
 | Where | Enabled |
 |-------|---------|
-| **agent** | `OPA_OSV=1` (`POST /api/security/osv/enrich`), `OPA_SECURITY_MIN_SEVERITY=high`, `OPA_SECURITY_FAIL_OBSERVED=1`. Ingest token / OIDC gate left unset (open local ingest). |
-| **orchestrator** | `OPA_SECURITY_WORKSPACE=/workspace` (fixture mount), gitleaks via image + `OPA_GITLEAKS_CONFIG`, `SKIP_CURSOR_AI=0`, `CURSOR_API_KEY` passed from host when set. |
+| **osa-api** | Security runs, findings, vulns/IAST, AppSec gate (`OSA_HTTP` / `:8093`) |
+| **ora-api** | SCM connectors, review, optional gate wait on OSA; gitleaks workspace when used for review-local scans |
+| **opl-api** | Perf scenarios/runs/JMeter (`PERF_LAB_HTTP` / `:8092`) |
 | **php-cli** | `OPA_IAST=1` / `opa.iast=1` + `OPA_IAST_BLOCK=1` / `opa.iast_block=1` (local smoke only — do not copy block to prod). |
 | **node-app** | `OPA_IAST=1` (parity; opa-node IAST is API/`installHooks`-driven). |
 
-Rebuild Agent from `wave28-30-verticals` (or newer) via `./harness/rebuild-smoke-images.sh` so OSV / AppSec code is in `opa-agent:smoke`.
-
-Optional after recreate — seed SBOM then enrich:
+Optional after recreate — seed SBOM then enrich against **OSA**:
 
 ```bash
-curl -fsS -X POST http://127.0.0.1:8080/v1/sbom \
+curl -fsS -X POST http://127.0.0.1:8093/v1/sbom \
   -H 'Content-Type: application/json' \
   --data-binary @harness/fixtures/sbom.smoke.json
-curl -fsS -X POST http://127.0.0.1:8080/api/security/osv/enrich \
+curl -fsS -X POST http://127.0.0.1:8093/api/security/osv/enrich \
   -H 'Content-Type: application/json' -d '{}'
 ```
 

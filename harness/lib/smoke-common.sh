@@ -17,6 +17,13 @@ if [[ -z "${PERF_LAB_HTTP:-}" ]]; then
     PERF_LAB_HTTP="$AGENT_HTTP"
   fi
 fi
+if [[ -z "${OSA_HTTP:-}" ]]; then
+  if [[ "$AGENT_HTTP" == "http://127.0.0.1:8080" || "$AGENT_HTTP" == "http://localhost:8080" ]]; then
+    OSA_HTTP="http://127.0.0.1:8093"
+  else
+    OSA_HTTP="$AGENT_HTTP"
+  fi
+fi
 ORG_ID="${ORG_ID:-test-org}"
 PROJECT_ID="${PROJECT_ID:-default-project}"
 SMOKE_TIMEOUT_S="${SMOKE_TIMEOUT_S:-5}"
@@ -61,7 +68,10 @@ smoke_base_for_path() {
     /api/perf|/api/perf/*)
       printf '%s' "$PERF_LAB_HTTP"
       ;;
-    /api/scm|/api/scm/*|/api/connectors|/api/connectors/*|/api/ai|/api/ai/*|/api/security/runs|/api/security/runs/*|/api/security/profiles|/v1/scm|/v1/scm/*)
+    /api/security|/api/security/*|/api/vulns|/api/vulns/*|/api/iast|/api/iast/*|/v1/security|/v1/security/*|/v1/sbom|/v1/sbom/*)
+      printf '%s' "$OSA_HTTP"
+      ;;
+    /api/scm|/api/scm/*|/api/connectors|/api/connectors/*|/api/ai|/api/ai/*|/v1/scm|/v1/scm/*)
       printf '%s' "$ORCHESTRATOR_HTTP"
       ;;
     *)

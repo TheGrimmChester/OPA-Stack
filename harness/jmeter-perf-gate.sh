@@ -3,7 +3,7 @@
 # Asserts Docker-first dispatch (mode=docker) unless OPA_PERF_ALLOW_HOST_JMETER=1.
 # Used standalone or as the reference contract for wave-smoke's smoke_wave31.
 set -euo pipefail
-AGENT_URL="${AGENT_URL:-http://127.0.0.1:8080}"
+AGENT_URL="${AGENT_URL:-http://127.0.0.1:8092}"
 RUN_ID="${RUN_ID:-}"
 SCENARIO_ID="${SCENARIO_ID:-}"
 DISPATCH="${DISPATCH:-true}"

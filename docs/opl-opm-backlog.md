@@ -98,63 +98,54 @@ describes itself as a "job scheduler stub" in its own startup log (`OPM-API/main
 nothing; `opm-api` spawns runner containers in-process (`job_runner.go:60-91`). Treat the service name as
 aspirational.
 
-**OPM does not deliver code.** A job clones the repo and discards the clone unused (`job_runner.go:45-50`,
-`_ = workDir`); the only git calls in the service are two `git clone` invocations (`workspace.go:57`, `:69`).
-There is no `git add` / `commit` / `push`, no branch creation, and no pull-request call. "Implementation" flips
-the next plan subtask to `completed` (`job_runner.go:321-341`) and may append to `IMPLEMENTATION_NOTES.md`
-(`model_apply.go:111-135`). Read every OPM bullet below with that in mind.
+**Code delivery is shipped in OPM-API.** Implementation records a change set; `POST …/tasks/{specId}/deliver`
+(and auto-deliver after review PASS) applies it, commits on `opm/<specId>`, pushes via ORA `scm:pr`, and opens
+a PR. Builtin-only runs still produce no source changes. Models/keys resolve from **OAM** when `PEER_OAM_URL`
+is set; `OPM_MODEL_*` is legacy rollback only.
 
 ### Done
 
-- GitHub-linked projects only (no local folder registry); hub orgs + ORA connectors/repos (`store.go:134`, `github_handlers.go:16`)
-- Co-deployed `/hub-auth/`; `PEER_OPA_URL` / `PEER_ORA_URL`; `git` in `opm-api:nas` for ephemeral clones
-- Board + tasks CRUD/move/**DnD** + task action menu; require-review + approve-for-coding; task detail (plan/progress/spec/logs) — `handlers.go:113-136`, `:241-317`; DnD at `Board.jsx:415-448`
-- Roadmap / ideation manual create + inline edit/delete; changelog generate + save (`handlers.go:117-121`)
-- Job executor writes artifacts for planning / implementation / review / QA / changelog (`job_runner.go:128-152`); **container spawn** of `opm-runner-task` when `spawnReady` (`execution: "container"`, builtin fallback)
-- Runner calls a chat-completions endpoint when `OPM_MODEL_API_KEY` is set (`cmd/opm-runner/main.go:69-100`); applied for planning, implementation, and review **only** (`model_apply.go:17-29`)
-- Stuck/recover (`mark-stuck`, `recover-subtask`); pause/resume (`pause-task`, `resume-task`) — `job_runner.go:137-144`
-- **Skip-to-phase** — `handlers.go:429` declares `targetPhase`, `:441-442` rejects a missing or `<1` value with 400, `:451` assigns it; dispatch `job_runner.go:153-154` → `builtinSkipToPhase` (`:930-995`) resolves the phase, marks earlier phases complete, and rewrites `progress.json`. UI at `TaskDetail.jsx:18`/`:311` and `Jobs.jsx:17`/`:100`/`:179`
-- **Roadmap discovery/features and ideation generators** — `job_runner.go:147-152` dispatches `builtinRoadmapDiscovery` (`:714`), `builtinRoadmapFeatures` (`:769`, bootstraps via discovery at `:779`), and `builtinIdeation` (`:844`); each writes real artifacts through `PutRoadmap` / `PutIdeation`. Honest limit: the content is **fixed template text** composed from the project name and board task titles, not model output — the runner carries no prompts for these actions and `model_apply.go:17-29` does not route them, so a model key changes nothing here
-- Jobs list + enqueue + cancel with operator `message`; filesystem project state under `OPM_DATA_DIR`
-- Orchestrator spawn probe (`/api/spawn-probe`) — `spawnReady: true` when docker CLI + daemon + runner image work
-- **GitHub Milestones + Projects v2 bind** — ORA peer `scm:pm`; OPM list/assign/sync; dashboard pickers on Roadmap + task detail; Status sync on board move (best-effort)
-- **Task ↔ GitHub Issue two-way sync** — `…/github/issues/{link,unlink,push,pull}` via ORA peer `scm:pm` (`/api/peer/scm/issues/{get,create,update}`); attach by number or create from task; push title/description/column-state/milestone; pull mirrors state/assignee/labels/milestone and moves the task on the `done`/reopen boundary only. Failures persist on the task (`githubIssueSyncError`) and in the `github-issue-sync` spec log with a machine-readable `status`; title divergence is reported, not silently resolved. Needs only `issues: write`. Dashboard: issue panel on task detail + board badge
+- GitHub-linked projects only (no local folder registry); hub orgs + ORA connector list / repos; credentials stored in OAM
+- Co-deployed `/hub-auth/`; `PEER_OPA_URL` / `PEER_ORA_URL` / `PEER_OAM_URL`; `git` in `opm-api:nas` for ephemeral clones
+- Board + tasks CRUD/move/**DnD** + task action menu; require-review + approve-for-coding; task detail (plan/progress/spec/logs)
+- Roadmap / ideation manual create + inline edit/delete; changelog generate + save
+- Job executor writes artifacts for planning / implementation / review / QA / changelog; **container spawn** of `opm-runner-task` when `spawnReady`
+- Per-job model + API key from OAM (`creds:resolve`) when `PEER_OAM_URL` set; legacy `OPM_MODEL_API_KEY` when unset
+- Stuck/recover; pause/resume; **skip-to-phase**
+- Repo-aware / model-backed roadmap discovery/features and ideation (builtin template fallback when no model)
+- Jobs list + enqueue + cancel; filesystem project state under `OPM_DATA_DIR`
+- Orchestrator spawn probe (`/api/spawn-probe`)
+- **GitHub Milestones + Projects v2 bind** — ORA peer `scm:pm`
+- **Task ↔ GitHub Issue two-way sync** — ORA peer `scm:pm`
+- **Code delivery** — apply change set, branch, push, open/merge PR via ORA `scm:pr`; auto-deliver after review PASS
 
 ### Not implemented
 
-- **Code delivery / pull requests from a task** — the largest real gap. Jobs never modify the clone
-  (`job_runner.go:45-50`); a positive-control search over all of OPM-API finds exactly two `exec.Command…("git"…)`
-  hits, both `git clone` (`workspace.go:57`, `:69`)
-- **Orchestrator dispatch + container reaping** — stub only (`main.go:114`); whole function read from the
-  `origin/main` blob
-- **Projects v2 draft-item title refresh** — `ORA-API/github_projects.go:294-302` returns `nil` without calling
-  the API and the caller discards the error (`peer_scm_pm.go:268`), so renaming a task reports success and never
-  reaches the board
-- **Model-backed roadmap / ideation** — the generators ship but emit fixed template text (see Done)
+- **Orchestrator dispatch + container reaping** — stub only (`main.go:114`); `opm-api` owns spawn
+- **PR state tracking** — `prState` is a snapshot at open time; no webhook/poll
+- **ORA review deep-link** — task `run-review` is an OPM agent phase, not Repo Watch
+- **Live-stack delivery verification** — covered by stub-ORA tests; exercise against a real GitHub App on NAS still outstanding
 
 ### Next
 
-- Give jobs a code-delivery path (branch + commit + pull request), or state plainly in the product that OPM
-  orchestrates planning and tracking rather than producing changes
-- Make the Projects v2 title-refresh no-op either work or report an error
-- Wire roadmap/ideation generation into the runner so it responds to the project, not a template table
-- **Deploy**: several capabilities above are merged in code and not yet on the deployed stack; a rebuild is
-  needed before any of them can be described as live
+- Live-stack verify delivery + OAM resolve on NAS after `*:nas` rebuild
+- Poll or webhook PR state via ORA
+- Deep-link to ORA for Repo Watch / check-runs (do not duplicate inside OPM)
+- **Deploy**: rebuild/redeploy when stack images lag `main`
 
 ### Later
 
-- Issue sync follow-ups: candidate-issue picker (`GET …/issues`) so attach is not number-entry only; issue comments ↔ task discussion; webhook-driven refresh (through ORA, like other SCM webhooks) instead of poll-only; multi-assignee mirroring
+- Issue sync follow-ups: candidate-issue picker; issue comments ↔ task discussion; webhook-driven refresh; multi-assignee mirroring
 - Multi-repo portfolio views
 - Durable job/history store (ClickHouse or equivalent) instead of filesystem-only
-- Deep-link to ORA for review — do not duplicate Repo Watch inside OPM
-- Insights / context / live terminals; pre-merge quality gates
+- Insights / context / live terminals; pre-merge quality gates (OSA/OPL)
 
 ---
 
 ## Related
 
 - [Products](products.md) — port table and ownership
-- [Interop](interop.md) — hub-auth, tenant headers, OPM ↔ hub/ORA
+- [Interop](interop.md) — hub-auth, tenant headers, OPM ↔ hub/OAM/ORA
 - [NAS deploy](nas-deploy.md) — `*:nas` images and verify curls
 - [OPL load lab capabilities](opl-lab-capabilities.md) — Done / On a branch, not merged / Missing / Different-by-design + flagship visual editor gap
 - [OPM project manager capabilities](opm-pm-capabilities.md) — Done / On a branch, not merged / Not implemented / Different-by-design inventory + top gaps

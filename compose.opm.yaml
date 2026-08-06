@@ -11,13 +11,13 @@ services:
       JWT_SECRET: ${JWT_SECRET:-}
       OPEN_SERVICE_JWT_SECRET: ${OPEN_SERVICE_JWT_SECRET:-}
       PEER_OPA_URL: ${PEER_OPA_URL:-}
+      PEER_OAM_URL: ${PEER_OAM_URL:-}
       PEER_ORA_URL: ${PEER_ORA_URL:-}
-      PEER_OSA_URL: ${PEER_OSA_URL:-}
-      PEER_OPL_URL: ${PEER_OPL_URL:-}
       OPM_RUNNER_TAG: ${OPM_RUNNER_TAG:-smoke}
       OPM_DATA_DIR: ${OPM_DATA_DIR:-/data}
       OPM_JOB_TMP: ${OPM_JOB_TMP:-/tmp/opm-jobs}
-      # GitHub credentials stay on ora-api (OPA_GITHUB_APP_* / PAT connectors).
+      # Connector/AI credential storage is OAM; ORA runs GitHub App/PAT protocol
+      # (OPA_GITHUB_APP_* / short-lived clone+PR credentials).
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
 

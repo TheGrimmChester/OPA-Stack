@@ -89,7 +89,7 @@ One ClickHouse server can host all products. Each service sets its own database:
 | OPL | `opl` |
 | OAM | `oam` |
 
-`compose.all.yaml` creates all four databases on first boot (`clickhouse/init-databases.sql`). Solo profiles create the same init script so a shared server stays consistent. Prefer `CLICKHOUSE_DB`; `CLICKHOUSE_DATABASE` is an accepted alias.
+`compose.all.yaml` creates all **five** databases on first boot (`clickhouse/init-databases.sql`: `opa`, `ora`, `osa`, `opl`, `oam`). OPM has no ClickHouse DB (filesystem under `OPM_DATA_DIR`). Solo profiles create the same init script so a shared server stays consistent. Prefer `CLICKHOUSE_DB`; `CLICKHOUSE_DATABASE` is an accepted alias.
 
 ### Legacy hub `opa.*` product tables
 
@@ -237,4 +237,4 @@ On NAS (`open-family`), `ORA_PUBLIC_URL` / `OPA_PUBLIC_URL` currently share the 
 
 ## All-in-one compose
 
-See [`compose.all.yaml`](../compose.all.yaml): one ClickHouse, databases `opa`/`ora`/`osa`/`opl`, shared `JWT_SECRET`, hub-issued tokens (`AUTH_MODE=codeployed`). Product dashboards use the `/hub-auth/` nginx bridge for browser login. Lab seed user is `admin` / `admin`.
+See [`compose.all.yaml`](../compose.all.yaml): one ClickHouse, databases `opa`/`ora`/`osa`/`opl`/`oam` (OPM uses filesystem only), shared `JWT_SECRET`, hub-issued tokens (`AUTH_MODE=codeployed`). Product dashboards use the `/hub-auth/` nginx bridge for browser login. Lab seed user is `admin` / `admin`.

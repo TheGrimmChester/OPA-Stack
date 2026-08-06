@@ -75,3 +75,51 @@ RUN apt-get update \
 USER 65532:65532
 WORKDIR /home/opa
 CMD ["sleep", "infinity"]
+
+# AI runner: Cursor agent + Playwright (required for OPA Review sandbox docker runs).
+FROM debian:bookworm-slim AS ora-runner-ai
+ARG TARGETARCH
+ARG PLAYWRIGHT_VERSION=1.50.1
+ARG PLAYWRIGHT_MCP_VERSION=0.0.28
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends \
+      ca-certificates curl wget git bash \
+      nodejs npm \
+      libnss3 libnspr4 libatk1.0-0 libatk-bridge2.0-0 libcups2 libdrm2 \
+      libdbus-1-3 libxkbcommon0 libxcomposite1 libxdamage1 libxfixes3 \
+      libxrandr2 libgbm1 libasound2 libpango-1.0-0 libcairo2 libatspi2.0-0 \
+      libx11-6 libx11-xcb1 libxcb1 libxext6 libglib2.0-0 libgtk-3-0 \
+      libxcb-shm0 libxshmfence1 libegl1 libxcursor1 libxi6 libxtst6 \
+      fonts-liberation fonts-noto-color-emoji \
+ && rm -rf /var/lib/apt/lists/* \
+ && node -v && npm -v \
+ && mkdir -p /opt/opa /opt/ms-playwright /home/opa \
+ && (NO_COLOR=1 curl -fsS https://cursor.com/install | bash \
+      && test -x /root/.local/bin/agent \
+      && AGENT_REAL="$(readlink -f /root/.local/bin/agent)" \
+      && test -n "$AGENT_REAL" && test -x "$AGENT_REAL" \
+      && AGENT_DIR="$(dirname "$AGENT_REAL")" \
+      && rm -rf /opt/opa/cursor-agent-dist \
+      && cp -a "$AGENT_DIR" /opt/opa/cursor-agent-dist \
+      && ln -sfn /opt/opa/cursor-agent-dist/$(basename "$AGENT_REAL") /opt/opa/agent \
+      && ln -sfn /opt/opa/agent /opt/opa/cursor-agent \
+      && chmod -R a+rX /opt/opa/cursor-agent-dist \
+      && chmod 0755 /opt/opa/agent \
+      && test -x /opt/opa/agent) \
+ || (echo "ERROR: Cursor Agent CLI required for ora-runner-ai" >&2; exit 1) \
+ && PLAYWRIGHT_BROWSERS_PATH=/opt/ms-playwright \
+      npx --yes "playwright@${PLAYWRIGHT_VERSION}" install-deps chromium \
+ && PLAYWRIGHT_BROWSERS_PATH=/opt/ms-playwright \
+      npx --yes "playwright@${PLAYWRIGHT_VERSION}" install chromium \
+ && npm install -g "@playwright/mcp@${PLAYWRIGHT_MCP_VERSION}" \
+ && chown -R 65532:65532 /home/opa /opt/ms-playwright \
+ && rm -rf /root/.npm /tmp/* /root/.local \
+ && test -x /opt/opa/agent \
+ && (/opt/opa/agent --help >/dev/null 2>&1 || /opt/opa/agent --version >/dev/null 2>&1 || true)
+ENV PATH="/opt/opa:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" \
+    PLAYWRIGHT_BROWSERS_PATH=/opt/ms-playwright \
+    NO_OPEN_BROWSER=1 \
+    HOME=/home/opa
+USER 65532:65532
+WORKDIR /home/opa
+CMD ["sleep", "infinity"]
