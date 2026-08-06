@@ -361,6 +361,8 @@ services:
       OPA_GITHUB_APP_SLUG: ${OPA_GITHUB_APP_SLUG:-ora}
       OPA_GITHUB_APP_PRIVATE_KEY: ${OPA_GITHUB_APP_PRIVATE_KEY}
       OPA_GITHUB_WEBHOOK_SECRET: ${OPA_GITHUB_WEBHOOK_SECRET}
+      # Dedicated install-state HMAC (≥16). Distinct from JWT_SECRET and OPEN_SERVICE_JWT_SECRET.
+      OPA_GITHUB_INSTALL_STATE_SECRET: ${OPA_GITHUB_INSTALL_STATE_SECRET:-}
       OPA_SCM_ALLOW_UNSIGNED: ${OPA_SCM_ALLOW_UNSIGNED:-0}
       OPA_PUBLIC_URL: ${OPA_PUBLIC_URL:-https://ai-orchestrator.clouded.fr}
       ORA_PUBLIC_URL: ${ORA_PUBLIC_URL:-https://ai-orchestrator.clouded.fr}
@@ -609,6 +611,9 @@ services:
       # undecryptable (it fails closed and logs — it never returns garbage).
       OAM_SECRET_KEY: ${OAM_SECRET_KEY:-${OPA_CONNECTOR_SECRET}}
       PEER_OPA_URL: http://hub:8080
+      # Discovers installable GitHub repos for directory project import
+      # (GET /api/projects/discovered → ORA GET /api/connectors/{id}/repos).
+      PEER_ORA_URL: http://ora-api:8091
     ports:
       - "18090:8090"
     networks:
@@ -675,9 +680,8 @@ services:
       OPM_MODEL_IDEATION: ${OPM_MODEL_IDEATION:-auto}
       OPM_MODEL_ROADMAP_DISCOVERY: ${OPM_MODEL_ROADMAP_DISCOVERY:-auto}
       OPM_MODEL_ROADMAP_FEATURES: ${OPM_MODEL_ROADMAP_FEATURES:-auto}
-      # internal+proxy: per-job sealed network + open-egress-proxy (ORA sentinel).
-      # OPM spawn must interpret this like ORA job_proxy — until then, override
-      # OPM_RUNNER_NETWORK=bridge as break-glass only.
+      # internal+proxy: per-job sealed network + open-egress-proxy (implemented in OPM spawn).
+      # Break-glass: OPM_RUNNER_NETWORK=bridge (full host egress — admin only).
       OPM_RUNNER_NETWORK: ${OPM_RUNNER_NETWORK:-internal+proxy}
       # Connector storage is OAM; GitHub App/PAT protocol + short-lived SCM creds are on ora-api.
       # OPM discovers orgs via PEER_OPA_URL, models/keys via PEER_OAM_URL, SCM via PEER_ORA_URL.
