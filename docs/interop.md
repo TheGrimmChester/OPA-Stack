@@ -279,6 +279,10 @@ POST /api/agents/resolve   (service JWT, scope creds:resolve)
 Model resolution: `task override → user → org → product default → family default`.
 The family default is `cli_cursor` / `auto`, which is what every product runs
 today, so adopting OAM changes no behaviour until someone sets an override.
+Endpoint kinds include `cli_qwen_code` (Qwen Code CLI) alongside `cli_cursor`,
+`cli_claude_code`, and the HTTP providers — register a Qwen account on **AI
+Endpoints** and set an explicit model on **Agents & Models** (`cli_qwen_code`
+does not support `auto`).
 Credential resolution: `user → org → fail closed` — never an admin key, never a
 process environment variable. A job whose org has no credential fails with
 `credential_unavailable` rather than borrowing a deployment-wide key.

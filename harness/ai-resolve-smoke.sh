@@ -20,6 +20,7 @@
 #   - model precedence: per-task override > org binding > family default
 #   - org isolation: one org's key/model never resolves for another, and an
 #     org-pinned service token overrides a body that asks for a different org
+#   - cli_qwen_code endpoint registration resolves through the candidate list
 set -u
 export PATH="/usr/bin:/bin:/usr/sbin:/sbin:/usr/local/bin:/opt/homebrew/bin:${PATH:-}"
 
@@ -234,6 +235,18 @@ expect_code "acme unchanged by globex write" 200 POST "$OAM/api/agents/resolve" 
 expect_field "acme still its own key" api_key crsr-acme-secret-key
 
 ########################################################################
+sec "9b. cli_qwen_code endpoint resolve"
+expect_code "register acme qwen endpoint" 200 POST "$OAM/api/ai/endpoints/set" -H "$JSON" \
+  -H "X-Organization-ID: acme" \
+  -d '{"id":"qwen-smoke","label":"Qwen smoke","kind":"cli_qwen_code","scope":"org","base_url":"https://dashscope.aliyuncs.com/compatible-mode/v1","priority":10,"value":"qwen-smoke-secret-key"}'
+expect_code "resolve qwen via binding override" 200 POST "$OAM/api/agents/resolve" -H "$JSON" \
+  -H "Authorization: Bearer $TOK" \
+  -d '{"organization_id":"acme","product":"opm","agent_key":"run-implementation","override":{"provider":"cli_qwen_code","model":"qwen3-coder-plus"}}'
+expect_field "qwen endpoint kind in candidates" candidates.0.kind cli_qwen_code
+expect_field "qwen endpoint credential returned" candidates.0.api_key qwen-smoke-secret-key
+expect_field "qwen model from override" model qwen3-coder-plus
+
+########################################################################
 sec "10. AI runtime present in job images"
 for img in ora-api:smoke opm-api:smoke; do
   if docker image inspect "$img" >/dev/null 2>&1; then
@@ -244,6 +257,15 @@ for img in ora-api:smoke opm-api:smoke; do
     fi
   else
     bad "$img" "image missing"
+  fi
+done
+for img in ora-api:smoke opm-runner-task:smoke ora-runner-ai:smoke; do
+  if docker image inspect "$img" >/dev/null 2>&1; then
+    if docker run --rm --entrypoint sh "$img" -c 'command -v qwen' >/dev/null 2>&1; then
+      ok "$img carries the Qwen Code CLI"
+    else
+      printf '  NOTE  %s has no qwen on PATH (cli_qwen_code jobs would need it at job time)\n' "$img"
+    fi
   fi
 done
 

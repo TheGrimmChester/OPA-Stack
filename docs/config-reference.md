@@ -46,8 +46,9 @@ Configure it in the OAM console's **Agents & Models** page —
 
 An organisation or user registers **many** AI endpoints — OpenAI-compatible and
 Anthropic-compatible APIs (official or not), several Cursor accounts, Claude Code,
-or any other agent CLI — each with its own credential, in a user-sortable priority
-order. Manage them on the console's **AI Endpoints** page.
+Qwen Code CLI (`cli_qwen_code`), or any other agent CLI — each with its own
+credential, in a user-sortable priority order. Manage them on the console's
+**AI Endpoints** page.
 
 A job resolves the top `OAM_RESOLVE_MAX_CANDIDATES` of that order and walks them:
 on a 429, an unreachable host or a bad key it advances to the next. Failover

@@ -53,6 +53,18 @@ RUN apt-get update \
       && ln -sf /root/.local/bin/agent /usr/local/bin/agent \
       && ln -sf /root/.local/bin/cursor-agent /usr/local/bin/cursor-agent) \
     || echo "WARN: Cursor Agent CLI install skipped" \
+ && (QWEN_INSTALL_VERSION=0.21.6 \
+     QWEN_INSTALL_ROOT=/opt/qwen \
+     QWEN_INSTALL_LIB_PARENT=/opt/qwen/lib \
+     QWEN_INSTALL_BIN_DIR=/usr/local/bin \
+     QWEN_NO_MODIFY_PATH=1 \
+     QWEN_INSTALL_METHOD=standalone \
+     NO_COLOR=1 curl -fsS \
+       https://qwen-code-assets.oss-cn-hangzhou.aliyuncs.com/installation/install-qwen-standalone.sh \
+     | bash -s -- --method standalone --no-modify-path \
+     && test -x /usr/local/bin/qwen \
+     && chmod -R a+rX /opt/qwen) \
+    || echo "WARN: Qwen Code CLI install skipped" \
  && npx --yes "playwright@${PLAYWRIGHT_VERSION}" install-deps chromium \
  && npx --yes "playwright@${PLAYWRIGHT_VERSION}" install chromium \
  && rm -rf /root/.npm /tmp/*
@@ -107,6 +119,18 @@ RUN apt-get update \
       && chmod 0755 /opt/opa/agent \
       && test -x /opt/opa/agent) \
  || (echo "ERROR: Cursor Agent CLI required for ora-runner-ai" >&2; exit 1) \
+ && (QWEN_INSTALL_VERSION=0.21.6 \
+     QWEN_INSTALL_ROOT=/opt/qwen \
+     QWEN_INSTALL_LIB_PARENT=/opt/qwen/lib \
+     QWEN_INSTALL_BIN_DIR=/usr/local/bin \
+     QWEN_NO_MODIFY_PATH=1 \
+     QWEN_INSTALL_METHOD=standalone \
+     NO_COLOR=1 curl -fsS \
+       https://qwen-code-assets.oss-cn-hangzhou.aliyuncs.com/installation/install-qwen-standalone.sh \
+     | bash -s -- --method standalone --no-modify-path \
+     && test -x /usr/local/bin/qwen \
+     && chmod -R a+rX /opt/qwen) \
+    || echo "WARN: Qwen Code CLI install skipped" \
  && PLAYWRIGHT_BROWSERS_PATH=/opt/ms-playwright \
       npx --yes "playwright@${PLAYWRIGHT_VERSION}" install-deps chromium \
  && PLAYWRIGHT_BROWSERS_PATH=/opt/ms-playwright \
