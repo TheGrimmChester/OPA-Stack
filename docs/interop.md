@@ -165,9 +165,18 @@ Sensitive cache values and ClickHouse credential columns use **Open-Crypto-Go** 
 
 ### Runner isolation
 
-`REDIS_URL` is **denylisted** from job sandbox env (ORA `job_env.go` today; **Open-Job-Env-Go** after extraction). Job containers run on sealed `opa-job-*` networks with no route to `redis-*`. Verify with `job_env_test.go` / runner network tests — a job box must not resolve `redis-osa` or reach ClickHouse.
+`REDIS_URL` is **denylisted** from job sandbox env via **Open-Job-Env-Go** (and Open-Job-Go `ScrubEnv`). Job containers run on sealed `opa-job-*` networks with no route to `redis-*`. Verify with `job_env_test.go` / runner network tests — a job box must not resolve `redis-osa` or reach ClickHouse.
 
-NAS defaults (`compose.nas.yaml`): `OPA_JOB_SANDBOX=docker` on ora-api/osa-api; `OPM_RUNNER_NETWORK=internal+proxy` on opm-api (OPM spawn must interpret this sentinel like ORA — see [nas-deploy.md](nas-deploy.md)). Break-glass: `OPA_JOB_SANDBOX=off`, `OPM_RUNNER_NETWORK=bridge`.
+NAS defaults (`compose.nas.yaml`): `OPA_JOB_SANDBOX=docker` on ora-api/osa-api; `OPM_RUNNER_NETWORK=internal+proxy` on opm-api (per-job sealed net + egress proxy). Break-glass: `OPA_JOB_SANDBOX=off`, `OPM_RUNNER_NETWORK=bridge`.
+
+### Job tokens and credential leases
+
+- **Job tokens** (`sub=job`): short-lived peer JWTs minted via OAM `POST /api/internal/job-tokens/mint`, revoked on job end. Validated like service JWTs (`aud`/`scope`) plus optional jti allowlist.
+- **Credential leases**: OAM `POST /api/internal/job-credentials/lease` → one-shot `redeem` so plaintext model keys are not held longer than needed. OPM prefers lease→redeem and falls back to `/api/agents/resolve`.
+
+### Adversarial-AI assumption
+
+Treat the job agent as an attacker with shell access. Only pass **user/org-owned** data for the acting principal; never platform secrets, `REDIS_URL`, or cross-tenant material. See [ORA job isolation](../../ORA-API/docs/job-isolation.md) and [OPM security](../../OPM-API/docs/security.md).
 
 ## Service-to-service
 
@@ -226,6 +235,10 @@ Products opt in when `PEER_<PRODUCT>_URL` is set on ORA. Unconfigured peers are 
 |------|------------|-------------|-------|
 | **GitHub App** | App installation under OAM org | `{ORA_PUBLIC_URL}/v1/scm/github/webhook` | Check Runs when token allows; OAM-scoped install state |
 | **Repository hooks** | PAT under OAM org (`admin:repo_hook` or fine-grained equivalent) | `{ORA_PUBLIC_URL}/v1/scm/github/webhook/{connector_id}` | Per-repo encrypted secret on `watched_repos`; events `pull_request`, `push` |
+
+**GitHub App → Open tenant bind:** start install from ORA (org Open session) so ORA mints a signed install `state` (`org`/`proj`/`user`). That is the primary bind — no separate “link GitHub account” product step. Marketplace/orphan installs without valid state stay `pending_claim` (invisible to lists/peers) and redirect once with a one-time `claim_token`; org admin claims via `POST /api/connectors/{id}/claim` `{ "claim_token": "…" }` into their JWT org. Personal accounts cannot install-url or claim (**400**). Peer resolve fail-closed: active + matching non-empty `org_id` only. Never map Open tenancy from GitHub `account_login` equality or silent `default-org`.
+
+**Picker surfaces:** ORA `GET /api/connectors`, OPM/OSA `GET /api/github/connectors` (re-filter active/same-org), OAM directory `GET /api/connectors` (actor org; `all_organizations=1` only for unbound platform admin). Dashboards must not show pending/foreign rows. See [security-tenant-scopes.md](security-tenant-scopes.md#github-connector-lists-all-pickers).
 
 Both routes share the same unified pipeline: verify → tenant resolve → build SCM envelope → parallel fan-out to configured peers → aggregate checker results → publish GitHub statuses.
 

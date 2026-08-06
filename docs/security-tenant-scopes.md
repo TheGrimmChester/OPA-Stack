@@ -148,6 +148,33 @@ HOST=192.168.100.101 ./harness/security-tenant-matrix.sh
 #   CHECK_IMAGES=1 SSHPASS=… HOST=192.168.100.101 ./harness/security-tenant-matrix.sh
 ```
 
+## GitHub connector lists (all pickers)
+
+GitHub App connectors are **org-bound** (signed install `state` or one-time claim nonce). Every product picker must only show **active** connectors for the caller’s Open org. `pending_claim` / empty-org rows are invisible until claimed.
+
+| Product | List endpoint | Upstream | Isolation |
+|---------|---------------|----------|-----------|
+| **ORA** | `GET /api/connectors` | Live / CH | User + service JWT: active + matching org only; foreign get → **404**; pendings hidden |
+| **OAM** | `GET /api/connectors` | Directory (`oam.connectors`) | Forced to actor org; foreign `?organization_id=` → **403**; platform admin cross-org only with `all_organizations=1` |
+| **OPM** | `GET /api/github/connectors` | Peer service JWT → ORA | Re-filters active/same-org; `POST /api/projects` with foreign `connectorId` → **404**, pending → **403** |
+| **OSA** | `GET /api/github/connectors` | Proxy user JWT → ORA | Re-filters active/same-org; create/discovery/rescan with foreign `connector_id` → **403** |
+
+Picker UIs (ORA Connectors / Watch, OPM Projects, OSA Runs/Repos) must not render pending or foreign rows even if an API regresses. OAM Connectors UI stays unwired (or nginx routes mutations to ORA) — no second install/claim path.
+
+**Install / claim / peer:**
+
+- Install from an Open **organization** session (`GET …/install-url`); personal accounts → **400**.
+- Marketplace/orphan callback mints a one-time `claim_token` (hash stored); `POST /api/connectors/{id}/claim` `{ "claim_token": "…" }` — wrong nonce **403**, double claim **409**, personal **400**.
+- Peer resolve (`clone` / PM / PR): fail closed — require `status=active` and non-empty matching `org_id` (**403** otherwise).
+
+```bash
+# Connector list scopes (wrong org must never return another tenant’s installs)
+curl -sf "http://$HOST:8091/api/connectors" "${WRONG[@]}" | jq '.connectors | length'   # 0
+curl -sf "http://$HOST:18090/api/connectors" "${WRONG[@]}" | jq '.connectors | length'  # 0 or 403
+curl -sf "http://$HOST:8096/api/github/connectors" "${WRONG[@]}" | jq '.connectors | length'  # 0
+curl -sf "http://$HOST:8093/api/github/connectors" "${WRONG[@]}" | jq '.connectors | length'  # 0
+```
+
 ## Pass criteria
 
 - Every protected route above returns **401** without JWT.
@@ -160,6 +187,7 @@ HOST=192.168.100.101 ./harness/security-tenant-matrix.sh
 - OPM `GET /api/projects/{id}` (+ board/jobs/tasks/status) with a foreign org header returns **404**, not the default-org project.
 - OSA `GET /api/security/runs/{id}` returns **401** without JWT.
 - `POST /api/peer/scm/clone-credentials` rejects hub user JWTs (**401**).
+- Connector lists (ORA / OAM / OPM / OSA) never return another org’s installs; OAM bare admin GET is not an unfiltered dump.
 - Running containers for hub / ora-api / osa-api / opl-api / opm-api resolve to **`*:nas`** image names (never `*:smoke`).
 
 ## NAS verification (2026-08-04)
@@ -186,6 +214,7 @@ Family harness: **56 PASS / 0 FAIL**. Sibling ORA/OSA curl matrix reported **13/
 
 - **Per-user project ACLs (hub + peers + Open-Auth-Go):** JWT `project_ids` allowlist. Hub middleware and product `Gate.Middleware` (`AuthMiddleware`) call `EnforceProjectACL` after `ApplyUserTenantHeaders`. Role `admin` sees all org projects; lab seed `admin`/`admin` stays unbound. No second membership store — hub-minted claims only.
 - Prefer always sending concrete `X-Organization-ID` / `X-Project-ID` from dashboards and scripts.
+- **Webhook-only orphan installs:** an install that arrives only via GitHub webhook (no browser callback) may create `pending_claim` **without** a one-time `claim_token` in a redirect. Those rows stay invisible until a callback/claim path issues a nonce — operators must re-run install-from-Open or use a future admin reclaim flow.
 
 ### Adoption notes (ORA / OSA / OPL / OPM) — done
 
