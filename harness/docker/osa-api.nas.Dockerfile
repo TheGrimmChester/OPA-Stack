@@ -37,7 +37,7 @@ FROM debian:bookworm-slim AS osa-api
 ARG TARGETARCH
 ARG GITLEAKS_VERSION=8.30.0
 RUN apt-get update \
- && apt-get install -y --no-install-recommends ca-certificates wget \
+ && apt-get install -y --no-install-recommends ca-certificates git wget \
  && rm -rf /var/lib/apt/lists/* \
  && arch="$TARGETARCH" \
  && case "$arch" in amd64|x86_64) gl_arch=x64 ;; arm64|aarch64) gl_arch=arm64 ;; *) gl_arch=x64 ;; esac \
