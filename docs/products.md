@@ -4,9 +4,9 @@ The Open-* family is five optional products plus a shared account plane and shar
 
 | Short | Full name | Control plane | Dashboard | Owns |
 |-------|-----------|---------------|-----------|------|
-| **OAM** | Open Account Manager | `oam-api` | `oam-dashboard` | Shared account plane: organizations, projects, users/RBAC, **family login** (`iss=oam-api`), connector **storage**, API keys, AI provider credentials, per-agent model bindings |
+| **OAM** | Open Account Manager | `oam-api` | `oam-dashboard` | Shared account plane: organizations, projects (directory + **per-product access** on `/projects`), users/RBAC, **family login** (`iss=oam-api`), connector **storage + management UI** (`/connectors`), API keys, AI provider credentials, per-agent model bindings |
 | **OPA** | Open Profiling Agent | `opa-hub` (central) + `opa-agent` (edge) | `opa-dashboard` | Observability only: edge ingest, hub registry/query/auth, APM, RUM, metrics, alerts/SLOs, synthetics |
-| **ORA** | Open Review Agent | `ora-api` + `ora-orchestrator` | `ora-dashboard` | Repo Watch, GitHub App/PAT **protocol** (install, clone/push/PR, issues), automated code review, review check-runs, coding agents |
+| **ORA** | Open Review Agent | `ora-api` + `ora-orchestrator` | `ora-dashboard` | Repo Watch, GitHub App/PAT **protocol** (install/callback/clone/push/PR via peer when OAM is home), automated code review, review check-runs, coding agents |
 | **OSA** | Open Security Agent | `osa-api` + `osa-orchestrator` | `osa-dashboard` | AppSec findings (secrets/SAST/IaC), security runs, vulns/IAST, AppSec CI gates |
 | **OPL** | Open Perf Lab | `opl-api` + `opl-orchestrator` | `opl-dashboard` | Load scenarios, runs, HAR/JMX, Docker JMeter, optional OPA correlation |
 | **OPM** | Open Project Manager | `opm-api` + `opm-orchestrator` | `opm-dashboard` | Multi-project registry, kanban, roadmaps, ideation, task specs/plans, task-automation jobs |

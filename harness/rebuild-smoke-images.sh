@@ -161,10 +161,13 @@ fi
 if wants oam-api || wants all; then
   need OAM-API
   need Open-Auth-Go
+  need Open-Client-Go
   need Open-Tenant-Go
   need Open-ClickHouse-Go
   need Open-HTTP-Go
   need Open-Logger-Go
+  need Open-Cache-Go
+  need Open-Crypto-Go
   if [[ -f "$DOCKER_DIR/oam-api.nas.Dockerfile" ]]; then
     build_df oam-api.nas.Dockerfile "oam-api:$TAG" --target oam-api
   else
@@ -204,6 +207,7 @@ if wants dashboards || wants all; then
       echo "==> Building ${image}:$TAG (PRODUCT=$product)"
       docker build -f "$DOCKER_DIR/dashboard.nas.Dockerfile" \
         --build-arg "PRODUCT=$product" \
+        --build-arg "VITE_OAM_URL=http://127.0.0.1:8097" \
         -t "${image}:$TAG" \
         "$FAMILY_ROOT"
     done

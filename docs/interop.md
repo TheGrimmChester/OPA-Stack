@@ -10,17 +10,33 @@ Products are **optional peers**. No hard dependency at boot. An empty peer URL d
 | **Co-deployed** | Shared `JWT_SECRET`; **OAM** issues user JWTs (`iss=oam-api`) when `PEER_OAM_URL` is set; hub validates and proxies login; ORA/OSA/OPL/OPM validate | `AUTH_MODE=codeployed`, set `PEER_OPA_URL` and `PEER_OAM_URL` |
 | **CI** | Product tokens (not `JWT_SECRET`) | Pipeline secrets |
 
-Headers: `Authorization: Bearer <user-jwt>`, **`X-Organization-ID`**, **`X-Project-ID`**.
+Headers: `Authorization: Bearer <user-jwt>`, **`X-Organization-ID`**, **`X-Project-ID`** (single), and optionally list-only **`X-Project-IDs`**.
 
 ### Tenant headers (required when auth is on)
 
 Full curl matrix (no JWT → 401, wrong org → empty/403, co-deployed local login → 503): [security-tenant-scopes.md](security-tenant-scopes.md). Harness: `HOST=192.168.100.101 ./harness/security-tenant-matrix.sh`.
 
-When `OPA_AUTH_REQUIRED=1` (NAS default on hub + ORA/OSA/OPL/OPM), Open-Tenant scopes ClickHouse list queries to the org/project in those headers. **Omit either header** (or send the picker marker `"all"`, which is stripped) and list endpoints scope to **`default-org` / `default-project`** — the same write tenant used for INSERT — not an empty array. They still return HTTP 200 (not `401`/`403`). Rows written under another tenant (e.g. `nas` / `infra`) stay invisible until you send those headers.
+When `OPA_AUTH_REQUIRED=1` (NAS default on hub + ORA/OSA/OPL/OPM), Open-Tenant scopes ClickHouse list queries to the org/project in those headers. **Omit either header** (or send the picker marker `"all"` on **`X-Project-ID`**, which is stripped) and list endpoints scope to **`default-org` / `default-project`** — the same write tenant used for INSERT — not an empty array. They still return HTTP 200 (not `401`/`403`). Rows written under another tenant (e.g. `nas` / `infra`) stay invisible until you send those headers.
 
-Always prefer sending both headers with the OAM-issued JWT. Canonical names (case-insensitive): `X-Organization-ID`, `X-Project-ID`. Query fallbacks `organization_id` / `project_id` work the same. The `"all"` picker marker is stripped under auth and does not widen scope to every tenant (Open-Tenant-Go ≥ 0.2.2 aligns missing/`all` with `WriteTenant` defaults).
+Always prefer sending org + project headers with the OAM-issued JWT. Canonical names (case-insensitive): `X-Organization-ID`, `X-Project-ID`. Query fallbacks `organization_id` / `project_id` work the same. The `"all"` picker marker on **`X-Project-ID`** is stripped under auth and does **not** widen scope to every tenant (Open-Tenant-Go ≥ 0.2.2 aligns missing/`all` with `WriteTenant` defaults). That meaning is unchanged — dashboards must **not** send `X-Project-ID: all` to mean “every enabled project.”
+
+**List multi-select (`X-Project-IDs`):** for list/read endpoints only, clients may send `X-Project-IDs: id1,id2,…` (comma-separated, cap **32**). Open-Tenant-Go turns that into `project_id IN (…)`; Open-Auth-Go ACL-checks every id. Keep **`X-Project-ID` single-valued** for writes and for exactly-one selection. Writes ignore the multi header. UI “All projects” stamps `X-Project-IDs` with the **enabled + allowlisted** OAM directory ids for the current product (same cap) — see [Family project switcher](#family-project-switcher-oam-directory).
 
 **Account types (immutable):** users are created as `personal` or `organization` in OAM and the type never changes. **Personal** accounts have empty JWT `org_id`; org headers (`X-Organization-ID` other than `"all"`) are rejected (**403**). **Organization** accounts carry a fixed JWT `org_id`; a mismatched org header is rejected (**403**). Headers select project within the JWT org only — they do not switch organizations. See [security-tenant-scopes.md](security-tenant-scopes.md#account-types-jwt-bound-tenancy).
+
+### Family project switcher (OAM directory)
+
+Every Open dashboard’s project menu lists **OAM directory** projects (`oam.projects`) — the same registry as OAM Dashboard `/projects`. The switcher is **always shown** (including personal accounts). Open-UI-JS `ProjectScopeMenu` + `projectScopeHeaders` implement All + checkbox multi-select; selection state is `'all' | string[]`.
+
+| Concern | Owner |
+|---------|-------|
+| Directory list + per-product enablement | **OAM** — `GET /api/projects?product=<code>`; `POST /api/projects/products/set` / `set-bulk` |
+| Peer proxies | **ORA / OPA-Hub / OPM / OSA / OPL** — `GET /api/oam/projects?product=` forwards to OAM |
+| Switcher UI | All six dashboards (Open-UI-JS ≥ 0.3.0) |
+| Enablement UI | **OAM Dashboard `/projects` only** — checkbox matrix (OPA/OSA/ORA/OPL/OPM) + row/table select-all |
+| OPM board registry | **Separate** — Projects/Board flows stay on OPM UUIDs; family switcher uses OAM ids |
+
+**`disabled_products`:** denylist `Array(String)` on each directory project. Empty = all products enabled (backward compatible). Product code `P` is allowed when `NOT has(disabled_products, P)`. Codes: `opa`, `osa`, `ora`, `opl`, `opm`. OAM’s own management list is unfiltered. Filtered lists: `GET /api/projects?product=osa` (and peer `GET /api/oam/projects?product=osa`). Product job/scan entrypoints **fail closed** when that product is in `disabled_products` for the concrete `X-Project-ID`.
 
 Verified on NAS (`192.168.100.101`; use `127.0.0.1` when curling on the host) after Open-Tenant-Go 0.2.2:
 
@@ -193,7 +209,7 @@ Caller sets `PEER_{OPA|ORA|OSA|OPL|OPM}_URL` and mints a **service JWT** with `O
 | `ingest:load_run` | Load-run correlation |
 | `health:read` | Peer probe |
 | `connectors:read` | List ORA GitHub connectors / repos (OPM → ORA) |
-| `connectors:write` | Upsert connector directory metadata (ORA → OAM `POST /api/internal/connectors/sync`) |
+| `connectors:write` | Upsert connector directory metadata (ORA → OAM `POST /api/internal/connectors/sync`); OAM BFF → ORA internal peer mutations |
 | `scm:events` | Receive SCM checker fan-out envelope (ORA → OSA/OPL/OPM `POST /api/peer/scm/events`) |
 | `scm:clone` | Short-lived clone credentials for ephemeral job workspaces (OPM → ORA) |
 | `creds:resolve` | Resolve a job's model + API key (any product → OAM). The only scope that yields a plaintext credential |
@@ -236,9 +252,9 @@ Products opt in when `PEER_<PRODUCT>_URL` is set on ORA. Unconfigured peers are 
 | **GitHub App** | App installation under OAM org | `{ORA_PUBLIC_URL}/v1/scm/github/webhook` | Check Runs when token allows; OAM-scoped install state |
 | **Repository hooks** | PAT under OAM org (`admin:repo_hook` or fine-grained equivalent) | `{ORA_PUBLIC_URL}/v1/scm/github/webhook/{connector_id}` | Per-repo encrypted secret on `watched_repos`; events `pull_request`, `push` |
 
-**GitHub App → Open tenant bind:** start install from ORA (org Open session) so ORA mints a signed install `state` (`org`/`proj`/`user`). That is the primary bind — no separate “link GitHub account” product step. Marketplace/orphan installs without valid state stay `pending_claim` (invisible to lists/peers) and redirect once with a one-time `claim_token`; org admin claims via `POST /api/connectors/{id}/claim` `{ "claim_token": "…" }` into their JWT org. Personal accounts cannot install-url or claim (**400**). Peer resolve fail-closed: active + matching non-empty `org_id` only. Never map Open tenancy from GitHub `account_login` equality or silent `default-org`.
+**GitHub App → Open tenant bind:** start install from **OAM Connectors** (org Open session). OAM BFF peers to ORA, which mints a signed install `state` (`org`/`proj`/`user`). That is the primary bind — no separate “link GitHub account” product step. Marketplace/orphan installs without valid state stay `pending_claim` (invisible to lists/peers) and redirect once to OAM `/connectors` with a one-time `claim_token`; org admin claims via OAM `POST /api/connectors/{id}/claim` `{ "claim_token": "…" }` into their JWT org. Personal accounts cannot install-url or claim (**400**). Peer resolve fail-closed: active + matching non-empty `org_id` only. Never map Open tenancy from GitHub `account_login` equality or silent `default-org`.
 
-**Picker surfaces:** ORA `GET /api/connectors`, OPM/OSA `GET /api/github/connectors` (re-filter active/same-org), OAM directory `GET /api/connectors` (actor org; `all_organizations=1` only for unbound platform admin). Dashboards must not show pending/foreign rows. See [security-tenant-scopes.md](security-tenant-scopes.md#github-connector-lists-all-pickers).
+**Picker surfaces:** ORA `GET /api/connectors` (runtime/Watch), OPM/OSA `GET /api/github/connectors` (re-filter active/same-org), OAM `GET /api/connectors` (management directory, enriched via `PEER_ORA_URL`). Dashboards must not show pending/foreign rows. See [security-tenant-scopes.md](security-tenant-scopes.md#github-connector-lists-all-pickers).
 
 Both routes share the same unified pipeline: verify → tenant resolve → build SCM envelope → parallel fan-out to configured peers → aggregate checker results → publish GitHub statuses.
 
@@ -294,7 +310,7 @@ Default for new watches (when peers configured): include all **compatible** chec
 
 Stub peers (OPL, OPM this ship) return `{ "checkers": [] }` until their checker bodies land. ORA publishes Check Run or commit-status fallback per returned checker (`{product}/{checker_id}` context).
 
-### OAM connector directory
+### OAM connector directory + management BFF
 
 Connector **metadata** (org, project, kind, `webhook_mode`) lives in OAM `connectors`; ORA keeps encrypted tokens and GitHub protocol. ORA dual-writes on create/update:
 
@@ -302,18 +318,20 @@ Connector **metadata** (org, project, kind, `webhook_mode`) lives in OAM `connec
 POST /api/internal/connectors/sync   (service JWT, scope connectors:write, aud=oam-api)
 ```
 
-OAM Dashboard lists connectors (proxied to ORA today) and shows org/project badges plus checker preview for repo registration.
+**OAM Dashboard** (`/connectors`, smoke `:8097` / NAS `:18097`) is the sole connector **management** UI (install App, PAT, claim, edit, delete, watched-repo registration). Public mutations go to `oam-api`, which peers to `PEER_ORA_URL` for protocol/token work. When `PEER_OAM_URL` is set, ORA refuses browser writes (`credentials_home_oam`) and redirects post-install / claim browsers via `OAM_DASHBOARD_URL` + `/connectors` (not OPA/ORA dashboard ports). Sibling products (ORA Watch, OPM/OSA pickers) keep list/select only and deep-link “Manage in Account Manager” to OAM.
 
 ## OPM + Hub + GitHub
 
 OPM projects are **GitHub repositories** only (no local folder registry).
 
+**Two project layers:** OAM directory projects (`oam.projects`) are the family tenancy scope (`X-Project-ID` / list-only `X-Project-IDs`, credentials, bindings, dashboard switchers). They may be created manually or imported from GitHub discovery (`source=manual|github`), and GitHub-backed rows may carry `external_id` / `external_key` plus `connector_ids` (union of ORA connectors that can see the repo). Per-product access is stored as `disabled_products` and managed only on OAM `/projects` — see [Family project switcher](#family-project-switcher-oam-directory). OAM discovers candidates via `PEER_ORA_URL` (`GET /api/projects/discovered` → ORA connector repo lists); import does **not** create or sync an OPM board project. The OPM registry remains a separate GitHub-linked work surface with its own link flow (family switcher ≠ board UUID).
+
 | Concern | Owner |
 |---------|-------|
 | Organizations / projects / users / RBAC / **login** | **OAM** (`PEER_OAM_URL`) — `POST /api/auth/login`, `iss=oam-api` |
-| Connectors, API keys, AI provider credentials, per-agent model bindings | **OAM** (`PEER_OAM_URL`) |
+| Connectors (**management UI + public write BFF**), API keys, AI provider credentials, per-agent model bindings | **OAM** (`PEER_OAM_URL`; mutations need `PEER_ORA_URL` on `oam-api`) |
 | Hub observability auth | **OPA-Hub** (`PEER_OPA_URL`) — validates OAM JWTs; proxies login to OAM when `PEER_OAM_URL` is set; org directory reads from OAM |
-| GitHub App / PAT *protocol* work (install-url, callback, clone creds, PR/issue writes) | **ORA** (`PEER_ORA_URL`), using OAM-stored credentials |
+| GitHub App / PAT *protocol* work (install-url, callback, clone creds, PR/issue writes; peer-only writes when OAM is home) | **ORA** (`PEER_ORA_URL`), using OAM-stored credentials |
 | Kanban / roadmap / task jobs | **OPM** |
 | Code review / Repo Watch | **ORA** (deep-link; do not duplicate) |
 
@@ -410,10 +428,12 @@ REDIS_OPM_PASSWORD=
 OAM_SECRET_KEY=            # oam-api only; must match ORA's OPA_CONNECTOR_SECRET
 PEER_OPA_URL=
 PEER_OAM_URL=              # account plane; unset = pre-OAM env behaviour
-PEER_ORA_URL=
+PEER_ORA_URL=              # required on oam-api for connector mutation BFF
 PEER_OSA_URL=
 PEER_OPL_URL=
 PEER_OPM_URL=
+OAM_DASHBOARD_URL=         # ora-api post-install / claim redirect base → /connectors
+OPA_DASHBOARD_URL=          # fallback redirect; Check Run / job deep-links
 OPA_PUBLIC_URL=            # legacy alias; prefer ORA_PUBLIC_URL for ora-api webhooks
 ORA_PUBLIC_URL=            # public base for ora-api (GitHub webhooks / review callbacks)
 OSA_PUBLIC_URL=

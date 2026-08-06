@@ -10,6 +10,8 @@ Related: [interop.md](interop.md) (tenant headers), [nas-deploy.md](nas-deploy.m
 |------|----------|
 | No JWT on protected route | **401** (or **403**) |
 | JWT, no `X-Organization-ID` / `X-Project-ID` | Scope to **`default-org` / `default-project`** (same as write tenant; Open-Tenant-Go ≥ 0.2.2). HTTP **200**, not an unscoped dump. |
+| JWT + `X-Project-ID: all` | Same as missing project header → **`default-project`** (auth meaning **unchanged**; does not mean org-wide unscoped) |
+| JWT + list-only `X-Project-IDs: id1,id2,…` | List/read scope `project_id IN (…)` (cap **32**); every id ACL-checked. Writes ignore this header and still need a concrete single `X-Project-ID`. |
 | JWT + wrong / unknown org | **Empty list** or **403** — never rows belonging to another org |
 | JWT + correct org | Tenant’s data (HTTP **200**) |
 | JWT with `project_ids` + non-member project | Hub + ORA/OSA/OPL/OPM → **403** (`project access denied`); admins exempt |
@@ -18,7 +20,7 @@ Related: [interop.md](interop.md) (tenant headers), [nas-deploy.md](nas-deploy.m
 | Personal account + non-empty org header | **403** (`tenant mismatch`) on protected routes |
 | Organization account + org header ≠ JWT `org_id` | **403** (`tenant mismatch`) |
 
-Canonical headers (case-insensitive): `Authorization: Bearer <oam-jwt>`, `X-Organization-ID`, `X-Project-ID`. Query fallbacks `organization_id` / `project_id` match. Picker marker `"all"` is stripped under auth and does **not** widen scope.
+Canonical headers (case-insensitive): `Authorization: Bearer <oam-jwt>`, `X-Organization-ID`, `X-Project-ID` (single), optional list-only `X-Project-IDs`. Query fallbacks `organization_id` / `project_id` match. Picker marker `"all"` on **`X-Project-ID`** is stripped under auth and does **not** widen scope. Dashboard UI “All projects” stamps **`X-Project-IDs`** with enabled OAM directory ids for that product — it does **not** redefine `X-Project-ID: all`. See [interop.md — Family project switcher](interop.md#family-project-switcher-oam-directory).
 
 ## Account types (JWT-bound tenancy)
 
@@ -159,12 +161,18 @@ GitHub App connectors are **org-bound** (signed install `state` or one-time clai
 | **OPM** | `GET /api/github/connectors` | Peer service JWT → ORA | Re-filters active/same-org; `POST /api/projects` with foreign `connectorId` → **404**, pending → **403** |
 | **OSA** | `GET /api/github/connectors` | Proxy user JWT → ORA | Re-filters active/same-org; create/discovery/rescan with foreign `connector_id` → **403** |
 
-Picker UIs (ORA Connectors / Watch, OPM Projects, OSA Runs/Repos) must not render pending or foreign rows even if an API regresses. OAM Connectors UI stays unwired (or nginx routes mutations to ORA) — no second install/claim path.
+Picker UIs (ORA Watch, OPM Projects, OSA Runs/Repos) must not render pending or foreign rows even if an API regresses. **OAM Connectors** (`/connectors`) is the write home: install, claim, PAT, edit, delete, and watched-repo registration. ORA refuses browser mutations when `PEER_OAM_URL` is set; OPM/OSA deep-link “Manage in Account Manager” to OAM and never ship a second install/claim console.
+
+**OAM directory vs OPM registry:** OAM `GET/POST /api/projects*` manage family directory tenancy (including `disabled_products` and `GET ?product=`). GitHub-backed directory rows may include `external_id` and `connector_ids` (import/discovery via `PEER_ORA_URL`). That does not replace OPM’s own project registry or link flow — the two remain separate. Family dashboard switchers consume OAM directory ids (`GET /api/oam/projects?product=opm`); OPM board UUIDs stay on Projects/Board flows.
+
+### Per-product project access (`disabled_products`)
+
+Directory projects may denylist Open products via `disabled_products` (empty = all enabled). **Only OAM Dashboard `/projects`** edits this (checkbox matrix + row/table select-all → `POST /api/projects/products/set` / `set-bulk`). Peer dashboards list enabled-only via `?product=<opa|osa|ora|opl|opm>` and never ship a second enablement UI. Job/scan entrypoints fail closed when the acting product is disabled for the concrete project.
 
 **Install / claim / peer:**
 
-- Install from an Open **organization** session (`GET …/install-url`); personal accounts → **400**.
-- Marketplace/orphan callback mints a one-time `claim_token` (hash stored); `POST /api/connectors/{id}/claim` `{ "claim_token": "…" }` — wrong nonce **403**, double claim **409**, personal **400**.
+- Install from OAM Connectors while in an Open **organization** session (`GET …/install-url` via OAM BFF); personal accounts → **400**.
+- Marketplace/orphan callback mints a one-time `claim_token` (hash stored) and redirects to `OAM_DASHBOARD_URL/connectors`; `POST /api/connectors/{id}/claim` `{ "claim_token": "…" }` on **oam-api** — wrong nonce **403**, double claim **409**, personal **400**.
 - Peer resolve (`clone` / PM / PR): fail closed — require `status=active` and non-empty matching `org_id` (**403** otherwise).
 
 ```bash
@@ -213,7 +221,8 @@ Family harness: **56 PASS / 0 FAIL**. Sibling ORA/OSA curl matrix reported **13/
 ## Documented gaps
 
 - **Per-user project ACLs (hub + peers + Open-Auth-Go):** JWT `project_ids` allowlist. Hub middleware and product `Gate.Middleware` (`AuthMiddleware`) call `EnforceProjectACL` after `ApplyUserTenantHeaders`. Role `admin` sees all org projects; lab seed `admin`/`admin` stays unbound. No second membership store — hub-minted claims only.
-- Prefer always sending concrete `X-Organization-ID` / `X-Project-ID` from dashboards and scripts.
+- Prefer always sending concrete `X-Organization-ID` / `X-Project-ID` from dashboards and scripts. For multi-project list views, use `X-Project-IDs` (enabled directory ids); never overload `X-Project-ID: all` as org-wide unscoped.
+- Product access (`disabled_products`) is managed only on OAM `/projects`; peers consume filtered OAM lists.
 - **Webhook-only orphan installs:** an install that arrives only via GitHub webhook (no browser callback) may create `pending_claim` **without** a one-time `claim_token` in a redirect. Those rows stay invisible until a callback/claim path issues a nonce — operators must re-run install-from-Open or use a future admin reclaim flow.
 
 ### Adoption notes (ORA / OSA / OPL / OPM) — done

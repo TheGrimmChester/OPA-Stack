@@ -131,6 +131,7 @@ fi
 if wants oam-api || wants all; then
   need OAM-API
   need Open-Auth-Go
+  need Open-Client-Go
   need Open-Tenant-Go
   need Open-ClickHouse-Go
   need Open-HTTP-Go
@@ -150,6 +151,7 @@ if wants opl-api || wants all; then
   need Open-Logger-Go
   need Open-Cache-Go
   need Open-Crypto-Go
+  need Open-Job-Env-Go
   build_df opl-api.nas.Dockerfile "opl-api:$TAG" --target opl-api
   docker build "${NO_CACHE_ARGS[@]}" -f "$DOCKER_DIR/opl-api.nas.Dockerfile" -t "opl-runner-jmeter:$TAG" --target opl-runner-jmeter "$FAMILY_ROOT"
 fi
@@ -197,11 +199,11 @@ if wants dashboards || wants all; then
     product="${pair%%:*}"
     image="${pair##*:}"
     echo "==> Building ${image}:$TAG (PRODUCT=$product)"
-    # NAS publishes OAM on :18097 (smoke uses :8097). Bake peer ports into SPA
-    # external links so ORA CTAs open the right origin without nginx 302s.
+    # NAS publishes OAM on :18097 (smoke uses :8097). Bake the absolute OAM
+    # origin into SPAs so “Manage in Account Manager” and login deep-links work.
     docker build "${NO_CACHE_ARGS[@]}" -f "$DOCKER_DIR/dashboard.nas.Dockerfile" \
       --build-arg "PRODUCT=$product" \
-      --build-arg "VITE_OAM_DASHBOARD_PORT=18097" \
+      --build-arg "VITE_OAM_URL=http://192.168.100.101:18097" \
       --build-arg "VITE_OPM_DASHBOARD_PORT=8098" \
       -t "${image}:$TAG" \
       "$FAMILY_ROOT"

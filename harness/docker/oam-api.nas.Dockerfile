@@ -6,6 +6,7 @@ WORKDIR /src
 ENV GOPROXY=https://proxy.golang.org,direct
 ENV GOSUMDB=sum.golang.org
 COPY Open-Auth-Go /modules/Open-Auth-Go
+COPY Open-Client-Go /modules/Open-Client-Go
 COPY Open-Tenant-Go /modules/Open-Tenant-Go
 COPY Open-ClickHouse-Go /modules/Open-ClickHouse-Go
 COPY Open-HTTP-Go /modules/Open-HTTP-Go
@@ -19,8 +20,10 @@ WORKDIR /src/OAM-API
 # this repo tree, so a local change to a shared module is picked up. `go mod edit`
 # rather than the sed-rewrite the older Dockerfiles use, because there are no
 # filesystem replaces in the committed file to rewrite.
+# open-client-go is required for PEER_ORA_URL discovery (project import BFF).
 RUN go mod edit \
       -replace github.com/TheGrimmChester/open-auth-go=/modules/Open-Auth-Go \
+      -replace github.com/TheGrimmChester/open-client-go=/modules/Open-Client-Go \
       -replace github.com/TheGrimmChester/open-tenant-go=/modules/Open-Tenant-Go \
       -replace github.com/TheGrimmChester/open-clickhouse-go=/modules/Open-ClickHouse-Go \
       -replace github.com/TheGrimmChester/open-http-go=/modules/Open-HTTP-Go \

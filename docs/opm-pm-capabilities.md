@@ -110,7 +110,7 @@ Pluggable providers; per-phase model overrides; prompt packs (a repo-level promp
 
 | Route | Page | Notes |
 |-------|------|-------|
-| `/` | Projects | Link GitHub repos via Hub orgs + ORA connectors |
+| `/` | Projects | Link GitHub repos via Hub orgs + ORA connector list (manage installs in OAM) |
 | `/board` | Board | CRUD + **DnD** + task action menu; require-review; Plan/Build/Approve/Pause/Recover; task detail drawer |
 | `/roadmap` | Roadmap | Create / edit / delete phases and features |
 | `/ideation` | Ideation | Create / edit / delete; promote to task |

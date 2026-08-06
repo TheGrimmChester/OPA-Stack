@@ -1,8 +1,13 @@
-# Family-root dashboard build for ORA/OSA/OPL/OPM (file: deps on Open-UI-JS / Open-Client-JS).
+# Family-root dashboard build for ORA/OSA/OPL/OPM/OAM/OPA (file: deps on Open-UI-JS / Open-Client-JS).
 #   docker build -f OPA-Stack/harness/docker/dashboard.nas.Dockerfile \
-#     --build-arg PRODUCT=ORA-Dashboard -t ora-dashboard:nas .
+#     --build-arg PRODUCT=ORA-Dashboard \
+#     --build-arg VITE_OAM_URL=http://192.168.100.101:18097 \
+#     -t ora-dashboard:nas .
 FROM node:18-alpine AS builder
 ARG PRODUCT=ORA-Dashboard
+# Absolute OAM dashboard origin for login + “Manage in Account Manager” deep-links.
+ARG VITE_OAM_URL=
+ENV VITE_OAM_URL=$VITE_OAM_URL
 WORKDIR /family
 COPY Open-Client-JS /family/Open-Client-JS
 COPY Open-UI-JS /family/Open-UI-JS
