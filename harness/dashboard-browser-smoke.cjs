@@ -14,7 +14,7 @@ const ROUTES = [
   '/synthetics', '/security', '/diagnostics', '/sql', '/http', '/service-map',
   '/network', '/rum', '/performance', '/perf-lab', '/compare', '/infrastructure',
   '/cloud', '/metrics', '/query', '/dashboards', '/live', '/serverless',
-  '/collaborate', '/system', '/users', '/api-keys', '/automation', '/federation',
+  '/collaborate', '/system', '/automation', '/federation',
 ];
 
 async function main() {

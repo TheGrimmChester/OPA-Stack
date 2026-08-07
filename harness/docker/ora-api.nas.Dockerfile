@@ -17,7 +17,8 @@ COPY Open-Crypto-Go /modules/Open-Crypto-Go
 COPY Open-Job-Env-Go /modules/Open-Job-Env-Go
 COPY ORA-API/ /src/ORA-API/
 WORKDIR /src/ORA-API
-RUN sed -i \
+RUN rm -f go.work go.work.sum \
+  && sed -i \
   -e 's|=> ../Open-Auth-Go|=> /modules/Open-Auth-Go|' \
   -e 's|=> ../Open-Client-Go|=> /modules/Open-Client-Go|' \
   -e 's|=> ../Open-Job-Go|=> /modules/Open-Job-Go|' \
@@ -27,6 +28,7 @@ RUN sed -i \
   -e 's|=> ../Open-Logger-Go|=> /modules/Open-Logger-Go|' \
   go.mod \
   && go mod edit \
+      -replace github.com/TheGrimmChester/open-client-go=/modules/Open-Client-Go \
       -replace github.com/TheGrimmChester/open-cache-go=/modules/Open-Cache-Go \
       -replace github.com/TheGrimmChester/open-crypto-go=/modules/Open-Crypto-Go \
       -replace github.com/TheGrimmChester/open-job-env-go=/modules/Open-Job-Env-Go \
@@ -35,8 +37,8 @@ RUN sed -i \
 
 FROM debian:bookworm-slim AS ora-api
 ARG TARGETARCH
-ARG GITLEAKS_VERSION=8.30.0
 ARG PLAYWRIGHT_VERSION=1.50.1
+# AppSec scanners live in OSA — do not bake gitleaks or lite scan scripts here.
 RUN apt-get update \
  && apt-get install -y --no-install-recommends \
       ca-certificates curl wget git bash \
@@ -49,12 +51,6 @@ RUN apt-get update \
       libxcb-shm0 libxshmfence1 libegl1 libxcursor1 libxi6 libxtst6 \
       fonts-liberation fonts-noto-color-emoji \
  && rm -rf /var/lib/apt/lists/* \
- && arch="$TARGETARCH" \
- && case "$arch" in amd64|x86_64) gl_arch=x64 ;; arm64|aarch64) gl_arch=arm64 ;; *) gl_arch=x64 ;; esac \
- && wget -qO /tmp/gitleaks.tgz \
-      "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_${gl_arch}.tar.gz" \
- && tar -xzf /tmp/gitleaks.tgz -C /usr/local/bin gitleaks \
- && rm -f /tmp/gitleaks.tgz \
  && (NO_COLOR=1 curl -fsS https://cursor.com/install | bash \
       && test -x /root/.local/bin/agent \
       && ln -sf /root/.local/bin/agent /usr/local/bin/agent \
@@ -78,8 +74,6 @@ RUN apt-get update \
  && rm -rf /root/.npm /tmp/*
 WORKDIR /root/
 COPY --from=builder /out/ora-api /usr/local/bin/ora-api
-COPY ORA-API/gitleaks.toml /etc/opa/gitleaks.toml
-COPY ORA-API/scripts/ /opt/opa/scripts/
 ENV HTTP_ADDR=:8091 \
     OPA_REVIEW_BROWSER_MCP=1 \
     OPA_REVIEW_BROWSER_DEPS_OK=1 \

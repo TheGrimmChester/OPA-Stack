@@ -13,7 +13,6 @@ The Open-* family is five optional products plus a shared account plane and shar
 
 SCM connector **management** is OAM-only (`/connectors`). Product dashboards scope clone/watch/scan work via the **family project switcher** (OAM `connector_ids` / `external_key`); **All projects** aggregates enabled projects' connectors. Do not add in-product connector pickers for scoping.
 
-
 ## Topology (OPA)
 
 Hub-and-spoke, push-primary: edge `opa-agent` registers and pushes telemetry outbound to `opa-hub`. `opa-dashboard` uses one URL and talks only to the hub.

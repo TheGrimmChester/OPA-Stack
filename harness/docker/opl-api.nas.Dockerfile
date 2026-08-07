@@ -13,6 +13,7 @@ COPY Open-HTTP-Go /modules/Open-HTTP-Go
 COPY Open-Logger-Go /modules/Open-Logger-Go
 COPY Open-Cache-Go /modules/Open-Cache-Go
 COPY Open-Crypto-Go /modules/Open-Crypto-Go
+COPY Open-Job-Env-Go /modules/Open-Job-Env-Go
 COPY OPL-API/ /src/OPL-API/
 WORKDIR /src/OPL-API
 RUN sed -i \
@@ -26,6 +27,7 @@ RUN sed -i \
   && go mod edit \
       -replace github.com/TheGrimmChester/open-cache-go=/modules/Open-Cache-Go \
       -replace github.com/TheGrimmChester/open-crypto-go=/modules/Open-Crypto-Go \
+      -replace github.com/TheGrimmChester/open-job-env-go=/modules/Open-Job-Env-Go \
   && go mod download \
   && CGO_ENABLED=0 GOOS=linux go build -o /out/opl-api .
 

@@ -198,17 +198,25 @@ check_tenant_scope() {
 
   for pair in "nohdr:$code_nohdr" "def:$code_def" "wrong:$code_wrong"; do
     label=${pair%%:*}; c=${pair##*:}
-    if [ "$c" != 200 ] && [ "$c" != 403 ]; then
+    if [ "$c" != 200 ] && [ "$c" != 403 ] && [ "$c" != 400 ]; then
       bad "$product JWT $label $path" "HTTP $c"
       return
     fi
   done
 
-  if [ "$code_nohdr" = 200 ] && [ "$code_def" = 200 ]; then
-    if [ "$n_nohdr" = "$n_def" ]; then
-      ok "$product JWT no-headers scopes like default-org (n=$n_def) $path"
+  # nohdr must NOT silently equal default-org (empty / 400 / JWT-pin)
+  if [ "$code_nohdr" = 400 ] || [ "$code_nohdr" = 403 ]; then
+    ok "$product JWT no-headers -> $code_nohdr (no default-org fallback) $path"
+  elif [ "$code_nohdr" = 200 ]; then
+    if [ "$n_nohdr" = "$n_def" ] && [ "$n_def" -gt 0 ]; then
+      bad "$product JWT no-headers must NOT equal default-org" "nohdr=$n_nohdr def=$n_def"
+    elif [ "$n_nohdr" = 0 ]; then
+      ok "$product JWT no-headers -> empty (no default-org fallback) $path"
+    elif [ "$n_nohdr" != "$n_def" ]; then
+      ok "$product JWT no-headers JWT-pin/own-scope (n=$n_nohdr != def=$n_def) $path"
     else
-      bad "$product JWT no-headers == default-org" "nohdr=$n_nohdr def=$n_def"
+      # both empty — no silent shared bucket
+      ok "$product JWT no-headers -> empty; default-org also empty $path"
     fi
   else
     bad "$product JWT no-headers" "HTTP $code_nohdr"

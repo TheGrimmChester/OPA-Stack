@@ -278,6 +278,8 @@ services:
       OPA_ORGANIZATION_ID: ${OPA_ORGANIZATION_ID:-nas}
       OPA_PROJECT_ID: ${OPA_PROJECT_ID:-infra}
       OPA_AGENT_ID: ${OPA_AGENT_ID:-nas-edge-1}
+      # Family identity home is OAM — agent refuses local users/api-keys/org-project mutations.
+      PEER_OAM_URL: http://oam-api:8090
       # Same ClickHouse as hub so edge ingest (PHP / collector :9090) keeps
       # writing full telemetry while the agent also registers with the hub.
       CLICKHOUSE_URL: "http://clickhouse:8123"
@@ -672,24 +674,12 @@ services:
       # instead of per deployment. A job whose org has no credential fails closed
       # with credential_unavailable rather than borrowing a deployment-wide key.
       PEER_OAM_URL: http://oam-api:8090
-      # LEGACY model path — used only when PEER_OAM_URL is unset. Kept so a
-      # deployment can roll back to the pre-OAM behaviour without a code change.
-      # These no longer participate while OAM is configured; the console's
-      # Agents & Models page is where model choice lives now.
-      OPM_MODEL_API_KEY: ${OPM_MODEL_API_KEY:-}
-      OPM_MODEL_BASE_URL: ${OPM_MODEL_BASE_URL:-}
-      OPM_MODEL: ${OPM_MODEL:-auto}
-      OPM_MODEL_PLANNING: ${OPM_MODEL_PLANNING:-auto}
-      OPM_MODEL_CODING: ${OPM_MODEL_CODING:-auto}
-      OPM_MODEL_REVIEW: ${OPM_MODEL_REVIEW:-auto}
-      OPM_MODEL_IDEATION: ${OPM_MODEL_IDEATION:-auto}
-      OPM_MODEL_ROADMAP_DISCOVERY: ${OPM_MODEL_ROADMAP_DISCOVERY:-auto}
-      OPM_MODEL_ROADMAP_FEATURES: ${OPM_MODEL_ROADMAP_FEATURES:-auto}
+      # Models/keys: OAM only (Agents & Models). No deployment-wide OPM_MODEL* fallback.
       # internal+proxy: per-job sealed network + open-egress-proxy (implemented in OPM spawn).
       # Break-glass: OPM_RUNNER_NETWORK=bridge (full host egress — admin only).
       OPM_RUNNER_NETWORK: ${OPM_RUNNER_NETWORK:-internal+proxy}
       # Connector storage is OAM; GitHub App/PAT protocol + short-lived SCM creds are on ora-api.
-      # OPM discovers orgs via PEER_OPA_URL, models/keys via PEER_OAM_URL, SCM via PEER_ORA_URL.
+      # Orgs/projects via PEER_OAM_URL; SCM via PEER_ORA_URL; hub status via PEER_OPA_URL.
     volumes:
       - opm_data:/data
       - /mnt/Apps/config-docker/open-stack/opm-jobs:/mnt/Apps/config-docker/open-stack/opm-jobs
@@ -713,9 +703,6 @@ services:
       ORCHESTRATOR_LISTEN_ADDR: ":8099"
       OPM_RUNNER_TAG: nas
       OPM_DATA_DIR: /data
-      OPM_MODEL_API_KEY: ${OPM_MODEL_API_KEY:-}
-      OPM_MODEL_BASE_URL: ${OPM_MODEL_BASE_URL:-}
-      OPM_MODEL: ${OPM_MODEL:-auto}
     volumes:
       - opm_data:/data
       - /var/run/docker.sock:/var/run/docker.sock

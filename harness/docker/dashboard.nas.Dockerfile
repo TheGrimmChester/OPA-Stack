@@ -5,7 +5,8 @@
 #     -t ora-dashboard:nas .
 FROM node:18-alpine AS builder
 ARG PRODUCT=ORA-Dashboard
-# Absolute OAM dashboard origin for login + “Manage in Account Manager” deep-links.
+# Absolute OAM dashboard origin for “Manage in Account Manager” deep-links.
+# Browser login uses same-origin /oam-auth (not this URL) under CSP connect-src 'self'.
 ARG VITE_OAM_URL=
 ENV VITE_OAM_URL=$VITE_OAM_URL
 WORKDIR /family

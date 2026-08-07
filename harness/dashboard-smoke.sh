@@ -131,8 +131,6 @@ smoke_dashboard_routes() {
     /serverless \
     /collaborate \
     /system \
-    /users \
-    /api-keys \
     /automation \
     /federation \
     /login \
@@ -258,10 +256,7 @@ smoke_dashboard_apis() {
   panel_api "/api/audit?limit=20" "system audit"
   panel_api "/api/stats" "stats"
 
-  # Admin
-  panel_api "/api/users" "users"
-  panel_api "/api/organizations" "api-keys orgs"
-  panel_api "/api/api-keys" "api-keys"
+  # Admin (users / API keys live in OAM — not probed here)
   panel_api "/api/mgmt/v1" "automation mgmt"
   panel_api "/api/mgmt/v1/revisions" "automation revisions"
   panel_api "/api/mgmt/v1/openapi.json" "automation openapi"

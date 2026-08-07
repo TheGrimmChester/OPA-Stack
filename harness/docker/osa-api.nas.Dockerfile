@@ -27,6 +27,7 @@ RUN sed -i \
   -e 's|=> ../Open-Logger-Go|=> /modules/Open-Logger-Go|' \
   go.mod \
   && go mod edit \
+      -replace github.com/TheGrimmChester/open-client-go=/modules/Open-Client-Go \
       -replace github.com/TheGrimmChester/open-cache-go=/modules/Open-Cache-Go \
       -replace github.com/TheGrimmChester/open-crypto-go=/modules/Open-Crypto-Go \
       -replace github.com/TheGrimmChester/open-job-env-go=/modules/Open-Job-Env-Go \

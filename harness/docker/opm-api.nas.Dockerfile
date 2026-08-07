@@ -17,7 +17,8 @@ COPY Open-Crypto-Go /modules/Open-Crypto-Go
 COPY Open-Job-Env-Go /modules/Open-Job-Env-Go
 COPY OPM-API/ /src/OPM-API/
 WORKDIR /src/OPM-API
-RUN sed -i \
+RUN rm -f go.work go.work.sum \
+  && sed -i \
   -e 's|=> ../Open-Auth-Go|=> /modules/Open-Auth-Go|' \
   -e 's|=> ../Open-Client-Go|=> /modules/Open-Client-Go|' \
   -e 's|=> ../Open-Job-Go|=> /modules/Open-Job-Go|' \
@@ -26,6 +27,7 @@ RUN sed -i \
   -e 's|=> ../Open-Logger-Go|=> /modules/Open-Logger-Go|' \
   go.mod \
   && go mod edit \
+      -replace github.com/TheGrimmChester/open-client-go=/modules/Open-Client-Go \
       -replace github.com/TheGrimmChester/open-cache-go=/modules/Open-Cache-Go \
       -replace github.com/TheGrimmChester/open-crypto-go=/modules/Open-Crypto-Go \
       -replace github.com/TheGrimmChester/open-job-env-go=/modules/Open-Job-Env-Go \

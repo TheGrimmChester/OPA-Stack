@@ -199,8 +199,9 @@ if wants dashboards || wants all; then
     product="${pair%%:*}"
     image="${pair##*:}"
     echo "==> Building ${image}:$TAG (PRODUCT=$product)"
-    # NAS publishes OAM on :18097 (smoke uses :8097). Bake the absolute OAM
-    # origin into SPAs so “Manage in Account Manager” and login deep-links work.
+    # Bake absolute OAM origin for “Manage in Account Manager” deep-links only.
+    # Browser login must use same-origin /oam-auth (CSP connect-src 'self') —
+    # Login.jsx ignores VITE_OAM_URL for auth XHR when codeployed.
     docker build "${NO_CACHE_ARGS[@]}" -f "$DOCKER_DIR/dashboard.nas.Dockerfile" \
       --build-arg "PRODUCT=$product" \
       --build-arg "VITE_OAM_URL=http://192.168.100.101:18097" \

@@ -119,8 +119,8 @@ rather than borrowing the deployment's key.
 | `OPA_TLS_CERT_FILE` | path | empty | API | TLS cert for admin API |
 | `OPA_TLS_KEY_FILE` | path | empty | API | TLS key |
 | `OPA_TLS_CLIENT_AUTH` | bool | `0` | API | Require client certs |
-| `OPA_INGEST_AUTH_REQUIRED` | bool | `0` | ingest | Require ingest token |
-| `OPA_INGEST_TOKEN` | string | empty | ingest | Shared ingest bearer token |
+| `OPA_INGEST_AUTH_REQUIRED` | bool | `0` | ingest | Require project ingest key (or shared `OPA_INGEST_TOKEN`) on ND-JSON / OTLP / RUM / diagnostics |
+| `OPA_INGEST_TOKEN` | string | empty | ingest | Optional shared lab bearer (no tenant binding); collectors use `OPA_INGEST_KEY` for per-project keys |
 | `OPA_PPROF` | bool | `0` | debug | Expose `/debug/pprof/` |
 | `OPA_DEADMAN` | bool | `1` | ops | Log ingest silence |
 | `OPA_DEADMAN_SILENCE_SECS` | int | `300` | ops | Silence threshold |

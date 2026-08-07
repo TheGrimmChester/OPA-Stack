@@ -1,0 +1,10 @@
+**/node_modules
+**/dist
+**/.git
+**/.agents
+**/designs
+**/.DS_Store
+**/*.md
+!**/*/README.md
+**/go.work
+**/go.work.sum
