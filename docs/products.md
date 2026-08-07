@@ -4,12 +4,15 @@ The Open-* family is five optional products plus a shared account plane and shar
 
 | Short | Full name | Control plane | Dashboard | Owns |
 |-------|-----------|---------------|-----------|------|
-| **OAM** | Open Account Manager | `oam-api` | `oam-dashboard` | Shared account plane: organizations, projects (directory + **per-product access** on `/projects`), users/RBAC, **family login** (`iss=oam-api`), connector **storage + management UI** (`/connectors`), API keys, AI provider credentials, per-agent model bindings |
+| **OAM** | Open Account Manager | `oam-api` | `oam-dashboard` | Shared account plane: organizations, projects (directory + **per-product access** on `/projects`), users/RBAC, **family login** (`iss=oam-api`), connector **storage + management UI** (`/connectors`), API keys, AI endpoint-backed secrets (`/endpoints`), per-agent model bindings |
 | **OPA** | Open Profiling Agent | `opa-hub` (central) + `opa-agent` (edge) | `opa-dashboard` | Observability only: edge ingest, hub registry/query/auth, APM, RUM, metrics, alerts/SLOs, synthetics |
 | **ORA** | Open Review Agent | `ora-api` + `ora-orchestrator` | `ora-dashboard` | Repo Watch, GitHub App/PAT **protocol** (install/callback/clone/push/PR via peer when OAM is home), automated code review, review check-runs, coding agents |
 | **OSA** | Open Security Agent | `osa-api` + `osa-orchestrator` | `osa-dashboard` | AppSec findings (secrets/SAST/IaC), security runs, vulns/IAST, AppSec CI gates |
 | **OPL** | Open Perf Lab | `opl-api` + `opl-orchestrator` | `opl-dashboard` | Load scenarios, runs, HAR/JMX, Docker JMeter, optional OPA correlation |
 | **OPM** | Open Project Manager | `opm-api` + `opm-orchestrator` | `opm-dashboard` | Multi-project registry, kanban, roadmaps, ideation, task specs/plans, task-automation jobs |
+
+SCM connector **management** is OAM-only (`/connectors`). Product dashboards scope clone/watch/scan work via the **family project switcher** (OAM `connector_ids` / `external_key`); **All projects** aggregates enabled projects' connectors. Do not add in-product connector pickers for scoping.
+
 
 ## Topology (OPA)
 
@@ -84,6 +87,7 @@ Full contract, compatibility matrix, and dual webhook setup: [interop.md — SCM
 
 ## Related docs
 
+- [AGENTS.md](../AGENTS.md) — agent workspace map: product/module ownership + misplaced-feature audit
 - [OPL + OPM remaining backlog](opl-opm-backlog.md) — Done / Next / Later for Perf Lab and Project Manager
 - [OPL load lab capabilities](opl-lab-capabilities.md) — Done / On a branch, not merged / Missing / Different-by-design
 - [OPM project manager capabilities](opm-pm-capabilities.md) — Done / On a branch, not merged / Not implemented / Different-by-design

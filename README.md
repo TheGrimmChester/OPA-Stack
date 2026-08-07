@@ -2,7 +2,7 @@
 
 Self-hosted Compose/Helm smoke and quickstart for the Open-* family (OPA, ORA, OSA, OPL).
 
-Product and module catalog: [docs/products.md](docs/products.md) · [docs/modules.md](docs/modules.md) · [docs/interop.md](docs/interop.md).
+Product and module catalog: [docs/products.md](docs/products.md) · [docs/modules.md](docs/modules.md) · [docs/interop.md](docs/interop.md). Agent ownership map: [AGENTS.md](AGENTS.md).
 
 ## Five-minute quickstart
 

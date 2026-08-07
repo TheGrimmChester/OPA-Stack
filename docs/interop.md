@@ -329,7 +329,7 @@ OPM projects are **GitHub repositories** only (no local folder registry).
 | Concern | Owner |
 |---------|-------|
 | Organizations / projects / users / RBAC / **login** | **OAM** (`PEER_OAM_URL`) — `POST /api/auth/login`, `iss=oam-api` |
-| Connectors (**management UI + public write BFF**), API keys, AI provider credentials, per-agent model bindings | **OAM** (`PEER_OAM_URL`; mutations need `PEER_ORA_URL` on `oam-api`) |
+| Connectors (**management UI + public write BFF**), API keys, AI endpoint-backed secrets (`/endpoints`), per-agent model bindings | **OAM** (`PEER_OAM_URL`; mutations need `PEER_ORA_URL` on `oam-api`) |
 | Hub observability auth | **OPA-Hub** (`PEER_OPA_URL`) — validates OAM JWTs; proxies login to OAM when `PEER_OAM_URL` is set; org directory reads from OAM |
 | GitHub App / PAT *protocol* work (install-url, callback, clone creds, PR/issue writes; peer-only writes when OAM is home) | **ORA** (`PEER_ORA_URL`), using OAM-stored credentials |
 | Kanban / roadmap / task jobs | **OPM** |

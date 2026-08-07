@@ -3,6 +3,7 @@
 
 ## Open-* family
 
+- [AGENTS.md](../AGENTS.md) — ownership map for agents (what each product/module owns; misplaced-feature audit)
 - [Products](products.md) — OPA · ORA · OSA · OPL · OPM (smoke/NAS ports, Alert Test → edge)
 - [OPL + OPM backlog](opl-opm-backlog.md) — Done / Next / Later for Perf Lab and Project Manager
 - [OPL load lab capabilities](opl-lab-capabilities.md) — Done / On a branch, not merged / Missing / Different-by-design; flagship visual editor gap
