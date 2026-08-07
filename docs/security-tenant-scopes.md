@@ -184,7 +184,7 @@ Directory projects may denylist Open products via `disabled_products` (empty = a
 
 - Install from OAM Connectors (`GET …/install-url` via OAM BFF). Organization Open sessions (org members, viewer+) bind by org; personal Open sessions bind under `user_id` (empty org) so they can install on GitHub orgs they admin. Platform admin may overview all connectors; Connect / claim / edit are not admin-only.
 - Marketplace/orphan callback mints a one-time `claim_token` (hash stored) and redirects to `OAM_DASHBOARD_URL/connectors`; `POST /api/connectors/{id}/claim` `{ "claim_token": "…" }` on **oam-api** — wrong nonce **403**, double claim **409**, personal without username **400**. Org members and personal users claim into their own tenant.
-- Peer resolve (`clone` / PM / PR): fail closed — require `status=active` and non-empty matching `org_id` (**403** otherwise).
+- Peer resolve (`clone` / PM / PR): fail closed — require `status=active`. Org connectors need a non-empty matching `org_id`; personal user-scoped connectors (empty org) authorize when the peer service/job JWT carries a matching `user_id` (**403** otherwise).
 
 ```bash
 # Connector list scopes (wrong org must never return another tenant’s installs)
