@@ -45,7 +45,7 @@ Every Open dashboard’s project menu lists **OAM directory** projects (`oam.pro
 | Peer proxies | **ORA / OPA-Hub / OPM / OSA / OPL** — `GET /api/oam/projects?product=` forwards to OAM |
 | Switcher UI | All six dashboards (Open-UI-JS ≥ 0.3.0) |
 | Enablement UI | **OAM Dashboard `/projects` only** — checkbox matrix (OPA/OSA/ORA/OPL/OPM) + row/table select-all |
-| OPM board registry | **OPM** — selecting a family project opens its board; `POST /api/projects/ensure` upserts a registry row keyed by the OAM directory id (GitHub fields from `external_key` / `connector_ids` when present). Attach GitHub from the directory when clone/jobs need a binding (no connector picker). |
+| OPM board registry | **OPM** — selecting a family project opens its board; `POST /api/projects/ensure` upserts a registry row keyed by the OAM directory id (GitHub fields from `external_key` / `connector_ids` when present). `POST /api/projects` (link) also fills omitted `connectorId`/`ownerRepo` from the directory (fail closed). Attach GitHub from the directory when clone/jobs need a binding (no connector picker). |
 
 /** `disabled_products`:** denylist `Array(String)` on each directory project. Empty = all products enabled (backward compatible). Product code `P` is allowed when `NOT has(disabled_products, P)`. Codes: `opa`, `osa`, `ora`, `opl`, `opm`. OAM’s own management list is unfiltered. Filtered lists: `GET /api/projects?product=osa` (and peer `GET /api/oam/projects?product=osa`). Product job/scan entrypoints **fail closed** when that product is in `disabled_products` for the concrete `X-Project-ID` (skip when `PEER_OAM_URL` unset or project empty/`all`):
 
