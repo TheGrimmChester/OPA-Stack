@@ -38,7 +38,7 @@ Per-product cache tuning (after Open-Cache-Go wiring): `REDIS_URL`, `{PRODUCT}_S
 | `CLICKHOUSE_DB` | string | `oam` | oam-api | Product database |
 | `OAM_SECRET_KEY` | string | falls back to `OPA_CONNECTOR_SECRET` | oam-api | AES-256-GCM key material for secrets at rest. **Must derive to the same bytes as the key ORA already uses**, because the migration copies ORA's ciphertext verbatim rather than re-encrypting it. Setting this to a *different* value is the one change that makes migrated credentials undecryptable — it fails closed and logs, it never returns garbage. Booting with no key is allowed (directory + model bindings still work) but every credential write is refused and `/api/health` reports `secret_key_present: false` |
 | `OAM_RESOLVE_MAX_CANDIDATES` | int | `3` | oam-api | How many endpoints a single resolve returns, so a job can fall through to the next when one is down or over quota. This is an **exposure bound**, not a tuning knob: a job env holds one credential per candidate. Every one is a key that actor already resolves at that scope, so it widens exposure without escalating privilege — but a leaked job env leaks up to this many. Clamped to 1..10; setting `1` restores the pre-failover blast radius exactly. Read per request, so it can be tightened without a restart |
-| `OPEN_SERVICE_JWT_SECRET` | string | empty | oam-api | **Required for credential resolution.** `POST /api/agents/resolve` refuses to serve without it, regardless of `OPA_AUTH_REQUIRED`: it is the only route returning a plaintext key, and a peer that cannot be authenticated must not receive one |
+| `OPEN_SERVICE_JWT_SECRET` | string | empty | oam-api | **Required for credential resolution and ingest-key verify.** `POST /api/agents/resolve` and `POST /api/internal/ingest-keys/verify` refuse unauthenticated service JWTs. Distinct from `JWT_SECRET` on NAS |
 | `PEER_ORA_URL` | string | empty | oam-api | Required for public connector mutations (BFF → ORA protocol / tokens). Unset → connector writes fail closed (`503 peer_unavailable`) |
 | `OAM_DASHBOARD_URL` | string | smoke `http://127.0.0.1:8097` / NAS `http://192.168.100.101:18097` | ora-api | Preferred post-install / claim browser redirect base (`/connectors`). Distinct from `OPA_DASHBOARD_URL` (Check Run / job deep-links) |
 
@@ -119,13 +119,14 @@ rather than borrowing the deployment's key.
 | `OPA_TLS_CERT_FILE` | path | empty | API | TLS cert for admin API |
 | `OPA_TLS_KEY_FILE` | path | empty | API | TLS key |
 | `OPA_TLS_CLIENT_AUTH` | bool | `0` | API | Require client certs |
-| `OPA_INGEST_AUTH_REQUIRED` | bool | `0` | ingest | Require project ingest key (or shared `OPA_INGEST_TOKEN`) on ND-JSON / OTLP / RUM / diagnostics |
-| `OPA_INGEST_TOKEN` | string | empty | ingest | Optional shared lab bearer (no tenant binding); collectors use `OPA_INGEST_KEY` for per-project keys |
+| `OPA_INGEST_AUTH_REQUIRED` | bool | `0` | ingest | Require project ingest key on ND-JSON (auth envelope / field), OTLP/HTTP Bearer, RUM body/`?ingest_key=`, and `/v1` diagnostics |
+| `OPA_INGEST_TOKEN` | string | empty | ingest | Optional shared lab bearer when OAM verify is unavailable (no tenant binding). Production collectors use per-project `OPA_INGEST_KEY` minted in OAM |
+| `PEER_OAM_URL` | string | empty | ingest/auth | When set, edge verifies project keys via OAM `POST /api/internal/ingest-keys/verify` (needs `OPEN_SERVICE_JWT_SECRET`) |
+| `OPA_OTLP_RECEIVER_ADDR` | string | empty | ingest | Optional dedicated OTLP/HTTP listen addr (e.g. `:4318`) for `/v1/traces`; admin mux already serves the same handler. OTLP/gRPC is not implemented |
 | `OPA_PPROF` | bool | `0` | debug | Expose `/debug/pprof/` |
 | `OPA_DEADMAN` | bool | `1` | ops | Log ingest silence |
 | `OPA_DEADMAN_SILENCE_SECS` | int | `300` | ops | Silence threshold |
 | `OPA_BUILD_VERSION` | string | `dev` | ops | `/api/version` |
-| `OPA_OTLP_GRPC` | bool | `0` | ingest | Enable OTLP/gRPC `:4317` |
 | `OPA_WS_ALLOWED_ORIGINS` | string | empty | WS | Allowed WebSocket origins |
 
 Regenerate hints from source:
