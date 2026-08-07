@@ -91,14 +91,16 @@ Refreshed **2026-08-07** (post connector-picker removal + prior migrations). Pre
 | **OPM** | Org discovery via Hub as primary | **`/api/oam/organizations`** |
 | **OPL-API** | Leftover `gitleaks.toml` | Deleted |
 | **ORA / OSA / OPM dashboards** | Connector **pickers** for scoping Watch/Runs/Projects | **Removed** — project switcher + OAM `connector_ids` (All projects aggregates) |
-| **OSA-API** | Client-supplied `connector_id` required for scans | Server resolves from OAM project when `X-Project-ID` set |
+| **OSA-API** | Client-supplied `connector_id` required for scans | Server resolves from OAM project when `X-Project-ID` set (`resolveSCMFromOAMProject`) |
+| **OPM-API** | Link/ensure needing client `connectorId` | `POST /api/projects` + `/ensure` fill from OAM `connector_ids` / `external_key` |
+| **ORA-API** | Agents prefs installation writes needing client `connector_id` | Resolves from OAM project when omitted (`resolveConnectorFromOAMProject`) |
 | **ORA-Dashboard** | Provider settings copy pointing at `/credentials` | Deep-link + copy → OAM **`/endpoints`** |
 
 ### Still open — high
 
 | Found in | Feature | Should live in | Notes |
 |----------|---------|----------------|-------|
-| **OAM-API** | `api_keys` schema without full management API/UI | **OAM** (complete it) | Gap historically pushed UI onto OPA |
+| **OAM-API** | Family API keys beyond project OPA ingest keys | **OAM** (complete if needed) | Project `opa_ingest` mint/list/rotate exists; broader family key console still thin |
 
 ### Still open — medium
 
@@ -116,7 +118,7 @@ Refreshed **2026-08-07** (post connector-picker removal + prior migrations). Pre
 | **ORA/OSA/OPL** | Copied `clickhouse.go` (incl. unused RUM helpers) | Prefer Open-ClickHouse-Go |
 | **ORA** | Direct CH reads of OSA finding tables for review ledger | Prefer OSA peer API over long term |
 | **OPM** | Roadmap competitor agent historically lifted from ORA | Keep as OPM roadmap input; drop ORA-era framing |
-| Local checkouts | Stale feature branches still showing old connector pickers | Prefer `origin/main` (e.g. OPM-Dashboard) |
+| Local checkouts | Stale feature-branch folders still showing old connector pickers | Prefer `origin/main` / `*-project-scope` worktrees (e.g. `OPM-Dashboard`) |
 
 ### Intentional peer patterns (not violations)
 
