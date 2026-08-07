@@ -91,6 +91,8 @@ Refreshed **2026-08-07** (post connector-picker removal + prior migrations). Pre
 | **OPM** | Org discovery via Hub as primary | **`/api/oam/organizations`** |
 | **OPL-API** | Leftover `gitleaks.toml` | Deleted |
 | **ORA / OSA / OPM dashboards** | Connector **pickers** for scoping Watch/Runs/Projects | **Removed** — project switcher + OAM `connector_ids` (All projects aggregates) |
+| **OSA-API** | Client-supplied `connector_id` required for scans | Server resolves from OAM project when `X-Project-ID` set |
+| **ORA-Dashboard** | Provider settings copy pointing at `/credentials` | Deep-link + copy → OAM **`/endpoints`** |
 
 ### Still open — high
 
@@ -114,6 +116,7 @@ Refreshed **2026-08-07** (post connector-picker removal + prior migrations). Pre
 | **ORA/OSA/OPL** | Copied `clickhouse.go` (incl. unused RUM helpers) | Prefer Open-ClickHouse-Go |
 | **ORA** | Direct CH reads of OSA finding tables for review ledger | Prefer OSA peer API over long term |
 | **OPM** | Roadmap competitor agent historically lifted from ORA | Keep as OPM roadmap input; drop ORA-era framing |
+| Local checkouts | Stale feature branches still showing old connector pickers | Prefer `origin/main` (e.g. OPM-Dashboard) |
 
 ### Intentional peer patterns (not violations)
 

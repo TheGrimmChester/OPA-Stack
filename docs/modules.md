@@ -10,9 +10,12 @@ Reusable code and images used by **two or more** products live in dedicated `Ope
 | `Open-Tenant-Go` | `X-Organization-ID` / `X-Project-ID` helpers | All Go APIs | `github.com/TheGrimmChester/open-tenant-go` |
 | `Open-ClickHouse-Go` | ClickHouse HTTP client, dial/config, migrate helpers | Go APIs using ClickHouse | `github.com/TheGrimmChester/open-clickhouse-go` |
 | `Open-Job-Go` | Sandboxed job lifecycle, hardened `docker run`, labels, env scrub | Product orchestrators (incl. OPM) | `github.com/TheGrimmChester/open-job-go` |
+| `Open-Job-Env-Go` | Job env scrub / denylist helpers shared by sandboxed runners | ORA / OSA / OPL / OPM APIs | `github.com/TheGrimmChester/open-job-env-go` ([repo](https://github.com/TheGrimmChester/Open-Job-Env-Go)) |
 | `Open-HTTP-Go` | Error JSON, CORS, health, request IDs | All Go APIs | `github.com/TheGrimmChester/open-http-go` |
 | `Open-Logger-Go` | Structured logger | Go services / orchestrators | `github.com/TheGrimmChester/open-logger-go` |
-| `Open-UI-JS` | Dashboard shell kit (layout, session helpers, tokens) | `*-Dashboard` (incl. OPM) | npm `@open-family/ui` |
+| `Open-Crypto-Go` | `enc:v2` secret encrypt/decrypt helpers | Go APIs storing secrets | `github.com/TheGrimmChester/open-crypto-go` |
+| `Open-Cache-Go` | Shared cache helpers | Go APIs | `github.com/TheGrimmChester/open-cache-go` |
+| `Open-UI-JS` | Dashboard shell kit (layout, session helpers, tokens, project scope menu) | `*-Dashboard` (incl. OPM) | npm `@open-family/ui` |
 | `Open-Egress-Proxy` | Allowlisted egress proxy image + source | ORA/OSA job sandboxes | image `open-egress-proxy:{smoke\|nas}` |
 
 ## Not modules
