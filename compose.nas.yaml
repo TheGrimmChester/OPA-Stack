@@ -531,6 +531,9 @@ services:
       OPA_JMETER_WORK: /opa-jmeter
       OPA_JMETER_VOLUME: ${COMPOSE_PROJECT_NAME:-open-family}_jmeter_work
       OPA_JMETER_NETWORK: ${COMPOSE_PROJECT_NAME:-open-family}_open_internal
+      # Lab RFC1918/loopback targets for validate/dispatch (comma-separated hostnames or IPs).
+      # HAR import keeps private hosts with warnings; dial-pin still requires this allowlist.
+      OPA_PERF_INTERNAL_HOSTS: ${OPA_PERF_INTERNAL_HOSTS:-}
       # Terminal-run notification channels (optional — set in .env; never commit secrets)
       OPL_RUN_NOTIFY_MODE: ${OPL_RUN_NOTIFY_MODE:-deliver}
       OPL_RUN_NOTIFY_STATUSES: ${OPL_RUN_NOTIFY_STATUSES:-}

@@ -46,7 +46,7 @@ OPL is a **self-hosted load lab** next to OPA, not a SaaS multi-cloud load grid.
 |-----------------|-----------|------------------------|
 | Virtual users / HTTP journeys | Scenario CRUD via upsert; Design VU tree + flat step fallback | `OPL-API` `load.go`, `jmeter_engine.go`; Dashboard Design |
 | **JMeter Visual editor (MVP+)** | Nested VU tree → JMX; DnD reorder/nest; If/While/Loop/ForEach; Fragment + Link | `VuTree.jsx`; `appendStepJMXIndexed`; import tree parse |
-| HAR → scenario | `POST /api/perf/scenarios/import-har` (+ Capture UI) | Skips private/metadata hosts (URL policy) |
+| HAR → scenario | `POST /api/perf/scenarios/import-har` (+ Capture UI) | Lab/private hosts kept on import with warnings; cloud metadata still skipped; validate/dispatch still needs `OPA_PERF_INTERNAL_HOSTS` |
 | **Collection import** | `POST /api/perf/scenarios/import-postman` (+ Capture UI) | `postman.go:15`; collection v2/v2.1 → HTTP steps; `{{var}}` → `${var}`, which a CSV dataset can now bind at run time; scripts ignored |
 | JMeter JMX import / export | `import-jmx`, `export-jmx`, JMX tab; nested controllers when parseable | Best-effort HTTP / timers / extractors / CSV / classic TG + If/While/Loop/ForEach/Txn/Fragment |
 | XHR capture import | `import-xhr` / `export-xhr` | Lab-oriented capture interchange |

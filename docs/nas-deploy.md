@@ -369,6 +369,8 @@ curl -sf "http://127.0.0.1:8093/api/security/runs?limit=5" "${H[@]}" | jq '.runs
 curl -sf "http://127.0.0.1:8092/api/perf/scenarios" "${H[@]}" | jq '.scenarios | length'
 ```
 
+**OPL lab private hosts:** HAR/XHR import keeps RFC1918 / loopback / `host.docker.internal` in steps with warnings. Validate and run dispatch still dial-pin — set `OPA_PERF_INTERNAL_HOSTS` in `.env` (wired on `opl-api` in `compose.nas.yaml`) to the hostnames or literal IPs used in those URLs (e.g. `192.168.100.101`). Cloud metadata stays blocked.
+
 **Batch 4 deferred routes (expected 404 on hub `:18080`):** Network (`/api/network/*`), Cloud (`/api/cloud/*`), Catalog (`/api/catalog*`), mgmt (`/api/mgmt/v1*`), and call-graph compare (`/api/callgraph/compare`). These dashboard pages are scaffolds with no backend yet — do not treat 404 as a regression. Filter suggestions (`/api/filter-suggestions/*`) return **404 on hub** and **200 on edge** `:18081` (dashboard does not call them today).
 
 **Not deferred:** `GET /api/explore/facets` is **hub-owned** (v0.7.3). Expect **200** on hub with JWT; do not treat it as a batch-4 scaffold.
