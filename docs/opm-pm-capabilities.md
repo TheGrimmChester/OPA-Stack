@@ -214,7 +214,7 @@ does not. "Done" is a claim about source code on `origin/main` only — see §3.
 |------------|--------|-------|
 | Multi-project registry | **Done** | GitHub-linked via Hub + ORA protocol; credentials in OAM |
 | Local folder / Electron app | **Different-by-design** | Web-only; API rejects path create |
-| Hub auth + tenant headers | **Done** | Co-deployed `/hub-auth/` |
+| OAM auth + tenant headers | **Done** | Co-deployed `/oam-auth/` (`iss=oam-api`); `/hub-auth/` proxies to OAM |
 | Project via ORA connectors | **Done** | List via ORA; storage in OAM |
 | Onboarding / welcome wizard | **Not implemented** | No onboarding route in `OPM-Dashboard/src/App.jsx` |
 | Settings (theme, providers, profiles) | **Partial** | Theme may be local; AI providers / per-agent models belong in **OAM** (`PEER_OAM_URL`); legacy `OPM_MODEL_*` only when OAM unset |
