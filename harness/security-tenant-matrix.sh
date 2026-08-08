@@ -17,12 +17,13 @@ ok()   { printf 'PASS  %s\n' "$1"; pass=$((pass+1)); }
 bad()  { printf 'FAIL  %s — %s\n' "$1" "$2"; fail=$((fail+1)); }
 note() { printf 'NOTE  %s\n' "$1"; note_n=$((note_n+1)); }
 
-# Per-request body file avoids n=-1 races when another matrix run shares /tmp.
-BODY_FILE="${BODY_FILE:-}"
+# Per-process body file avoids n=-1 races when another matrix run shares /tmp.
+# Must be a stable path: http_code is often called as code=$(http_code …) in a
+# subshell, so a mktemp assignment inside would not reach json_get/json_len.
+BODY_FILE="${BODY_FILE:-${TMPDIR:-/tmp}/opa_tenant_matrix_body.$$}"
 http_code() {
   local method="$1"; shift
   local url="$1"; shift
-  BODY_FILE=$(mktemp "${TMPDIR:-/tmp}/opa_tenant_matrix_body.XXXXXX.json")
   curl -sS -o "$BODY_FILE" -w '%{http_code}' --connect-timeout 8 \
     -X "$method" "$@" "$url" 2>/dev/null || echo 000
 }
