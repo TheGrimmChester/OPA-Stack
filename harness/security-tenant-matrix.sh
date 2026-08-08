@@ -298,18 +298,43 @@ echo "========== 5. ACCOUNT TYPE + JWT-BOUND HEADERS =========="
 if [ "${ACCOUNT_TYPE_CUTOVER:-0}" != 1 ]; then
   note "account_type checks skipped — OAM not reporting account_type yet"
 else
-  # Lab seed admin is account_type=personal — org headers must be rejected.
-  if [ "$HUB_ACCT" = "personal" ] || [ "$OAM_ACCT" = "personal" ]; then
-    code_personal_org=$(http_code GET "http://$HOST:8093/api/security/runs?limit=5" \
+  # Personal non-admin accounts must reject org headers (403). The lab seed
+  # admin is account_type=personal WITH role=admin — platform operators may
+  # select orgs (Open-Auth IsPersonalAccount is false for admin). Probe a
+  # disposable personal viewer instead of the seed token.
+  PERS_USER="harness-pers-$$"
+  PERS_PASS="harness-pers-pass-$$"
+  if [ -n "$TOKEN" ]; then
+    pers_create=$(http_code POST "http://$HOST:$OAM_PORT/api/users/set" \
       -H "Authorization: Bearer $TOKEN" \
-      -H "X-Organization-ID: nas" -H "X-Project-ID: infra")
-    if [ "$code_personal_org" = 403 ]; then
-      ok "personal account + org header -> 403 (OSA runs)"
+      -H 'Content-Type: application/json' \
+      -d "{\"username\":\"$PERS_USER\",\"password\":\"$PERS_PASS\",\"role\":\"viewer\",\"account_type\":\"personal\"}")
+    if [ "$pers_create" = 200 ] || [ "$pers_create" = 201 ]; then
+      ok "created personal viewer $PERS_USER"
+      http_code POST "http://$HOST:$OAM_PORT/api/auth/login" \
+        -H 'Content-Type: application/json' \
+        -d "{\"username\":\"$PERS_USER\",\"password\":\"$PERS_PASS\"}" >/dev/null
+      PERS_TOKEN="$(json_get token)"
+      PERS_ACCT="$(json_get account_type)"
+      if [ -n "$PERS_TOKEN" ] && [ "$PERS_ACCT" = "personal" ]; then
+        code_personal_org=$(http_code GET "http://$HOST:8093/api/security/runs?limit=5" \
+          -H "Authorization: Bearer $PERS_TOKEN" \
+          -H "X-Organization-ID: nas" -H "X-Project-ID: infra")
+        if [ "$code_personal_org" = 403 ]; then
+          ok "personal account + org header -> 403 (OSA runs)"
+        else
+          bad "personal account org header" "expected 403 got $code_personal_org"
+        fi
+      else
+        bad "personal viewer login" "account_type=$PERS_ACCT token_empty=$([ -z \"$PERS_TOKEN\" ] && echo 1 || echo 0)"
+      fi
+    elif [ "$pers_create" = 000 ]; then
+      note "OAM personal user create unreachable — skip personal org-header check"
     else
-      bad "personal account org header" "expected 403 got $code_personal_org"
+      note "OAM personal user create HTTP $pers_create — skip personal org-header check"
     fi
   else
-    note "seed admin account_type=${HUB_ACCT:-$OAM_ACCT} — skip personal org-header check"
+    note "no admin token — skip personal org-header check"
   fi
 
   # Create a disposable organization member and verify foreign org header -> 403.
