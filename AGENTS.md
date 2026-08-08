@@ -79,6 +79,7 @@ Refreshed **2026-08-07** (post connector-picker removal + prior migrations). Pre
 
 | Was in | Feature | Resolution |
 |--------|---------|------------|
+| Stale docs/strings | Occasional “Hub issues tokens” / `iss=opa-hub` | **OAM** (`iss=oam-api`) | Canonical stack docs use `/oam-auth/` + `iss=oam-api`; solo hub may still mint `iss=opa-hub` |
 | **OPA-Dashboard** | Users & roles / API keys pages | Removed; Account deep-links to OAM |
 | **OPA-Dashboard** | Vite `/api` → edge agent | Default proxy → **hub** |
 | **OPA-Agent** | Identity CRUD as family SoT | **503** when `PEER_OAM_URL` / `OPA_HUB_URL` set |
@@ -109,7 +110,6 @@ Refreshed **2026-08-07** (post connector-picker removal + prior migrations). Pre
 | **ORA-API, OPM-API** | Duplicated egress-proxy spawn/allowlist orchestration | **Open-Egress-Proxy** (+ thin wiring) | |
 | **ORA/OSA/OPL** | Tenant validation still reading legacy `opa.organizations` / `opa.projects` when OAM unset | **OAM** directory | Short-circuit when `PEER_OAM_URL` set (done); standalone path remains |
 | **ORA-Dashboard** | Security scanner prefs in Watch Agents UI | **OSA** policy UX | ORA may keep gate wiring only |
-| Stale docs/strings | Occasional “Hub issues tokens” / `iss=opa-hub` | **OAM** (`iss=oam-api`) | Code mostly proxies correctly |
 
 ### Still open — low / noise
 

@@ -73,7 +73,7 @@ OPL is a **self-hosted load lab** next to OPA, not a SaaS multi-cloud load grid.
 | **JTL import** | `POST /api/perf/runs/import-jtl` + Results UI upload | Offline analysis path |
 | Compare two runs | Compare tab (delta on KPIs) | Simpler than full trend report builder |
 | APM correlation | `X-OPA-Load-Run-Id` / baggage → OPA Trace Explorer | First-party OPL ↔ OPA correlation |
-| Tenant + hub auth | Org/project headers; co-deployed `/hub-auth/` | Hub JWT + org/project scopes |
+| Tenant + OAM auth | Org/project headers; co-deployed `/oam-auth/` (`iss=oam-api`) | OAM JWT + org/project scopes |
 | CI gate scripts | `harness/perf-gate.sh`, `harness/jmeter-perf-gate.sh`, workflow example | Scripts only; no per-CI-vendor setup wizards |
 | On-prem execution | Docker JMeter on the Perf Lab host | Lab host workers; not public cloud regions |
 
