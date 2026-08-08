@@ -17,21 +17,25 @@ ok()   { printf 'PASS  %s\n' "$1"; pass=$((pass+1)); }
 bad()  { printf 'FAIL  %s — %s\n' "$1" "$2"; fail=$((fail+1)); }
 note() { printf 'NOTE  %s\n' "$1"; note_n=$((note_n+1)); }
 
+# Per-request body file avoids n=-1 races when another matrix run shares /tmp.
+BODY_FILE="${BODY_FILE:-}"
 http_code() {
   local method="$1"; shift
   local url="$1"; shift
-  curl -sS -o /tmp/opa_tenant_matrix_body.json -w '%{http_code}' --connect-timeout 8 \
+  BODY_FILE=$(mktemp "${TMPDIR:-/tmp}/opa_tenant_matrix_body.XXXXXX.json")
+  curl -sS -o "$BODY_FILE" -w '%{http_code}' --connect-timeout 8 \
     -X "$method" "$@" "$url" 2>/dev/null || echo 000
 }
 
-body() { cat /tmp/opa_tenant_matrix_body.json 2>/dev/null; }
+body() { cat "${BODY_FILE:-/dev/null}" 2>/dev/null; }
 
 json_get() {
   local path="$1"
+  local f="${BODY_FILE:-}"
   python3 -c "
 import json,sys
 try:
-  d=json.load(open('/tmp/opa_tenant_matrix_body.json'))
+  d=json.load(open(sys.argv[1]))
   cur=d
   for p in '''$path'''.strip('.').split('.'):
     if not p: continue
@@ -42,15 +46,16 @@ try:
   else: print(cur)
 except Exception:
   print('')
-" 2>/dev/null
+" "$f" 2>/dev/null
 }
 
 json_len() {
   local path="$1"
+  local f="${BODY_FILE:-}"
   python3 -c "
-import json
+import json,sys
 try:
-  d=json.load(open('/tmp/opa_tenant_matrix_body.json'))
+  d=json.load(open(sys.argv[1]))
   cur=d
   for p in '''$path'''.strip('.').split('.'):
     if not p: continue
@@ -61,7 +66,7 @@ try:
   else: print(0 if cur in (None, {}, []) else 1)
 except Exception:
   print(-1)
-" 2>/dev/null
+" "$f" 2>/dev/null
 }
 
 if [ "$CHECK_IMAGES" = 1 ]; then
