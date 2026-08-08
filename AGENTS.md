@@ -79,6 +79,7 @@ Refreshed **2026-08-07** (post connector-picker removal + prior migrations). Pre
 
 | Was in | Feature | Resolution |
 |--------|---------|------------|
+| **OAM-API** | Family API keys beyond project OPA ingest keys | **OAM** | **Accepted thin:** AI Endpoints + `opa_ingest` only; no broader family key console (OAM-API docs) |
 | **ORA/OSA/OPL** | Tenant validation still reading legacy `opa.organizations` / `opa.projects` when OAM unset | **OAM** directory | Auth-on requires `PEER_OAM_URL` (**503**); CH fallback only when auth off (ORA #32, OSA #18, OPL #25) |
 | Stale docs/strings | Occasional “Hub issues tokens” / `iss=opa-hub` | **OAM** (`iss=oam-api`) | Canonical stack docs use `/oam-auth/` + `iss=oam-api`; solo hub may still mint `iss=opa-hub` |
 | **OPA-Dashboard** | Users & roles / API keys pages | Removed; Account deep-links to OAM |
@@ -102,7 +103,6 @@ Refreshed **2026-08-07** (post connector-picker removal + prior migrations). Pre
 
 | Found in | Feature | Should live in | Notes |
 |----------|---------|----------------|-------|
-| **OAM-API** | Family API keys beyond project OPA ingest keys | **OAM** (complete if needed) | Project `opa_ingest` mint/list/rotate exists; broader family key console still thin |
 
 ### Still open — medium
 
