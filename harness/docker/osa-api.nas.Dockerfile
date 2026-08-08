@@ -31,6 +31,8 @@ RUN sed -i \
       -replace github.com/TheGrimmChester/open-cache-go=/modules/Open-Cache-Go \
       -replace github.com/TheGrimmChester/open-crypto-go=/modules/Open-Crypto-Go \
       -replace github.com/TheGrimmChester/open-job-env-go=/modules/Open-Job-Env-Go \
+      -replace github.com/TheGrimmChester/open-tenant-go=/modules/Open-Tenant-Go \
+      -replace github.com/TheGrimmChester/open-auth-go=/modules/Open-Auth-Go \
   && go mod download \
   && CGO_ENABLED=0 GOOS=linux go build -o /out/osa-api .
 
