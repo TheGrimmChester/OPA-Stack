@@ -79,6 +79,7 @@ Refreshed **2026-08-07** (post connector-picker removal + prior migrations). Pre
 
 | Was in | Feature | Resolution |
 |--------|---------|------------|
+| **ORA-API, OPM-API** | Duplicated egress-proxy spawn/allowlist orchestration | **Open-Egress-Proxy** `orchestrate` | Thin product wrappers (ORA/OPM PRs) |
 | **OAM-API** | Family API keys beyond project OPA ingest keys | **OAM** | **Accepted thin:** AI Endpoints + `opa_ingest` only; no broader family key console (OAM-API docs) |
 | **ORA/OSA/OPL** | Tenant validation still reading legacy `opa.organizations` / `opa.projects` when OAM unset | **OAM** directory | Auth-on requires `PEER_OAM_URL` (**503**); CH fallback only when auth off (ORA #32, OSA #18, OPL #25) |
 | Stale docs/strings | Occasional “Hub issues tokens” / `iss=opa-hub` | **OAM** (`iss=oam-api`) | Canonical stack docs use `/oam-auth/` + `iss=oam-api`; solo hub may still mint `iss=opa-hub` |
@@ -108,7 +109,6 @@ Refreshed **2026-08-07** (post connector-picker removal + prior migrations). Pre
 
 | Found in | Feature | Should live in | Notes |
 |----------|---------|----------------|-------|
-| **ORA-API, OPM-API** | Duplicated egress-proxy spawn/allowlist orchestration | **Open-Egress-Proxy** (+ thin wiring) | |
 | **ORA-Dashboard** | Security scanner prefs in Watch Agents UI | **OSA** policy UX | ORA may keep gate wiring only |
 
 ### Still open — low / noise
